@@ -1,0 +1,42 @@
+# .gitignore
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Uploaded files
+uploads/
+
+# Temporary files
+.tmp/
+temp/
+
+# Build files
+dist/
+build/
+
+# Coverage directory
+coverage/
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
