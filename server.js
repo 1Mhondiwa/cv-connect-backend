@@ -77,11 +77,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/message', messageRoutes);
 
-// Health check endpoint
+// Health check endpoint 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
+  res.status(200).json({ 
+    status: 'OK', 
     timestamp: new Date().toISOString(),
+    service: 'CV-Connect Backend',
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
