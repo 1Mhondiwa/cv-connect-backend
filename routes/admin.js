@@ -3,6 +3,9 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const db = require('../config/database');
+const { uploadProfileImage } = require('../middleware/upload');
+const fs = require('fs-extra');
+const path = require('path');
 
 // Get system stats
 router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res) => {
@@ -131,6 +134,102 @@ router.put('/users/:userId/toggle-active', authenticateToken, requireRole(['admi
     });
   } catch (error) {
     console.error('Toggle user error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Upload or update admin profile image
+router.post('/profile-image', authenticateToken, requireRole(['admin']), uploadProfileImage.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No image uploaded'
+      });
+    }
+    const userId = req.user.user_id;
+    // Get current admin info
+    const userResult = await db.query(
+      'SELECT profile_picture_url FROM "User" WHERE user_id = $1',
+      [userId]
+    );
+    if (userResult.rowCount === 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'Admin user not found'
+      });
+    }
+    const oldImageUrl = userResult.rows[0].profile_picture_url;
+    // Delete old image if it exists
+    if (oldImageUrl) {
+      const oldImagePath = path.join(__dirname, '..', oldImageUrl);
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+      }
+    }
+    // Update user with new image URL
+    const imageUrl = `/uploads/profile_images/${req.file.filename}`;
+    await db.query(
+      'UPDATE "User" SET profile_picture_url = $1 WHERE user_id = $2',
+      [imageUrl, userId]
+    );
+    return res.status(200).json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      image_url: imageUrl
+    });
+  } catch (error) {
+    console.error('Admin profile image upload error:', error);
+    if (req.file && req.file.path) {
+      fs.unlinkSync(req.file.path);
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Delete admin profile image
+router.delete('/profile-image', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    // Get current admin info
+    const userResult = await db.query(
+      'SELECT profile_picture_url FROM "User" WHERE user_id = $1',
+      [userId]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin user not found'
+      });
+    }
+    const imageUrl = userResult.rows[0].profile_picture_url;
+    // Delete image file if it exists
+    if (imageUrl) {
+      const imagePath = path.join(__dirname, '..', imageUrl);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+      // Update user record
+      await db.query(
+        'UPDATE "User" SET profile_picture_url = NULL WHERE user_id = $1',
+        [userId]
+      );
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Profile image deleted successfully'
+    });
+  } catch (error) {
+    console.error('Admin profile image deletion error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
