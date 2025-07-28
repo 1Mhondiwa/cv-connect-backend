@@ -46,6 +46,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+/*app.get("/", (req, res) => {
+  res.send("🎉 Welcome to CV-Connect backend! The server is running.");
+});*/
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -168,3 +172,5 @@ process.on('SIGINT', async () => {
     process.exit(0);
   });
 });
+
+

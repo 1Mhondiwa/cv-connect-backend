@@ -287,21 +287,33 @@ cleanDocText(text) {
     const skills = [];
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     
-    // Find skills section
+    // Find skills section - expanded keywords
     let skillsStartIndex = -1;
     let skillsEndIndex = lines.length;
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      if (line.includes('skills') || line.includes('technical skills') || line.includes('technologies')) {
+      const skillsKeywords = [
+        'skills', 'technical skills', 'technologies', 'technical expertise',
+        'competencies', 'expertise', 'proficiencies', 'technical knowledge',
+        'programming languages', 'languages', 'tools', 'software',
+        'technical abilities', 'capabilities', 'qualifications'
+      ];
+      
+      if (skillsKeywords.some(keyword => line.includes(keyword))) {
         skillsStartIndex = i;
         break;
       }
     }
     
-    // Find where skills section ends
+    // Find where skills section ends - expanded end sections
     if (skillsStartIndex !== -1) {
-      const endSections = ['education', 'work experience', 'experience', 'projects', 'certifications'];
+      const endSections = [
+        'education', 'academic', 'qualification', 'work experience', 
+        'experience', 'employment', 'projects', 'certifications',
+        'awards', 'achievements', 'interests', 'hobbies', 'languages',
+        'references', 'contact', 'personal', 'volunteer', 'activities'
+      ];
       for (let i = skillsStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
         if (endSections.some(section => line.includes(section))) {
@@ -317,7 +329,7 @@ cleanDocText(text) {
     
     const skillsLines = lines.slice(skillsStartIndex + 1, skillsEndIndex);
     
-    // Parse skills from the actual CV format
+    // Parse skills from the actual CV format - multiple patterns
     for (const line of skillsLines) {
       const trimmedLine = line.trim();
       
@@ -326,19 +338,68 @@ cleanDocText(text) {
         continue;
       }
       
-      // Pattern: "JavaScript - Expert - 6 years"
-      const skillPattern = /^([A-Za-z\s\.#\+\-]+?)\s*-\s*(Expert|Advanced|Intermediate|Beginner)\s*-\s*(\d+)\s*years?/i;
-      const match = trimmedLine.match(skillPattern);
+      // Pattern 1: "JavaScript - Expert - 6 years"
+      const skillPattern1 = /^([A-Za-z\s\.#\+\-]+?)\s*-\s*(Expert|Advanced|Intermediate|Beginner)\s*-\s*(\d+)\s*years?/i;
+      const match1 = trimmedLine.match(skillPattern1);
       
-      if (match) {
-        const skillName = match[1].trim();
-        const proficiency = match[2];
-        const years = parseInt(match[3]);
+      if (match1) {
+        const skillName = match1[1].trim();
+        const proficiency = match1[2];
+        const years = parseInt(match1[3]);
         
         skills.push({
           name: skillName,
           proficiency: proficiency,
           years_experience: years
+        });
+        continue;
+      }
+      
+      // Pattern 2: "JavaScript, React, Node.js" (comma-separated)
+      const skillPattern2 = /^([A-Za-z\s\.#\+\-]+(?:,\s*[A-Za-z\s\.#\+\-]+)*)$/i;
+      const match2 = trimmedLine.match(skillPattern2);
+      
+      if (match2) {
+        const skillNames = match2[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
+        skillNames.forEach(skillName => {
+          if (skillName.length > 1) {
+            skills.push({
+              name: skillName,
+              proficiency: 'Intermediate',
+              years_experience: 1
+            });
+          }
+        });
+        continue;
+      }
+      
+      // Pattern 3: "• JavaScript • React • Node.js" (bullet-separated)
+      const skillPattern3 = /^[•\-\*]\s*([A-Za-z\s\.#\+\-]+)(?:\s*[•\-\*]\s*[A-Za-z\s\.#\+\-]+)*$/i;
+      const match3 = trimmedLine.match(skillPattern3);
+      
+      if (match3) {
+        const skillNames = trimmedLine.split(/[•\-\*]/).map(s => s.trim()).filter(s => s.length > 0);
+        skillNames.forEach(skillName => {
+          if (skillName.length > 1) {
+            skills.push({
+              name: skillName,
+              proficiency: 'Intermediate',
+              years_experience: 1
+            });
+          }
+        });
+        continue;
+      }
+      
+      // Pattern 4: Single skill on a line
+      const skillPattern4 = /^([A-Za-z\s\.#\+\-]{2,50})$/i;
+      const match4 = trimmedLine.match(skillPattern4);
+      
+      if (match4 && !trimmedLine.toLowerCase().includes('years') && !trimmedLine.toLowerCase().includes('experience')) {
+        skills.push({
+          name: trimmedLine,
+          proficiency: 'Intermediate',
+          years_experience: 1
         });
       }
     }
@@ -627,21 +688,32 @@ looksLikeName(word) {
     const education = [];
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     
-    // Find education section
+    // Find education section - expanded keywords
     let educationStartIndex = -1;
     let educationEndIndex = lines.length;
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      if (line.includes('education') || line.includes('academic') || line.includes('qualification')) {
+      const educationKeywords = [
+        'education', 'academic', 'qualification', 'school', 'university',
+        'college', 'institute', 'degree', 'certificate', 'diploma',
+        'masters', 'phd', 'doctorate', 'mba', 'bachelor', 'associate',
+        'high school', 'secondary school', 'elementary school'
+      ];
+      
+      if (educationKeywords.some(keyword => line.includes(keyword))) {
         educationStartIndex = i;
         break;
       }
     }
     
-    // Find where education section ends
+    // Find where education section ends - expanded end sections
     if (educationStartIndex !== -1) {
-      const endSections = ['work experience', 'experience', 'employment', 'projects', 'skills', 'certifications'];
+      const endSections = [
+        'work experience', 'experience', 'employment', 'projects', 'skills',
+        'certifications', 'awards', 'interests', 'hobbies', 'languages',
+        'references', 'contact', 'personal', 'volunteer', 'activities'
+      ];
       for (let i = educationStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
         if (endSections.some(section => line.includes(section))) {
@@ -803,21 +875,30 @@ looksLikeName(word) {
     const experiences = [];
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     
-    // Find the work experience section
+    // Find the work experience section - expanded keywords
     let experienceStartIndex = -1;
     let experienceEndIndex = lines.length;
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      if (line.includes('work experience') || line.includes('experience') || line.includes('employment')) {
+      const experienceKeywords = [
+        'work experience', 'experience', 'employment', 'job history',
+        'professional experience', 'career history', 'employment history',
+        'previous experience', 'past experience', 'previous employment'
+      ];
+      
+      if (experienceKeywords.some(keyword => line.includes(keyword))) {
         experienceStartIndex = i;
         break;
       }
     }
     
-    // Find where experience section ends
+    // Find where experience section ends - expanded end sections
     if (experienceStartIndex !== -1) {
-      const endSections = ['projects', 'certifications', 'references', 'awards', 'interests', 'hobbies'];
+      const endSections = [
+        'projects', 'certifications', 'references', 'awards', 'interests',
+        'hobbies', 'languages', 'contact', 'personal', 'volunteer', 'activities'
+      ];
       for (let i = experienceStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
         if (endSections.some(section => line.includes(section))) {
