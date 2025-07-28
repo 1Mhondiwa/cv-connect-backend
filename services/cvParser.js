@@ -927,10 +927,19 @@ looksLikeName(word) {
         continue;
       }
       
-      // Check if this line looks like a job title
+      // Check if this line looks like a job title - expanded patterns
       const jobTitlePatterns = [
+        // Technical roles
         /^(Senior|Lead|Principal|Junior|Associate|Staff|Chief)?\s*(Software|Web|Frontend|Backend|Full-stack|Data|Cloud|DevOps|Mobile|System|Network|Security|QA|Test)?\s*(Engineer|Developer|Architect|Designer|Analyst|Scientist|Manager|Consultant|Administrator|Specialist|Programmer|Technician)\s*$/i,
-        /^(Project|Product|Technical|Engineering|Development|Marketing|Sales|Operations|HR|Finance)\s+(Manager|Director|Lead|Coordinator|Specialist)\s*$/i
+        /^(Project|Product|Technical|Engineering|Development|Marketing|Sales|Operations|HR|Finance)\s+(Manager|Director|Lead|Coordinator|Specialist)\s*$/i,
+        // Business roles
+        /^(Business|Marketing|Sales|Customer|Client|Account|Product|Project|Program|Operations|HR|Human\s*Resources|Finance|Financial|Administrative|Executive|Senior|Junior|Associate|Assistant)\s+(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator)\s*$/i,
+        // Creative roles
+        /^(Creative|Graphic|UI|UX|Visual|Digital|Content|Social\s*Media|Brand|Marketing|Communication)\s+(Designer|Manager|Specialist|Coordinator|Director|Lead|Consultant)\s*$/i,
+        // Generic professional titles
+        /^(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator|Assistant|Associate|Senior|Junior|Principal|Chief|Head|Vice)\s*$/i,
+        // Industry-specific roles
+        /^(Sales|Marketing|Business|Financial|Administrative|Executive|Creative|Technical|Professional|Senior|Junior|Associate|Assistant)\s+(Representative|Manager|Director|Analyst|Specialist|Coordinator|Consultant|Advisor|Officer|Supervisor)\s*$/i
       ];
       
       const isJobTitle = jobTitlePatterns.some(pattern => pattern.test(line));
