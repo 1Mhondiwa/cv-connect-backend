@@ -774,12 +774,28 @@ looksLikeName(word) {
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      const educationKeywords = [
-        'education', 'academic', 'qualification', 'school', 'university',
-        'college', 'institute', 'degree', 'certificate', 'diploma',
-        'masters', 'phd', 'doctorate', 'mba', 'bachelor', 'associate',
-        'high school', 'secondary school', 'elementary school'
-      ];
+     // Updated education section detection keywords
+const educationKeywords = [
+  'education', 'academic', 'qualification', 'school', 'university',
+  'college', 'institute', 'degree', 'certificate', 'diploma',
+  'masters', 'phd', 'doctorate', 'mba', 'bachelor', 'associate',
+  'high school', 'secondary school', 'elementary school',
+  // Added comprehensive education keywords
+  'educational background', 'academic background', 'academic qualifications',
+  'educational qualifications', 'training', 'coursework', 'studies',
+  'academic achievements', 'academic history', 'educational history',
+  'certifications', 'licenses', 'professional development',
+  'continuing education', 'professional training', 'technical training',
+  'vocational training', 'trade school', 'apprenticeship',
+  'professional certifications', 'industry certifications',
+  'medical school', 'law school', 'graduate school', 'undergraduate',
+  'postgraduate', 'doctoral', 'fellowship', 'residency',
+  'internship', 'clinical training', 'medical training',
+  'legal education', 'engineering education', 'business school',
+  'nursing school', 'dental school', 'veterinary school',
+  'education and training', 'qualifications and certifications',
+  'academic credentials', 'professional credentials'
+];
       
       if (educationKeywords.some(keyword => line.includes(keyword))) {
         educationStartIndex = i;
