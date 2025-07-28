@@ -1178,6 +1178,8 @@ findSectionEnd(text, startIndex) {
   return minIndex;
 }
 
+
+
   // Find institution name
   findInstitution(text, index) {
     if (!text || typeof index !== 'number') {
@@ -1257,9 +1259,16 @@ findSectionEnd(text, startIndex) {
     
     // Find where experience section ends - expanded end sections
     if (experienceStartIndex !== -1) {
-      const endSections = [
-        'projects', 'certifications', 'references', 'awards', 'interests',
-        'hobbies', 'languages', 'contact', 'personal', 'volunteer', 'activities'
+      const workExperienceEndSections = [
+        'education', 'academic', 'qualifications', 'training', 'certifications',
+        'licenses', 'skills', 'competencies', 'abilities', 'expertise',
+        'projects', 'achievements', 'awards', 'honors', 'publications',
+        'presentations', 'conferences', 'research', 'volunteer', 'community',
+        'activities', 'interests', 'hobbies', 'languages', 'references',
+        'contact', 'personal', 'additional', 'other', 'miscellaneous',
+        'professional development', 'continuing education', 'memberships',
+        'affiliations', 'associations', 'leadership', 'extracurricular',
+        'military', 'service', 'security clearance', 'clearances'
       ];
       for (let i = experienceStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
@@ -1463,6 +1472,8 @@ const jobTitlePatterns = [
     
     return experiences;
   }
+
+
 
   // Calculate total years of experience
   calculateTotalExperience(workExperience) {
