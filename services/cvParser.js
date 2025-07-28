@@ -116,110 +116,79 @@ async extractText(filePath) {
   }
 }
 
-// New method for cleaning PDF text
+// Enhanced cleanPdfText method
 cleanPdfText(text) {
   if (!text) return '';
-  
   // PDF text often has scattered formatting, so we need aggressive cleaning
-  
-  // Replace various line ending combinations
   text = text.replace(/\r\n/g, '\n');
   text = text.replace(/\r/g, '\n');
-  
-  // Remove excessive spaces and tabs
   text = text.replace(/[ \t]+/g, ' ');
-  
-  // Fix broken words that might be split across lines (common in PDFs)
-  text = text.replace(/([a-z])\n([a-z])/g, '$1$2');
-  
+  // Remove page numbers and common headers/footers
+  text = text.replace(/\n?Page \d+( of \d+)?\n?/gi, '\n');
+  text = text.replace(/\n?Curriculum Vitae\n?/gi, '\n');
+  // Normalize bullet points and numbered lists
+  text = text.replace(/[•\*\u2022\u25AA\u25CF\u25CB\u25A0\u25B2\u25B6\u25C6\u25C7\u25A1\u25B3\u25B7\u25C7\u25A3\u25A4\u25A5\u25A6\u25A7\u25A8\u25A9\u25AA\u25AB\u25AC\u25AD\u25AE\u25AF\u25B0\u25B1\u25B2\u25B3\u25B4\u25B5\u25B6\u25B7\u25B8\u25B9\u25BA\u25BB\u25BC\u25BD\u25BE\u25BF\u25C0\u25C1\u25C2\u25C3\u25C4\u25C5\u25C6\u25C7\u25C8\u25C9\u25CA\u25CB\u25CC\u25CD\u25CE\u25CF\u25D0\u25D1\u25D2\u25D3\u25D4\u25D5\u25D6\u25D7\u25D8\u25D9\u25DA\u25DB\u25DC\u25DD\u25DE\u25DF\u25E0\u25E1\u25E2\u25E3\u25E4\u25E5\u25E6\u25E7\u25E8\u25E9\u25EA\u25EB\u25EC\u25ED\u25EE\u25EF]/g, '•');
+  text = text.replace(/\n\s*\d+\./g, '\n•');
   // Remove excessive newlines but preserve paragraph breaks
   text = text.replace(/\n{3,}/g, '\n\n');
-  
   // Clean up each line
   text = text.split('\n').map(line => {
     line = line.trim();
-    // Remove lines that are just punctuation or single characters
     if (line.length <= 1 || /^[^\w\s]*$/.test(line)) {
       return '';
     }
     return line;
   }).join('\n');
-  
-  // Remove empty lines at the beginning and end
   text = text.replace(/^\n+/, '').replace(/\n+$/, '');
-  
-  // Final cleanup for any remaining excessive whitespace
   text = text.replace(/\n{3,}/g, '\n\n');
-  
   return text;
 }
 
-// New method for cleaning TXT text
+// Enhanced cleanTxtText method
 cleanTxtText(text) {
   if (!text) return '';
-  
-  // Handle different line endings
   text = text.replace(/\r\n/g, '\n');
   text = text.replace(/\r/g, '\n');
-  
-  // Remove excessive spaces but preserve single spaces
   text = text.replace(/[ \t]+/g, ' ');
-  
-  // Remove excessive newlines (more than 2 consecutive)
+  text = text.replace(/\n?Page \d+( of \d+)?\n?/gi, '\n');
+  text = text.replace(/\n?Curriculum Vitae\n?/gi, '\n');
+  text = text.replace(/[•\*]/g, '•');
+  text = text.replace(/\n\s*\d+\./g, '\n•');
   text = text.replace(/\n{3,}/g, '\n\n');
-  
-  // Trim each line but preserve the line structure
   text = text.split('\n').map(line => line.trim()).join('\n');
-  
-  // Remove any remaining extra whitespace at start/end
   text = text.trim();
-  
   return text;
 }
 
 // Enhanced cleanDocxText method
 cleanDocxText(text) {
   if (!text) return '';
-  
-  // Remove excessive whitespace but preserve line breaks
   text = text.replace(/\r\n/g, '\n');
   text = text.replace(/\r/g, '\n');
-  
-  // Remove excessive spaces but keep single spaces
   text = text.replace(/[ \t]+/g, ' ');
-  
-  // Remove excessive newlines (more than 2 consecutive)
+  text = text.replace(/\n?Page \d+( of \d+)?\n?/gi, '\n');
+  text = text.replace(/\n?Curriculum Vitae\n?/gi, '\n');
+  text = text.replace(/[•\*]/g, '•');
+  text = text.replace(/\n\s*\d+\./g, '\n•');
   text = text.replace(/\n{3,}/g, '\n\n');
-  
-  // Trim each line but preserve the line structure
   text = text.split('\n').map(line => line.trim()).join('\n');
-  
-  // Remove any remaining extra whitespace at start/end
   text = text.trim();
-  
   return text;
 }
 
-// New method for cleaning DOC text
+// Enhanced cleanDocText method
 cleanDocText(text) {
   if (!text) return '';
-  
-  // DOC extraction often has similar issues to PDF
   text = text.replace(/\r\n/g, '\n');
   text = text.replace(/\r/g, '\n');
-  
-  // Remove excessive spaces and tabs
   text = text.replace(/[ \t]+/g, ' ');
-  
-  // Remove excessive newlines
+  text = text.replace(/\n?Page \d+( of \d+)?\n?/gi, '\n');
+  text = text.replace(/\n?Curriculum Vitae\n?/gi, '\n');
+  text = text.replace(/[•\*]/g, '•');
+  text = text.replace(/\n\s*\d+\./g, '\n•');
   text = text.replace(/\n{3,}/g, '\n\n');
-  
-  // Clean up each line
   text = text.split('\n').map(line => line.trim()).join('\n');
-  
-  // Remove any remaining extra whitespace at start/end
   text = text.trim();
-  
   return text;
 }
 
