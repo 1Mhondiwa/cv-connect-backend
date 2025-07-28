@@ -262,12 +262,24 @@ cleanDocText(text) {
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      const skillsKeywords = [
-        'skills', 'technical skills', 'technologies', 'technical expertise',
-        'competencies', 'expertise', 'proficiencies', 'technical knowledge',
-        'programming languages', 'languages', 'tools', 'software',
-        'technical abilities', 'capabilities', 'qualifications'
-      ];
+      // Updated skills section detection - more comprehensive keywords
+const skillsKeywords = [
+  'skills', 'technical skills', 'technologies', 'technical expertise',
+  'competencies', 'expertise', 'proficiencies', 'technical knowledge',
+  'programming languages', 'languages', 'tools', 'software',
+  'technical abilities', 'capabilities', 'qualifications',
+  // Added non-IT keywords
+  'core competencies', 'professional skills', 'key skills',
+  'specialized skills', 'trade skills', 'clinical skills',
+  'medical skills', 'surgical skills', 'diagnostic skills',
+  'construction skills', 'electrical skills', 'plumbing skills',
+  'mechanical skills', 'engineering skills', 'design skills',
+  'management skills', 'leadership skills', 'communication skills',
+  'analytical skills', 'problem-solving skills', 'organizational skills',
+  'areas of expertise', 'specializations', 'core strengths',
+  'professional competencies', 'technical competencies',
+  'skill set', 'skillset', 'abilities', 'knowledge areas'
+];
       
       if (skillsKeywords.some(keyword => line.includes(keyword))) {
         skillsStartIndex = i;
