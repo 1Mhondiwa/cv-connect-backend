@@ -324,7 +324,8 @@ cleanDocText(text) {
     }
     
     if (skillsStartIndex === -1) {
-      return [];
+      // Fallback: Try keyword-based extraction throughout the document
+      return this.extractSkillsFallback(text);
     }
     
     const skillsLines = lines.slice(skillsStartIndex + 1, skillsEndIndex);
@@ -398,6 +399,45 @@ cleanDocText(text) {
       if (match4 && !trimmedLine.toLowerCase().includes('years') && !trimmedLine.toLowerCase().includes('experience')) {
         skills.push({
           name: trimmedLine,
+          proficiency: 'Intermediate',
+          years_experience: 1
+        });
+      }
+    }
+    
+    // If no skills found in section, try fallback
+    if (skills.length === 0) {
+      return this.extractSkillsFallback(text);
+    }
+    
+    return skills;
+  }
+
+  // Fallback skills extraction using keyword matching throughout the document
+  extractSkillsFallback(text) {
+    const skills = [];
+    const commonSkills = [
+      // Programming Languages
+      'JavaScript', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'TypeScript',
+      'HTML', 'CSS', 'SQL', 'R', 'MATLAB', 'Scala', 'Perl', 'Shell', 'Bash', 'PowerShell',
+      // Frameworks & Libraries
+      'React', 'Angular', 'Vue.js', 'Node.js', 'Express.js', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET',
+      'Bootstrap', 'jQuery', 'Redux', 'Vuex', 'GraphQL', 'REST API', 'MongoDB', 'MySQL', 'PostgreSQL',
+      // Tools & Technologies
+      'Git', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'Google Cloud', 'Jenkins', 'Jira', 'Confluence',
+      'Figma', 'Adobe Photoshop', 'Adobe Illustrator', 'Sketch', 'InVision', 'Zeplin',
+      // Methodologies
+      'Agile', 'Scrum', 'Kanban', 'DevOps', 'CI/CD', 'TDD', 'BDD', 'Waterfall',
+      // Other Technical Skills
+      'Machine Learning', 'Data Analysis', 'Statistics', 'Excel', 'Power BI', 'Tableau', 'SAS', 'SPSS'
+    ];
+    
+    const lowerText = text.toLowerCase();
+    
+    for (const skill of commonSkills) {
+      if (lowerText.includes(skill.toLowerCase())) {
+        skills.push({
+          name: skill,
           proficiency: 'Intermediate',
           years_experience: 1
         });
@@ -724,7 +764,8 @@ looksLikeName(word) {
     }
     
     if (educationStartIndex === -1) {
-      return [];
+      // Fallback: Try keyword-based extraction throughout the document
+      return this.extractEducationFallback(text);
     }
     
     const educationLines = lines.slice(educationStartIndex + 1, educationEndIndex);
@@ -812,9 +853,72 @@ looksLikeName(word) {
       education.push(currentEducation);
     }
     
+    // If no education found in section, try fallback
+    if (education.length === 0) {
+      return this.extractEducationFallback(text);
+    }
+    
     return education;
   }
-  
+
+  // Fallback education extraction using keyword matching throughout the document
+  extractEducationFallback(text) {
+    const education = [];
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    
+    // Look for degree patterns throughout the document
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Check for degree patterns
+      const degreePatterns = [
+        /(Bachelor|B\.?A\.?|B\.?S\.?|B\.?Sc\.?|B\.?Tech\.?|B\.?E\.?|B\.?Eng\.?|B\.?Comm\.?|B\.?Bus\.?|B\.?Admin\.?)\s+(?:of\s+|in\s+)?([A-Za-z\s]+)/i,
+        /(Master|M\.?A\.?|M\.?S\.?|M\.?Sc\.?|M\.?Tech\.?|M\.?E\.?|M\.?Eng\.?|M\.?Comm\.?|M\.?Bus\.?|M\.?Admin\.?)\s+(?:of\s+|in\s+)?([A-Za-z\s]+)/i,
+        /(MBA|M\.?B\.?A\.?|Master\s+of\s+Business\s+Administration)/i,
+        /(Ph\.?D\.?|PhD|Doctorate|Doctor|D\.?Phil\.?)/i,
+        /(Associate|A\.?A\.?|A\.?S\.?|A\.?Sc\.?|A\.?Tech\.?|A\.?E\.?)\s+(?:of\s+|in\s+)?([A-Za-z\s]+)/i,
+        /(BSc|BA|BEng|BTech|MSc|MA|MEng|MTech|Diploma|Certificate|Certification)/i,
+        /(High\s+School|Secondary\s+School|Secondary\s+Education|GED|GCSE|A-Level|IB|International\s+Baccalaureate)/i
+      ];
+      
+      for (const pattern of degreePatterns) {
+        const match = trimmedLine.match(pattern);
+        if (match) {
+          const degree = match[0].trim();
+          const field = match[2] ? match[2].trim() : '';
+          
+          // Look for institution in nearby lines
+          let institution = null;
+          const lineIndex = lines.indexOf(line);
+          for (let i = Math.max(0, lineIndex - 2); i <= Math.min(lines.length - 1, lineIndex + 2); i++) {
+            const nearbyLine = lines[i].trim();
+            if (nearbyLine.includes('University') || nearbyLine.includes('College') || nearbyLine.includes('Institute') || nearbyLine.includes('School')) {
+              institution = nearbyLine;
+              break;
+            }
+          }
+          
+          // Look for year
+          let year = null;
+          const yearMatch = trimmedLine.match(/\b(19|20)\d{2}\b/);
+          if (yearMatch) {
+            year = parseInt(yearMatch[0]);
+          }
+          
+          education.push({
+            degree: degree,
+            field: field,
+            institution: institution,
+            year: year
+          });
+          break;
+        }
+      }
+    }
+    
+    return education;
+  }
+
 
   // Find section end
   findSectionEnd(text, startIndex) {
@@ -923,9 +1027,9 @@ looksLikeName(word) {
       }
     }
     
-    // If no experience section found, return empty array
+    // If no experience section found, try fallback
     if (experienceStartIndex === -1) {
-      return [];
+      return this.extractWorkExperienceFallback(text);
     }
     
     // Extract experience entries
@@ -1015,6 +1119,70 @@ looksLikeName(word) {
     if (currentExperience) {
       currentExperience.description = descriptionLines.join(' ').trim();
       experiences.push(currentExperience);
+    }
+    
+    // If no experience found in section, try fallback
+    if (experiences.length === 0) {
+      return this.extractWorkExperienceFallback(text);
+    }
+    
+    return experiences;
+  }
+
+  // Fallback work experience extraction using keyword matching throughout the document
+  extractWorkExperienceFallback(text) {
+    const experiences = [];
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    
+    // Look for job title patterns throughout the document
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Check for job title patterns
+      const jobTitlePatterns = [
+        /^(Senior|Lead|Principal|Junior|Associate|Staff|Chief)?\s*(Software|Web|Frontend|Backend|Full-stack|Data|Cloud|DevOps|Mobile|System|Network|Security|QA|Test)?\s*(Engineer|Developer|Architect|Designer|Analyst|Scientist|Manager|Consultant|Administrator|Specialist|Programmer|Technician)\s*$/i,
+        /^(Business|Marketing|Sales|Customer|Client|Account|Product|Project|Program|Operations|HR|Human\s*Resources|Finance|Financial|Administrative|Executive|Senior|Junior|Associate|Assistant)\s+(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator)\s*$/i,
+        /^(Creative|Graphic|UI|UX|Visual|Digital|Content|Social\s*Media|Brand|Marketing|Communication)\s+(Designer|Manager|Specialist|Coordinator|Director|Lead|Consultant)\s*$/i,
+        /^(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator|Assistant|Associate|Senior|Junior|Principal|Chief|Head|Vice)\s*$/i
+      ];
+      
+      const isJobTitle = jobTitlePatterns.some(pattern => pattern.test(line));
+      
+      if (isJobTitle) {
+        // Look for company name in nearby lines
+        let company = null;
+        for (let j = i + 1; j < Math.min(lines.length, i + 3); j++) {
+          const nearbyLine = lines[j].trim();
+          if (nearbyLine.includes('Inc') || nearbyLine.includes('LLC') || nearbyLine.includes('Corp') || nearbyLine.includes('Ltd') || nearbyLine.includes('Company') || nearbyLine.includes('Group')) {
+            company = nearbyLine;
+            break;
+          }
+        }
+        
+        // Look for dates in nearby lines
+        let startDate = null;
+        let endDate = null;
+        for (let j = i - 1; j <= Math.min(lines.length - 1, i + 3); j++) {
+          if (j >= 0) {
+            const nearbyLine = lines[j].trim();
+            const datePattern = /\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}|\d{4})\s*[-–—]\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}|\d{4}|Present|Current)\b/i;
+            const dateMatch = nearbyLine.match(datePattern);
+            if (dateMatch) {
+              startDate = dateMatch[1];
+              endDate = dateMatch[2];
+              break;
+            }
+          }
+        }
+        
+        experiences.push({
+          title: line,
+          company: company,
+          start_date: startDate,
+          end_date: endDate,
+          description: ''
+        });
+      }
     }
     
     return experiences;
