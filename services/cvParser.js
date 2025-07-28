@@ -1259,17 +1259,7 @@ findSectionEnd(text, startIndex) {
     
     // Find where experience section ends - expanded end sections
     if (experienceStartIndex !== -1) {
-      const workExperienceEndSections = [
-        'education', 'academic', 'qualifications', 'training', 'certifications',
-        'licenses', 'skills', 'competencies', 'abilities', 'expertise',
-        'projects', 'achievements', 'awards', 'honors', 'publications',
-        'presentations', 'conferences', 'research', 'volunteer', 'community',
-        'activities', 'interests', 'hobbies', 'languages', 'references',
-        'contact', 'personal', 'additional', 'other', 'miscellaneous',
-        'professional development', 'continuing education', 'memberships',
-        'affiliations', 'associations', 'leadership', 'extracurricular',
-        'military', 'service', 'security clearance', 'clearances'
-      ];
+      const endSections = workExperienceEndSections;
       for (let i = experienceStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
         if (endSections.some(section => line.includes(section))) {
