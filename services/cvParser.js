@@ -1004,6 +1004,57 @@ const degreePatterns = [
     return education;
   }
 
+  // Added this method to make the section detection more flexible
+findSectionBoundaries(text, sectionKeywords, endSectionKeywords) {
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
+  let startIndex = -1;
+  let endIndex = lines.length;
+  
+  // Find section start with fuzzy matching
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase().trim();
+    
+    // Remove special characters for better matching
+    const cleanLine = line.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Check if line contains any section keyword
+    const matchesKeyword = sectionKeywords.some(keyword => {
+      const cleanKeyword = keyword.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      return cleanLine.includes(cleanKeyword) || 
+             line.includes(keyword.toLowerCase()) ||
+             // Fuzzy matching - check if most words match
+             this.calculateSimilarity(cleanLine, cleanKeyword) > 0.7;
+    });
+    
+    if (matchesKeyword) {
+      startIndex = i;
+      break;
+    }
+  }
+  
+  // Find section end
+  if (startIndex !== -1) {
+    for (let i = startIndex + 1; i < lines.length; i++) {
+      const line = lines[i].toLowerCase().trim();
+      const cleanLine = line.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      const matchesEndKeyword = endSectionKeywords.some(keyword => {
+        const cleanKeyword = keyword.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        return cleanLine.includes(cleanKeyword) || 
+               line.includes(keyword.toLowerCase()) ||
+               this.calculateSimilarity(cleanLine, cleanKeyword) > 0.7;
+      });
+      
+      if (matchesEndKeyword) {
+        endIndex = i;
+        break;
+      }
+    }
+  }
+  
+  return { startIndex, endIndex, lines };
+}
+
 
   // Find section end
   findSectionEnd(text, startIndex) {
