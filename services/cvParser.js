@@ -836,25 +836,54 @@ const educationKeywords = [
         continue;
       }
       
-      // Check if this line is a degree - expanded patterns
-      const degreePatterns = [
-        // Standard US/UK degrees
-        /^(Bachelor|B\.?A\.?|B\.?S\.?|B\.?Sc\.?|B\.?Tech\.?|B\.?E\.?|B\.?Eng\.?|B\.?Comm\.?|B\.?Bus\.?|B\.?Admin\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
-        /^(Master|M\.?A\.?|M\.?S\.?|M\.?Sc\.?|M\.?Tech\.?|M\.?E\.?|M\.?Eng\.?|M\.?Comm\.?|M\.?Bus\.?|M\.?Admin\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
-        /^(MBA|M\.?B\.?A\.?|Master\s+of\s+Business\s+Administration)\s+(?:in\s+)?(.+)?$/i,
-        /^(Ph\.?D\.?|PhD|Doctorate|Doctor|D\.?Phil\.?)\s+(?:in\s+)?(.+)?$/i,
-        /^(Associate|A\.?A\.?|A\.?S\.?|A\.?Sc\.?|A\.?Tech\.?|A\.?E\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
-        // International degrees
-        /^(BSc|BA|BEng|BTech|MSc|MA|MEng|MTech|Diploma|Certificate|Certification)\s+(?:in\s+)?(.+)?$/i,
-        // Diploma and certificate patterns
-        /^(Diploma|Certificate|Certification|Advanced\s+Diploma|Postgraduate\s+Diploma)\s+(?:in\s+)?(.+)$/i,
-        // High school and secondary education
-        /^(High\s+School|Secondary\s+School|Secondary\s+Education|GED|GCSE|A-Level|IB|International\s+Baccalaureate)\s+(?:in\s+)?(.+)?$/i,
-        // Professional certifications
-        /^(Professional\s+Certification|Professional\s+Certificate|Industry\s+Certification)\s+(?:in\s+)?(.+)$/i,
-        // Generic degree patterns
-        /^([A-Z][a-z]+)\s+(?:Degree|Program|Course)\s+(?:in\s+)?(.+)$/i
-      ];
+     // Updated degree patterns to cover all fields and professions
+const degreePatterns = [
+  // Medical degrees
+  /(Doctor\s+of\s+Medicine|M\.?D\.?|Medical\s+Doctor|Doctor\s+of\s+Osteopathic\s+Medicine|D\.?O\.?|Doctor\s+of\s+Dental\s+Surgery|D\.?D\.?S\.?|Doctor\s+of\s+Dental\s+Medicine|D\.?M\.?D\.?|Doctor\s+of\s+Veterinary\s+Medicine|D\.?V\.?M\.?|Doctor\s+of\s+Pharmacy|Pharm\.?D\.?|Doctor\s+of\s+Physical\s+Therapy|D\.?P\.?T\.?|Doctor\s+of\s+Nursing\s+Practice|D\.?N\.?P\.?)\s*(?:in\s+)?(.+)?$/i,
+  
+  // Legal degrees
+  /(Juris\s+Doctor|J\.?D\.?|Doctor\s+of\s+Jurisprudence|Bachelor\s+of\s+Laws|LL\.?B\.?|Master\s+of\s+Laws|LL\.?M\.?|Doctor\s+of\s+Juridical\s+Science|S\.?J\.?D\.?)\s*(?:in\s+)?(.+)?$/i,
+  
+  // Standard academic degrees
+  /(Bachelor|B\.?A\.?|B\.?S\.?|B\.?Sc\.?|B\.?Tech\.?|B\.?E\.?|B\.?Eng\.?|B\.?Comm\.?|B\.?Bus\.?|B\.?Admin\.?|B\.?F\.?A\.?|B\.?Ed\.?|B\.?N\.?|B\.?S\.?N\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
+  /(Master|M\.?A\.?|M\.?S\.?|M\.?Sc\.?|M\.?Tech\.?|M\.?E\.?|M\.?Eng\.?|M\.?Comm\.?|M\.?Bus\.?|M\.?Admin\.?|M\.?F\.?A\.?|M\.?Ed\.?|M\.?N\.?|M\.?S\.?N\.?|M\.?P\.?H\.?|M\.?S\.?W\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
+  /(MBA|M\.?B\.?A\.?|Master\s+of\s+Business\s+Administration)\s+(?:in\s+)?(.+)?$/i,
+  /(Ph\.?D\.?|PhD|Doctorate|Doctor|D\.?Phil\.?|Ed\.?D\.?|Psy\.?D\.?|D\.?B\.?A\.?|D\.?Sc\.?|D\.?Eng\.?)\s+(?:in\s+)?(.+)?$/i,
+  /(Associate|A\.?A\.?|A\.?S\.?|A\.?Sc\.?|A\.?Tech\.?|A\.?E\.?|A\.?A\.?S\.?|A\.?D\.?N\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
+  
+  // International and alternative degrees
+  /(BSc|BA|BEng|BTech|MSc|MA|MEng|MTech)\s+(?:in\s+)?(.+)?$/i,
+  
+  // Certificates and diplomas
+  /(Diploma|Certificate|Certification|Advanced\s+Diploma|Postgraduate\s+Diploma|Graduate\s+Diploma|Professional\s+Diploma|National\s+Diploma|Higher\s+National\s+Diploma|HND)\s+(?:in\s+)?(.+)$/i,
+  
+  // Trade and vocational certifications
+  /(Trade\s+Certificate|Vocational\s+Certificate|Technical\s+Certificate|Apprenticeship\s+Certificate|Journey\s*man\s+License|Master\s+License|Professional\s+License|Occupational\s+License)\s+(?:in\s+)?(.+)$/i,
+  
+  // Professional certifications by field
+  /(Certified\s+Public\s+Accountant|CPA|Certified\s+Management\s+Accountant|CMA|Chartered\s+Accountant|CA|Certified\s+Financial\s+Planner|CFP|Chartered\s+Financial\s+Analyst|CFA|Project\s+Management\s+Professional|PMP|Certified\s+Project\s+Manager|CPM)\s*(?:in\s+)?(.+)?$/i,
+  
+  // Medical licenses and certifications
+  /(Medical\s+License|Nursing\s+License|RN|LPN|Licensed\s+Practical\s+Nurse|Registered\s+Nurse|Certified\s+Nursing\s+Assistant|CNA|Emergency\s+Medical\s+Technician|EMT|Paramedic\s+License|Pharmacy\s+License|Physical\s+Therapy\s+License|Occupational\s+Therapy\s+License)\s*(?:in\s+)?(.+)?$/i,
+  
+  // Engineering and technical certifications
+  /(Professional\s+Engineer|P\.?E\.?|Certified\s+Engineer|Licensed\s+Engineer|Engineering\s+License|FE|EIT|Engineer\s+in\s+Training|Fundamentals\s+of\s+Engineering)\s*(?:in\s+)?(.+)?$/i,
+  
+  // Trade licenses
+  /(Electrical\s+License|Electrician\s+License|Plumbing\s+License|Plumber\s+License|HVAC\s+License|Contractor\s+License|General\s+Contractor\s+License|Master\s+Electrician|Master\s+Plumber|Journeyman\s+Electrician|Journeyman\s+Plumber)\s*(?:in\s+)?(.+)?$/i,
+  
+  // High school and secondary education
+  /(High\s+School|Secondary\s+School|Secondary\s+Education|GED|General\s+Educational\s+Development|GCSE|General\s+Certificate\s+of\s+Secondary\s+Education|A-Level|Advanced\s+Level|IB|International\s+Baccalaureate|High\s+School\s+Diploma|Secondary\s+School\s+Diploma)\s+(?:in\s+)?(.+)?$/i,
+  
+  // Professional development and continuing education
+  /(Professional\s+Certification|Professional\s+Certificate|Industry\s+Certification|Continuing\s+Education\s+Units|CEU|Professional\s+Development\s+Certificate|Training\s+Certificate|Workshop\s+Certificate|Seminar\s+Certificate)\s+(?:in\s+)?(.+)$/i,
+  
+  // Generic degree patterns (more flexible)
+  /([A-Z][a-z]+)\s+(?:Degree|Program|Course|Training|Certification|License)\s+(?:in\s+)?(.+)$/i,
+  
+  // Catch-all for any remaining degree-like patterns
+  /(Associate|Bachelor|Master|Doctorate|Doctor|Certificate|Diploma|License|Certification)\s+(.+)$/i
+];
       
       for (const pattern of degreePatterns) {
         const match = trimmedLine.match(pattern);
