@@ -394,39 +394,98 @@ const skillsKeywords = [
     return skills;
   }
 
-  // Fallback skills extraction using keyword matching throughout the document
-  extractSkillsFallback(text) {
-    const skills = [];
-    const commonSkills = [
-      // Programming Languages
-      'JavaScript', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'TypeScript',
-      'HTML', 'CSS', 'SQL', 'R', 'MATLAB', 'Scala', 'Perl', 'Shell', 'Bash', 'PowerShell',
-      // Frameworks & Libraries
-      'React', 'Angular', 'Vue.js', 'Node.js', 'Express.js', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET',
-      'Bootstrap', 'jQuery', 'Redux', 'Vuex', 'GraphQL', 'REST API', 'MongoDB', 'MySQL', 'PostgreSQL',
-      // Tools & Technologies
-      'Git', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'Google Cloud', 'Jenkins', 'Jira', 'Confluence',
-      'Figma', 'Adobe Photoshop', 'Adobe Illustrator', 'Sketch', 'InVision', 'Zeplin',
-      // Methodologies
-      'Agile', 'Scrum', 'Kanban', 'DevOps', 'CI/CD', 'TDD', 'BDD', 'Waterfall',
-      // Other Technical Skills
-      'Machine Learning', 'Data Analysis', 'Statistics', 'Excel', 'Power BI', 'Tableau', 'SAS', 'SPSS'
-    ];
+// Updated extractSkillsFallback method with comprehensive skill categories
+extractSkillsFallback(text) {
+  const skills = [];
+  const commonSkills = [
+    // Programming Languages (existing)
+    'JavaScript', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'TypeScript',
+    'HTML', 'CSS', 'SQL', 'R', 'MATLAB', 'Scala', 'Perl', 'Shell', 'Bash', 'PowerShell',
     
-    const lowerText = text.toLowerCase();
+    // Medical & Healthcare Skills
+    'Patient Care', 'Medical Diagnosis', 'Surgery', 'Anesthesia', 'Radiology', 'Cardiology', 
+    'Pediatrics', 'Emergency Medicine', 'Clinical Research', 'Medical Records', 'CPR', 'First Aid',
+    'Nursing', 'Physical Therapy', 'Occupational Therapy', 'Medical Imaging', 'Laboratory Testing',
+    'Pharmacology', 'Medical Equipment', 'Sterilization', 'Infection Control', 'Medical Coding',
     
-    for (const skill of commonSkills) {
-      if (lowerText.includes(skill.toLowerCase())) {
-        skills.push({
-          name: skill,
-          proficiency: 'Intermediate',
-          years_experience: 1
-        });
-      }
+    // Construction & Trades
+    'Carpentry', 'Plumbing', 'Electrical Work', 'HVAC', 'Welding', 'Masonry', 'Roofing',
+    'Painting', 'Flooring', 'Drywall', 'Concrete', 'Blueprint Reading', 'Safety Protocols',
+    'Construction Management', 'Project Planning', 'Quality Control', 'Equipment Operation',
+    'Crane Operation', 'Excavation', 'Site Preparation', 'Building Codes', 'Permits',
+    
+    // Engineering (Non-Software)
+    'Mechanical Engineering', 'Civil Engineering', 'Electrical Engineering', 'Chemical Engineering',
+    'Structural Engineering', 'AutoCAD', 'SolidWorks', 'CAD Design', '3D Modeling', 'Technical Drawing',
+    'Project Management', 'Quality Assurance', 'Process Improvement', 'Manufacturing', 'Production',
+    'Materials Science', 'Thermodynamics', 'Fluid Mechanics', 'Structural Analysis',
+    
+    // Business & Management
+    'Project Management', 'Team Leadership', 'Strategic Planning', 'Budget Management',
+    'Business Analysis', 'Marketing', 'Sales', 'Customer Service', 'Human Resources',
+    'Operations Management', 'Supply Chain', 'Inventory Management', 'Financial Analysis',
+    'Risk Management', 'Compliance', 'Negotiation', 'Presentation Skills', 'Public Speaking',
+    
+    // Legal & Finance
+    'Legal Research', 'Contract Law', 'Corporate Law', 'Criminal Law', 'Family Law',
+    'Litigation', 'Legal Writing', 'Court Procedures', 'Client Counseling', 'Mediation',
+    'Financial Planning', 'Investment Analysis', 'Accounting', 'Auditing', 'Tax Preparation',
+    'Banking', 'Insurance', 'Real Estate', 'Wealth Management', 'Financial Reporting',
+    
+    // Education & Training
+    'Curriculum Development', 'Lesson Planning', 'Classroom Management', 'Student Assessment',
+    'Educational Technology', 'Special Education', 'Adult Learning', 'Training Design',
+    'Instructional Design', 'E-Learning', 'Workshop Facilitation', 'Mentoring', 'Coaching',
+    
+    // Creative & Design
+    'Graphic Design', 'Web Design', 'Photography', 'Video Editing', 'Animation',
+    'Illustration', 'Branding', 'Typography', 'Color Theory', 'Layout Design',
+    'Adobe Creative Suite', 'Photoshop', 'Illustrator', 'InDesign', 'After Effects',
+    
+    // Hospitality & Service
+    'Customer Service', 'Food Service', 'Hotel Management', 'Event Planning',
+    'Restaurant Management', 'Catering', 'Bartending', 'Housekeeping', 'Front Desk',
+    'Travel Planning', 'Tourism', 'Guest Relations', 'Reservation Management',
+    
+    // Transportation & Logistics
+    'Driving', 'Commercial Driving', 'CDL', 'Logistics', 'Warehouse Management',
+    'Inventory Control', 'Shipping', 'Receiving', 'Fleet Management', 'Route Planning',
+    'Forklift Operation', 'Loading', 'Unloading', 'Distribution', 'Supply Chain',
+    
+    // Agriculture & Environmental
+    'Farming', 'Crop Management', 'Livestock', 'Agricultural Equipment', 'Irrigation',
+    'Pest Control', 'Soil Analysis', 'Environmental Science', 'Sustainability',
+    'Waste Management', 'Water Treatment', 'Environmental Compliance',
+    
+    // Technical & IT (existing expanded)
+    'React', 'Angular', 'Vue.js', 'Node.js', 'Express.js', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET',
+    'Bootstrap', 'jQuery', 'Redux', 'Vuex', 'GraphQL', 'REST API', 'MongoDB', 'MySQL', 'PostgreSQL',
+    'Git', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'Google Cloud', 'Jenkins', 'Jira', 'Confluence',
+    'Machine Learning', 'Data Analysis', 'Statistics', 'Excel', 'Power BI', 'Tableau', 'SAS', 'SPSS',
+    
+    // Methodologies & Soft Skills
+    'Agile', 'Scrum', 'Kanban', 'DevOps', 'CI/CD', 'TDD', 'BDD', 'Waterfall',
+    'Communication', 'Leadership', 'Problem Solving', 'Critical Thinking', 'Time Management',
+    'Organization', 'Multitasking', 'Attention to Detail', 'Teamwork', 'Adaptability',
+    'Creativity', 'Innovation', 'Decision Making', 'Conflict Resolution', 'Stress Management'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  
+  for (const skill of commonSkills) {
+    // More flexible matching - check for skill as whole word or part of phrase
+    const skillRegex = new RegExp(`\\b${skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (skillRegex.test(lowerText)) {
+      skills.push({
+        name: skill,
+        proficiency: 'Intermediate',
+        years_experience: 1
+      });
     }
-    
-    return skills;
   }
+  
+  return skills;
+}
 
   // Helper to extract context around a keyword
   extractContext(text, keyword, windowSize = 200) {
