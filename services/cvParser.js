@@ -1056,20 +1056,79 @@ findSectionBoundaries(text, sectionKeywords, endSectionKeywords) {
 }
 
 
-  // Find section end
-  findSectionEnd(text, startIndex) {
-    const sectionKeywords = ['experience', 'work', 'employment', 'skills', 'projects', 'certifications', 'references'];
-    let minIndex = text.length;
+  // Updated findSectionEnd function with comprehensive keywords
+findSectionEnd(text, startIndex) {
+  // Comprehensive section keywords that could end any section
+  const sectionKeywords = [
+    // Work & Employment
+    'experience', 'work', 'employment', 'career', 'professional experience',
+    'work experience', 'employment history', 'job history', 'positions',
+    'roles', 'responsibilities', 'professional background',
     
-    for (const keyword of sectionKeywords) {
-      const index = text.indexOf(keyword, startIndex + 50);
-      if (index !== -1 && index < minIndex) {
+    // Education & Training
+    'education', 'academic', 'qualifications', 'training', 'academic background',
+    'educational background', 'academic qualifications', 'educational qualifications',
+    'degrees', 'certifications', 'licenses', 'professional development',
+    'continuing education', 'professional training', 'technical training',
+    
+    // Skills & Competencies
+    'skills', 'competencies', 'abilities', 'expertise', 'technical skills',
+    'professional skills', 'core competencies', 'key skills', 'specialized skills',
+    'trade skills', 'clinical skills', 'technical competencies', 'skill set',
+    
+    // Projects & Achievements
+    'projects', 'achievements', 'awards', 'honors', 'accomplishments',
+    'recognition', 'publications', 'presentations', 'research', 'portfolio',
+    
+    // Additional Sections
+    'certifications', 'licenses', 'professional certifications', 'industry certifications',
+    'references', 'contact', 'personal', 'additional', 'other', 'miscellaneous',
+    'volunteer', 'community service', 'activities', 'interests', 'hobbies',
+    'languages', 'language skills', 'memberships', 'affiliations', 'associations',
+    'leadership', 'extracurricular', 'military', 'service', 'security clearance',
+    
+    // Professional Development
+    'professional development', 'continuing education', 'workshops', 'seminars',
+    'conferences', 'training programs', 'course work', 'specialized training',
+    
+    // Contact & Personal
+    'contact information', 'personal information', 'personal details',
+    'additional information', 'other information', 'summary', 'objective',
+    'profile', 'about', 'overview', 'biography'
+  ];
+  
+  let minIndex = text.length;
+  
+  // Look for section keywords starting from a reasonable offset
+  for (const keyword of sectionKeywords) {
+    // Use case-insensitive search
+    const lowerText = text.toLowerCase();
+    const lowerKeyword = keyword.toLowerCase();
+    
+    // Find the keyword starting from the offset
+    const index = lowerText.indexOf(lowerKeyword, startIndex + 50);
+    if (index !== -1 && index < minIndex) {
+      // Additional validation: make sure it's likely a section header
+      // Check if the keyword appears at the beginning of a line or after newline
+      const beforeKeyword = text.substring(Math.max(0, index - 5), index);
+      const afterKeyword = text.substring(index + keyword.length, Math.min(text.length, index + keyword.length + 10));
+      
+      // More likely to be a section header if:
+      // 1. Preceded by newline or start of text
+      // 2. Followed by colon, newline, or end of line
+      const isLikelyHeader = 
+        /[\n\r]/.test(beforeKeyword) || index < 10 || // At start or after newline
+        /[\n\r:]/.test(afterKeyword) || // Followed by newline or colon
+        afterKeyword.trim().length === 0; // At end of line
+      
+      if (isLikelyHeader) {
         minIndex = index;
       }
     }
-    
-    return minIndex;
   }
+  
+  return minIndex;
+}
 
   // Find institution name
   findInstitution(text, index) {
