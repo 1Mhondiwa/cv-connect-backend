@@ -1055,6 +1055,25 @@ findSectionBoundaries(text, sectionKeywords, endSectionKeywords) {
   return { startIndex, endIndex, lines };
 }
 
+// Helper method to calculate similarity between two strings
+calculateSimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  
+  const words1 = str1.split(' ').filter(w => w.length > 0);
+  const words2 = str2.split(' ').filter(w => w.length > 0);
+  
+  if (words1.length === 0 || words2.length === 0) return 0;
+  
+  let matches = 0;
+  for (const word1 of words1) {
+    if (words2.some(word2 => word1.includes(word2) || word2.includes(word1))) {
+      matches++;
+    }
+  }
+  
+  return matches / Math.max(words1.length, words2.length);
+}
+
 
   // Updated findSectionEnd function with comprehensive keywords
 findSectionEnd(text, startIndex) {
