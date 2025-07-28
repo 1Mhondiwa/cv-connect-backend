@@ -1086,20 +1086,53 @@ looksLikeName(word) {
         continue;
       }
       
-      // Check if this line looks like a job title - expanded patterns
-      const jobTitlePatterns = [
-        // Technical roles
-        /^(Senior|Lead|Principal|Junior|Associate|Staff|Chief)?\s*(Software|Web|Frontend|Backend|Full-stack|Data|Cloud|DevOps|Mobile|System|Network|Security|QA|Test)?\s*(Engineer|Developer|Architect|Designer|Analyst|Scientist|Manager|Consultant|Administrator|Specialist|Programmer|Technician)\s*$/i,
-        /^(Project|Product|Technical|Engineering|Development|Marketing|Sales|Operations|HR|Finance)\s+(Manager|Director|Lead|Coordinator|Specialist)\s*$/i,
-        // Business roles
-        /^(Business|Marketing|Sales|Customer|Client|Account|Product|Project|Program|Operations|HR|Human\s*Resources|Finance|Financial|Administrative|Executive|Senior|Junior|Associate|Assistant)\s+(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator)\s*$/i,
-        // Creative roles
-        /^(Creative|Graphic|UI|UX|Visual|Digital|Content|Social\s*Media|Brand|Marketing|Communication)\s+(Designer|Manager|Specialist|Coordinator|Director|Lead|Consultant)\s*$/i,
-        // Generic professional titles
-        /^(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator|Assistant|Associate|Senior|Junior|Principal|Chief|Head|Vice)\s*$/i,
-        // Industry-specific roles
-        /^(Sales|Marketing|Business|Financial|Administrative|Executive|Creative|Technical|Professional|Senior|Junior|Associate|Assistant)\s+(Representative|Manager|Director|Analyst|Specialist|Coordinator|Consultant|Advisor|Officer|Supervisor)\s*$/i
-      ];
+     // Updated job title patterns to cover all industries
+const jobTitlePatterns = [
+  // Medical & Healthcare
+  /^(Doctor|Dr\.?|Physician|Surgeon|Nurse|Registered\s+Nurse|RN|Licensed\s+Practical\s+Nurse|LPN|Medical\s+Assistant|Pharmacist|Therapist|Physical\s+Therapist|Occupational\s+Therapist|Radiologist|Cardiologist|Pediatrician|Anesthesiologist|Emergency\s+Medicine|Family\s+Medicine|Internal\s+Medicine|Psychiatrist|Psychologist|Dentist|Dental\s+Hygienist|Veterinarian|Medical\s+Technician|Lab\s+Technician|X-Ray\s+Technician|Ultrasound\s+Technician|Paramedic|EMT|Healthcare\s+Administrator|Medical\s+Receptionist|Medical\s+Secretary|Clinical\s+Coordinator|Patient\s+Care\s+Coordinator)\s*$/i,
+  
+  // Construction & Trades
+  /^(Plumber|Electrician|Carpenter|Mason|Bricklayer|Roofer|Painter|Welder|HVAC\s+Technician|Construction\s+Worker|Construction\s+Manager|Project\s+Manager|Site\s+Supervisor|Foreman|General\s+Contractor|Contractor|Subcontractor|Heavy\s+Equipment\s+Operator|Crane\s+Operator|Excavator\s+Operator|Concrete\s+Finisher|Drywall\s+Installer|Flooring\s+Installer|Tile\s+Setter|Glazier|Insulation\s+Worker|Landscaper|Tree\s+Trimmer|Groundskeeper)\s*$/i,
+  
+  // Engineering (Non-Software)
+  /^(Civil\s+Engineer|Mechanical\s+Engineer|Electrical\s+Engineer|Chemical\s+Engineer|Environmental\s+Engineer|Structural\s+Engineer|Aerospace\s+Engineer|Biomedical\s+Engineer|Industrial\s+Engineer|Materials\s+Engineer|Petroleum\s+Engineer|Mining\s+Engineer|Nuclear\s+Engineer|Marine\s+Engineer|Agricultural\s+Engineer|Engineering\s+Technician|CAD\s+Designer|Design\s+Engineer|Quality\s+Engineer|Process\s+Engineer|Manufacturing\s+Engineer|Production\s+Engineer|Plant\s+Engineer|Maintenance\s+Engineer|Project\s+Engineer)\s*$/i,
+  
+  // Legal & Finance
+  /^(Lawyer|Attorney|Paralegal|Legal\s+Assistant|Legal\s+Secretary|Judge|Magistrate|Court\s+Reporter|Bailiff|Legal\s+Counsel|Corporate\s+Counsel|Public\s+Defender|District\s+Attorney|Prosecutor|Legal\s+Advisor|Compliance\s+Officer|Accountant|CPA|Certified\s+Public\s+Accountant|Bookkeeper|Financial\s+Analyst|Financial\s+Advisor|Investment\s+Advisor|Tax\s+Preparer|Auditor|Controller|CFO|Treasurer|Banking\s+Associate|Loan\s+Officer|Insurance\s+Agent|Insurance\s+Adjuster|Real\s+Estate\s+Agent|Realtor|Mortgage\s+Broker)\s*$/i,
+  
+  // Education & Training
+  /^(Teacher|Professor|Instructor|Educator|Principal|Vice\s+Principal|Assistant\s+Principal|School\s+Administrator|Curriculum\s+Coordinator|Academic\s+Advisor|Counselor|School\s+Counselor|Librarian|Teaching\s+Assistant|Substitute\s+Teacher|Tutor|Coach|Athletic\s+Director|Special\s+Education\s+Teacher|ESL\s+Teacher|Preschool\s+Teacher|Elementary\s+Teacher|Middle\s+School\s+Teacher|High\s+School\s+Teacher|College\s+Professor|University\s+Professor|Research\s+Assistant|Graduate\s+Assistant|Training\s+Coordinator|Corporate\s+Trainer)\s*$/i,
+  
+  // Transportation & Logistics
+  /^(Driver|Truck\s+Driver|Bus\s+Driver|Taxi\s+Driver|Delivery\s+Driver|CDL\s+Driver|Commercial\s+Driver|Forklift\s+Operator|Warehouse\s+Worker|Warehouse\s+Manager|Logistics\s+Coordinator|Supply\s+Chain\s+Manager|Shipping\s+Clerk|Receiving\s+Clerk|Inventory\s+Specialist|Material\s+Handler|Dock\s+Worker|Freight\s+Handler|Dispatcher|Fleet\s+Manager|Transportation\s+Manager|Pilot|Flight\s+Attendant|Air\s+Traffic\s+Controller|Ship\s+Captain|Maritime\s+Officer|Train\s+Engineer|Conductor)\s*$/i,
+  
+  // Hospitality & Service
+  /^(Server|Waiter|Waitress|Bartender|Chef|Cook|Line\s+Cook|Prep\s+Cook|Kitchen\s+Manager|Restaurant\s+Manager|Food\s+Service\s+Manager|Hotel\s+Manager|Front\s+Desk\s+Clerk|Concierge|Housekeeper|Housekeeping\s+Supervisor|Maintenance\s+Worker|Event\s+Coordinator|Event\s+Planner|Wedding\s+Planner|Catering\s+Manager|Banquet\s+Manager|Travel\s+Agent|Tour\s+Guide|Recreation\s+Coordinator|Activities\s+Director|Fitness\s+Instructor|Personal\s+Trainer|Lifeguard|Security\s+Guard|Bouncer)\s*$/i,
+  
+  // Retail & Sales
+  /^(Sales\s+Associate|Sales\s+Representative|Sales\s+Manager|Regional\s+Sales\s+Manager|Account\s+Manager|Key\s+Account\s+Manager|Business\s+Development\s+Manager|Sales\s+Director|Retail\s+Manager|Store\s+Manager|Assistant\s+Manager|Cashier|Customer\s+Service\s+Representative|Customer\s+Service\s+Manager|Call\s+Center\s+Representative|Telemarketer|Real\s+Estate\s+Sales\s+Agent|Insurance\s+Sales\s+Agent|Car\s+Salesperson|Retail\s+Associate|Merchandiser|Visual\s+Merchandiser|Stock\s+Clerk|Inventory\s+Associate)\s*$/i,
+  
+  // Agriculture & Environmental
+  /^(Farmer|Rancher|Agricultural\s+Worker|Farm\s+Manager|Ranch\s+Manager|Livestock\s+Manager|Crop\s+Manager|Agricultural\s+Technician|Veterinary\s+Technician|Animal\s+Care\s+Worker|Groundskeeper|Landscaper|Arborist|Tree\s+Trimmer|Pest\s+Control\s+Technician|Environmental\s+Scientist|Environmental\s+Technician|Park\s+Ranger|Forest\s+Ranger|Wildlife\s+Biologist|Conservation\s+Officer|Waste\s+Management\s+Worker|Recycling\s+Coordinator|Water\s+Treatment\s+Operator|Environmental\s+Compliance\s+Officer)\s*$/i,
+  
+  // Manufacturing & Production
+  /^(Machine\s+Operator|Production\s+Worker|Assembly\s+Worker|Quality\s+Control\s+Inspector|Quality\s+Assurance\s+Technician|Manufacturing\s+Engineer|Production\s+Manager|Plant\s+Manager|Shift\s+Supervisor|Line\s+Supervisor|Maintenance\s+Technician|Industrial\s+Mechanic|Tool\s+and\s+Die\s+Maker|Machinist|CNC\s+Operator|Welder|Fabricator|Safety\s+Coordinator|Safety\s+Manager|Production\s+Planner|Scheduler|Inventory\s+Control\s+Specialist)\s*$/i,
+  
+  // Creative & Media
+  /^(Graphic\s+Designer|Web\s+Designer|UI\s+Designer|UX\s+Designer|Art\s+Director|Creative\s+Director|Photographer|Videographer|Video\s+Editor|Film\s+Editor|Sound\s+Engineer|Music\s+Producer|Artist|Illustrator|Animator|Motion\s+Graphics\s+Designer|Social\s+Media\s+Manager|Content\s+Creator|Content\s+Writer|Copywriter|Technical\s+Writer|Journalist|Reporter|Editor|Proofreader|Marketing\s+Coordinator|Marketing\s+Manager|Brand\s+Manager|Public\s+Relations\s+Specialist|Communications\s+Manager)\s*$/i,
+  
+  // Technology & IT (existing patterns but more comprehensive)
+  /^(Senior|Lead|Principal|Junior|Associate|Staff|Chief)?\s*(Software|Web|Frontend|Front-end|Backend|Back-end|Full-stack|Fullstack|Data|Cloud|DevOps|Mobile|System|Network|Security|QA|Quality\s+Assurance|Test|Testing|Database|Infrastructure|Platform|Solutions|Applications?)?\s*(Engineer|Developer|Architect|Designer|Analyst|Scientist|Manager|Consultant|Administrator|Specialist|Programmer|Technician|Director|Coordinator|Lead)\s*$/i,
+  
+  // General Business & Administrative
+  /^(Manager|Director|Vice\s+President|VP|President|CEO|Chief\s+Executive\s+Officer|COO|Chief\s+Operating\s+Officer|CFO|Chief\s+Financial\s+Officer|CTO|Chief\s+Technology\s+Officer|Executive\s+Assistant|Administrative\s+Assistant|Secretary|Receptionist|Office\s+Manager|Operations\s+Manager|Human\s+Resources\s+Manager|HR\s+Manager|Recruiter|Training\s+Manager|Business\s+Analyst|Data\s+Analyst|Research\s+Analyst|Market\s+Research\s+Analyst|Consultant|Management\s+Consultant|Project\s+Coordinator|Program\s+Manager|Account\s+Executive|Client\s+Manager|Relationship\s+Manager)\s*$/i,
+  
+  // Public Service & Government
+  /^(Police\s+Officer|Detective|Sheriff|Deputy|Firefighter|Fire\s+Captain|Fire\s+Chief|Emergency\s+Medical\s+Technician|Paramedic|Social\s+Worker|Case\s+Worker|Probation\s+Officer|Parole\s+Officer|Corrections\s+Officer|Border\s+Patrol\s+Agent|Customs\s+Officer|Immigration\s+Officer|Government\s+Administrator|City\s+Manager|Mayor|Council\s+Member|Public\s+Health\s+Officer|Building\s+Inspector|Code\s+Enforcement\s+Officer|Tax\s+Assessor|Court\s+Clerk|DMV\s+Clerk|Postal\s+Worker|Mail\s+Carrier)\s*$/i,
+  
+  // Generic professional titles (keep existing)
+  /^(Manager|Director|Lead|Coordinator|Specialist|Analyst|Representative|Consultant|Advisor|Officer|Supervisor|Coordinator|Assistant|Associate|Senior|Junior|Principal|Chief|Head|Vice|Executive|Professional|Technician|Worker|Operator|Inspector|Administrator|Clerk|Agent)\s*$/i
+];
       
       const isJobTitle = jobTitlePatterns.some(pattern => pattern.test(line));
       
