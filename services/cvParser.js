@@ -1074,6 +1074,35 @@ calculateSimilarity(str1, str2) {
   return matches / Math.max(words1.length, words2.length);
 }
 
+// Enhanced pattern matching for any text format
+extractPatternBasedInfo(text, patterns, context = '') {
+  const results = [];
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (match) {
+        // Get context from surrounding lines
+        const contextLines = [];
+        for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 2); j++) {
+          if (j !== i) contextLines.push(lines[j].trim());
+        }
+        
+        results.push({
+          match: match,
+          line: line,
+          context: contextLines.join(' '),
+          lineNumber: i
+        });
+      }
+    }
+  }
+  
+  return results;
+}
 
   // Updated findSectionEnd function with comprehensive keywords
 findSectionEnd(text, startIndex) {
