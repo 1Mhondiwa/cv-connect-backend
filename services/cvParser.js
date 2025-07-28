@@ -739,9 +739,24 @@ looksLikeName(word) {
         continue;
       }
       
-      // Check if this line is a degree
+      // Check if this line is a degree - expanded patterns
       const degreePatterns = [
-        /^(Bachelor|B\.?A\.?|B\.?S\.?|B\.?Sc\.?|B\.?Tech\.?|B\.?E\.?|Master|M\.?A\.?|M\.?S\.?|M\.?Sc\.?|M\.?Tech\.?|M\.?E\.?|MBA|M\.?B\.?A\.?|Ph\.?D\.?|PhD|Doctorate|Doctor|Associate|A\.?A\.?|A\.?S\.?)\s+(?:of\s+|in\s+)?(.+)$/i
+        // Standard US/UK degrees
+        /^(Bachelor|B\.?A\.?|B\.?S\.?|B\.?Sc\.?|B\.?Tech\.?|B\.?E\.?|B\.?Eng\.?|B\.?Comm\.?|B\.?Bus\.?|B\.?Admin\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
+        /^(Master|M\.?A\.?|M\.?S\.?|M\.?Sc\.?|M\.?Tech\.?|M\.?E\.?|M\.?Eng\.?|M\.?Comm\.?|M\.?Bus\.?|M\.?Admin\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
+        /^(MBA|M\.?B\.?A\.?|Master\s+of\s+Business\s+Administration)\s+(?:in\s+)?(.+)?$/i,
+        /^(Ph\.?D\.?|PhD|Doctorate|Doctor|D\.?Phil\.?)\s+(?:in\s+)?(.+)?$/i,
+        /^(Associate|A\.?A\.?|A\.?S\.?|A\.?Sc\.?|A\.?Tech\.?|A\.?E\.?)\s+(?:of\s+|in\s+)?(.+)$/i,
+        // International degrees
+        /^(BSc|BA|BEng|BTech|MSc|MA|MEng|MTech|Diploma|Certificate|Certification)\s+(?:in\s+)?(.+)?$/i,
+        // Diploma and certificate patterns
+        /^(Diploma|Certificate|Certification|Advanced\s+Diploma|Postgraduate\s+Diploma)\s+(?:in\s+)?(.+)$/i,
+        // High school and secondary education
+        /^(High\s+School|Secondary\s+School|Secondary\s+Education|GED|GCSE|A-Level|IB|International\s+Baccalaureate)\s+(?:in\s+)?(.+)?$/i,
+        // Professional certifications
+        /^(Professional\s+Certification|Professional\s+Certificate|Industry\s+Certification)\s+(?:in\s+)?(.+)$/i,
+        // Generic degree patterns
+        /^([A-Z][a-z]+)\s+(?:Degree|Program|Course)\s+(?:in\s+)?(.+)$/i
       ];
       
       for (const pattern of degreePatterns) {
