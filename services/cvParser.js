@@ -836,7 +836,7 @@ const educationKeywords = [
         continue;
       }
       
-     // Updated degree patterns to cover all fields and professions
+// Updated degree patterns to cover all fields and professions
 const degreePatterns = [
   // Medical degrees
   /(Doctor\s+of\s+Medicine|M\.?D\.?|Medical\s+Doctor|Doctor\s+of\s+Osteopathic\s+Medicine|D\.?O\.?|Doctor\s+of\s+Dental\s+Surgery|D\.?D\.?S\.?|Doctor\s+of\s+Dental\s+Medicine|D\.?M\.?D\.?|Doctor\s+of\s+Veterinary\s+Medicine|D\.?V\.?M\.?|Doctor\s+of\s+Pharmacy|Pharm\.?D\.?|Doctor\s+of\s+Physical\s+Therapy|D\.?P\.?T\.?|Doctor\s+of\s+Nursing\s+Practice|D\.?N\.?P\.?)\s*(?:in\s+)?(.+)?$/i,
