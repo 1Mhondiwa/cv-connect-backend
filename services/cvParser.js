@@ -689,45 +689,48 @@ extractNameFromLine(line) {
     /\s(manager|director|supervisor|coordinator|specialist|analyst|consultant|technician|engineer|developer|designer|administrator|assistant|associate|representative|officer|clerk|worker|operator|inspector|agent)$/i
   ];
   
+  const shouldSkip = exclusionPatterns.some(pattern => pattern.test(cleanLine));
+  if (shouldSkip) {
+    return { firstName: '', lastName: '' };
+  }
+  
+  // Enhanced name patterns with more flexibility for different cultures and formats
+  const namePatterns = [
+    // Standard Western names (First Last, First Middle Last)
+    /^([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})*)\s+([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})*)$/,
+    
+    // Names with initials (John A. Smith, J. Smith, John A Smith)
+    /^([A-Z][a-z]{1,20}(?:\s+[A-Z]\.?))\s+([A-Z][a-z]{1,20})$/,
+    /^([A-Z]\.?\s+)([A-Z][a-z]{1,20})$/,
+    
+    // All caps names (common in some CV formats)
+    /^([A-Z]{2,20}(?:\s+[A-Z]{1,3}\.?)?)\s+([A-Z]{2,20})$/,
+    
+    // Names with hyphens or apostrophes
+    /^([A-Z][a-z]*(?:[-'][A-Z][a-z]*)*)\s+([A-Z][a-z]*(?:[-'][A-Z][a-z]*)*)$/,
+    
+    // International names with multiple parts
+    /^([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})*)\s+([A-Z][a-z]{1,20}(?:\s+[A-Z][a-z]{1,20})*)$/,
+    
+    // Names that might have formatting issues from PDF extraction
+    /([A-Z][a-z]{1,20})\s+([A-Z][a-z]{1,20})/,
+    
+    // Flexible pattern for any capitalized words (fallback)
+    /^([A-Z][A-Za-z\-']{1,25})\s+([A-Z][A-Za-z\-'\s]{1,40})$/
+  ];
+  
   for (const pattern of namePatterns) {
     const match = cleanLine.match(pattern);
     if (match) {
-      const fullName = match[1].trim();
+      const firstName = match[1].trim();
+      const lastName = match[2].trim();
       
-      // More lenient validation for name length and structure
-      if (fullName.length >= 3 && fullName.length <= 80) {
-        const nameParts = fullName.split(/\s+/).filter(part => part.length > 0);
-        
-        // Should have at least 2 parts
-        if (nameParts.length >= 2) {
-          // Additional validation: check if it looks like a real name
-          const tooManyNumbers = (fullName.match(/\d/g) || []).length > 2;
-          const tooManySpecialChars = (fullName.match(/[^a-zA-Z\s\-'\.]/g) || []).length > 2;
-          
-          if (!tooManyNumbers && !tooManySpecialChars) {
-            // Convert to proper case
-            const properCaseName = nameParts.map(part => {
-              if (part.length <= 2 && part.endsWith('.')) {
-                // Handle initials (A., B.)
-                return part.toUpperCase();
-              } else if (part.length === 1) {
-                // Handle single letter initials
-                return part.toUpperCase();
-              } else {
-                // Handle regular names, preserving hyphens and apostrophes
-                return part.replace(/\b\w/g, char => char.toUpperCase())
-                          .replace(/\b\w+/g, word => 
-                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                          );
-              }
-            });
-            
-            return {
-              firstName: properCaseName[0],
-              lastName: properCaseName.slice(1).join(' ')
-            };
-          }
-        }
+      // Validation: check if it looks like a real name
+      if (this.isValidName(firstName, lastName, cleanLine)) {
+        return {
+          firstName: this.formatName(firstName),
+          lastName: this.formatName(lastName)
+        };
       }
     }
   }
