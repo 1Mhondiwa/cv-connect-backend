@@ -651,7 +651,7 @@ extractName(text) {
   return { firstName: '', lastName: '' };
 }
 
-// Helper method to extract name from a single line
+// Updated extractNameFromLine method with better patterns for all professions
 extractNameFromLine(line) {
   // Clean the line more aggressively
   let cleanLine = line.replace(/[^\w\s\-'\.]/g, ' ').trim();
@@ -659,18 +659,34 @@ extractNameFromLine(line) {
   // Remove multiple spaces
   cleanLine = cleanLine.replace(/\s+/g, ' ');
   
-  // Enhanced name patterns with more flexibility
-  const namePatterns = [
-    // All caps name (JOHN SMITH, JOHN A. SMITH)
-    /^([A-Z]{2,}(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z]{2,})+)\s*$/,
-    // Proper case name (John Smith, John A. Smith, John A Smith)
-    /^([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)\s*$/,
-    // Mixed case with common variations (more flexible)
-    /^([A-Za-z]{2,}(?:\s+[A-Za-z]\.?\s*)?(?:\s+[A-Za-z]{2,})+)\s*$/,
-    // Handle names with hyphens or apostrophes (O'Connor, Mary-Jane)
-    /^([A-Za-z]{2,}(?:[-']?[A-Za-z]+)*(?:\s+[A-Za-z]\.?\s*)?(?:\s+[A-Za-z]{2,}(?:[-']?[A-Za-z]+)*)+)\s*$/,
-    // Handle names that might have numbers or special chars mixed in (from PDF extraction issues)
-    /([A-Za-z]{2,}(?:\s+[A-Za-z]\.?\s*)?(?:\s+[A-Za-z]{2,})+)/
+  // Enhanced exclusion patterns - more comprehensive
+  const exclusionPatterns = [
+    // Contact information
+    /@/,
+    /http[s]?:\/\//,
+    /www\./,
+    /\.(com|org|net|edu|gov|pdf|doc|docx|txt)/i,
+    /\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,
+    /^\d+$/,
+    
+    // CV/Resume headers and sections
+    /^(cv|resume|curriculum|vitae|portfolio|profile|biography|bio)$/i,
+    /^(page\s*\d+|page\s*\d+\s*of\s*\d+)$/i,
+    /^[-=_*#]{3,}$/,
+    /^\s*$/,
+    
+    // Professional sections
+    /^(summary|objective|profile|about|skills|education|experience|work|projects|certifications|languages|references|contact|personal|achievements|awards|publications|interests|hobbies|employment|career|professional|technical|additional|volunteer|activities|memberships|training|qualifications|background|expertise|competencies)$/i,
+    
+    // Contact fields
+    /^(phone|email|linkedin|github|address|location|mobile|tel|website|portfolio|city|state|country|zip|postal|street|avenue|road|drive|lane|circle|court|place|way|boulevard|parkway)$/i,
+    
+    // All profession-specific exclusions
+    /^(doctor|dr|physician|surgeon|nurse|registered|licensed|medical|pharmacist|therapist|radiologist|cardiologist|pediatrician|dentist|veterinarian|plumber|electrician|carpenter|mason|contractor|engineer|civil|mechanical|electrical|chemical|lawyer|attorney|paralegal|judge|accountant|cpa|teacher|professor|instructor|principal|driver|truck|bus|chef|cook|server|manager|director|supervisor|coordinator|specialist|analyst|consultant|technician)$/i,
+    
+    // Job titles with common prefixes/suffixes
+    /^(senior|junior|lead|chief|head|assistant|associate|principal|staff|executive|vice|deputy|acting|interim|temporary|former|retired|experienced|certified|licensed|registered|professional)\s/i,
+    /\s(manager|director|supervisor|coordinator|specialist|analyst|consultant|technician|engineer|developer|designer|administrator|assistant|associate|representative|officer|clerk|worker|operator|inspector|agent)$/i
   ];
   
   for (const pattern of namePatterns) {
