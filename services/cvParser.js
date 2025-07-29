@@ -289,12 +289,7 @@ const skillsKeywords = [
     
     // Find where skills section ends - expanded end sections
     if (skillsStartIndex !== -1) {
-      const endSections = [
-        'education', 'academic', 'qualification', 'work experience', 
-        'experience', 'employment', 'projects', 'certifications',
-        'awards', 'achievements', 'interests', 'hobbies', 'languages',
-        'references', 'contact', 'personal', 'volunteer', 'activities'
-      ];
+      const endSections = skillsEndSections;
       for (let i = skillsStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
         if (endSections.some(section => line.includes(section))) {
