@@ -789,6 +789,24 @@ isValidName(firstName, lastName, fullLine) {
   return true;
 }
 
+// Format name to proper case
+formatName(name) {
+  if (!name) return '';
+  
+  return name.split(/[\s\-']/).map(part => {
+    if (part.length <= 2 && part.endsWith('.')) {
+      // Handle initials
+      return part.toUpperCase();
+    } else if (part.length === 1) {
+      // Handle single letters
+      return part.toUpperCase();
+    } else {
+      // Handle regular name parts
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    }
+  }).join(name.includes('-') ? '-' : name.includes("'") ? "'" : ' ');
+}
+
 // Alternative extraction method using regex on entire text
 extractNameAlternative(text) {
   // Look for common name patterns in the document
