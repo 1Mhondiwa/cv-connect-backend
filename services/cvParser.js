@@ -805,11 +805,7 @@ const educationKeywords = [
     
     // Find where education section ends - expanded end sections
     if (educationStartIndex !== -1) {
-      const endSections = [
-        'work experience', 'experience', 'employment', 'projects', 'skills',
-        'certifications', 'awards', 'interests', 'hobbies', 'languages',
-        'references', 'contact', 'personal', 'volunteer', 'activities'
-      ];
+      const endSections = educationEndSections;
       for (let i = educationStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].toLowerCase().trim();
         if (endSections.some(section => line.includes(section))) {
