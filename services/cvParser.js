@@ -31,6 +31,16 @@ class CVParser {
     'affiliations', 'leadership', 'extracurricular', 'military', 'service'
   ];
 
+  static skillsEndSections = [
+    'education', 'academic', 'qualifications', 'training', 'work experience',
+    'experience', 'employment', 'career', 'professional', 'projects',
+    'certifications', 'licenses', 'achievements', 'awards', 'honors',
+    'publications', 'presentations', 'research', 'volunteer', 'activities',
+    'interests', 'hobbies', 'languages', 'references', 'contact',
+    'personal', 'additional', 'other', 'miscellaneous', 'memberships',
+    'affiliations', 'leadership', 'extracurricular', 'military', 'service'
+  ];
+
 // Enhanced extractText method with improved DOCX/DOC support
 async extractText(filePath) {
   try {
