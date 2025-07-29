@@ -6,6 +6,19 @@ const nlp = require('compromise');
 const mammoth = require('mammoth'); 
 
 class CVParser {
+
+  static workExperienceEndSections = [
+    'education', 'academic', 'qualifications', 'training', 'certifications',
+    'licenses', 'skills', 'competencies', 'abilities', 'expertise',
+    'projects', 'achievements', 'awards', 'honors', 'publications',
+    'presentations', 'conferences', 'research', 'volunteer', 'community',
+    'activities', 'interests', 'hobbies', 'languages', 'references',
+    'contact', 'personal', 'additional', 'other', 'miscellaneous',
+    'professional development', 'continuing education', 'memberships',
+    'affiliations', 'associations', 'leadership', 'extracurricular',
+    'military', 'service', 'security clearance', 'clearances'
+  ];
+  
 // Enhanced extractText method with improved DOCX/DOC support
 async extractText(filePath) {
   try {
