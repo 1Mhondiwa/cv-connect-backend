@@ -738,6 +738,57 @@ extractNameFromLine(line) {
   return { firstName: '', lastName: '' };
 }
 
+// Enhanced name validation
+isValidName(firstName, lastName, fullLine) {
+  // Basic length checks
+  if (!firstName || !lastName || firstName.length < 1 || lastName.length < 1) {
+    return false;
+  }
+  
+  if (firstName.length > 30 || lastName.length > 40) {
+    return false;
+  }
+  
+  // Check for too many numbers or special characters
+  const combinedName = `${firstName} ${lastName}`;
+  const numberCount = (combinedName.match(/\d/g) || []).length;
+  const specialCharCount = (combinedName.match(/[^a-zA-Z\s\-'\.]/g) || []).length;
+  
+  if (numberCount > 1 || specialCharCount > 3) {
+    return false;
+  }
+  
+  // Check against common non-name words that might appear in CVs
+  const nonNameWords = [
+    'summary', 'objective', 'profile', 'contact', 'phone', 'email', 'address',
+    'skills', 'experience', 'education', 'work', 'employment', 'career',
+    'professional', 'personal', 'references', 'languages', 'interests',
+    'achievements', 'awards', 'certifications', 'projects', 'volunteer',
+    'activities', 'hobbies', 'training', 'qualifications', 'background',
+    'medical', 'doctor', 'nurse', 'engineer', 'manager', 'director',
+    'specialist', 'consultant', 'technician', 'assistant', 'coordinator',
+    'analyst', 'developer', 'designer', 'administrator', 'supervisor',
+    'present', 'current', 'former', 'previous', 'years', 'months',
+    'company', 'corporation', 'organization', 'department', 'division',
+    'university', 'college', 'school', 'institute', 'hospital', 'clinic'
+  ];
+  
+  const firstNameLower = firstName.toLowerCase();
+  const lastNameLower = lastName.toLowerCase();
+  
+  if (nonNameWords.includes(firstNameLower) || nonNameWords.includes(lastNameLower)) {
+    return false;
+  }
+  
+  // Additional validation: names should contain mostly alphabetic characters
+  const alphaRatio = (combinedName.match(/[a-zA-Z]/g) || []).length / combinedName.length;
+  if (alphaRatio < 0.7) {
+    return false;
+  }
+  
+  return true;
+}
+
 // Alternative extraction method using regex on entire text
 extractNameAlternative(text) {
   // Look for common name patterns in the document
