@@ -709,6 +709,84 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
     }
   });
   
+  // Update CV parsed data (work experience and education)
+  router.put('/cv/parsed-data', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { parsed_data } = req.body;
+      
+      if (!parsed_data) {
+        return res.status(400).json({
+          success: false,
+          message: 'Parsed data is required'
+        });
+      }
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      
+      // Merge existing parsed data with new data
+      const updatedParsedData = {
+        ...existingParsedData,
+        ...parsed_data
+      };
+      
+      // Update CV record with new parsed data
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // After successful CV parsed data update
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'CV Data Updated'
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'CV parsed data updated successfully',
+        parsed_data: updatedParsedData
+      });
+    } catch (error) {
+      console.error('Update CV parsed data error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
   // Get dashboard data
   router.get('/dashboard', authenticateToken, requireRole(['freelancer']), async (req, res) => {
     try {
