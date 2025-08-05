@@ -59,6 +59,25 @@ const submitAssociateRequest = async (req, res) => {
         [email, industry, contact_person, phone, address || null, website || null, company_name || null, request_reason || null]
       );
 
+      const requestId = requestResult.rows[0].request_id;
+
+    return res.status(201).json({
+      success: true,
+      message: 'Associate request submitted successfully. ESC will review your request.',
+      data: {
+        request_id: requestId,
+        status: 'pending'
+      }
+    });
+  } catch (error) {
+    console.error('Submit associate request error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
 
 
-}
+
