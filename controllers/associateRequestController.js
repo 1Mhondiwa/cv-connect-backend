@@ -24,4 +24,17 @@ const submitAssociateRequest = async (req, res) => {
           });
         }
 
+        // Check if email already exists in User table
+    const existingUser = await db.query(
+        'SELECT user_id FROM "User" WHERE email = $1',
+        [email]
+      );
+  
+      if (existingUser.rowCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Email already exists in the system'
+        });
+      }
+
 }
