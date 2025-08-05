@@ -37,4 +37,19 @@ const submitAssociateRequest = async (req, res) => {
         });
       }
 
+      // Check if there's already a pending request for this email
+    const existingRequest = await db.query(
+        'SELECT request_id FROM "Associate_Request" WHERE email = $1 AND status = $2',
+        [email, 'pending']
+      );
+  
+      if (existingRequest.rowCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'A request for this email is already pending review'
+        });
+      }
+
+
+
 }
