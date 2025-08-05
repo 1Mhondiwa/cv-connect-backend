@@ -79,5 +79,66 @@ const submitAssociateRequest = async (req, res) => {
   }
 };
 
+// Get all associate requests (ESC Admin only)
+const getAllAssociateRequests = async (req, res) => {
+    try {
+      const { status, page = 1, limit = 10 } = req.query;
+      const offset = (page - 1) * limit;
+  
+      let whereClause = '';
+      const params = [];
+  
+      if (status && status !== 'all') {
+        whereClause = 'WHERE status = $1';
+        params.push(status);
+      }
+  
+      // Count query
+      const countQuery = `
+        SELECT COUNT(*) 
+        FROM "Associate_Request" 
+        ${whereClause}
+      `;
+      const countResult = await db.query(countQuery, params);
+      const totalCount = parseInt(countResult.rows[0].count);
+  
+      // Main query
+      const query = `
+        SELECT ar.*, 
+               u.email as reviewer_email,
+               u.user_type as reviewer_type
+        FROM "Associate_Request" ar
+        LEFT JOIN "User" u ON ar.reviewed_by = u.user_id
+        ${whereClause}
+        ORDER BY ar.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+      
+      params.push(limit, offset);
+      const result = await db.query(query, params);
+  
+      return res.status(200).json({
+        success: true,
+        data: {
+          requests: result.rows,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: totalCount,
+            pages: Math.ceil(totalCount / limit)
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Get associate requests error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  };
+  
+
 
 
