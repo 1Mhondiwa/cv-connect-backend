@@ -50,6 +50,15 @@ const submitAssociateRequest = async (req, res) => {
         });
       }
 
+      // Create the associate request
+    const requestResult = await db.query(
+        `INSERT INTO "Associate_Request" 
+         (email, industry, contact_person, phone, address, website, company_name, request_reason) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+         RETURNING request_id`,
+        [email, industry, contact_person, phone, address || null, website || null, company_name || null, request_reason || null]
+      );
+
 
 
 }
