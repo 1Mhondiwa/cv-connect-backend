@@ -262,6 +262,49 @@ const reviewAssociateRequest = async (req, res) => {
       client.release();
     }
   };
+
+  // Get associate request by ID (ESC Admin only)
+const getAssociateRequestById = async (req, res) => {
+    try {
+      const { requestId } = req.params;
+  
+      const result = await db.query(
+        `SELECT ar.*, 
+                u.email as reviewer_email,
+                u.user_type as reviewer_type
+         FROM "Associate_Request" ar
+         LEFT JOIN "User" u ON ar.reviewed_by = u.user_id
+         WHERE ar.request_id = $1`,
+        [requestId]
+      );
+  
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Associate request not found'
+        });
+      }
+  
+      return res.status(200).json({
+        success: true,
+        data: result.rows[0]
+      });
+    } catch (error) {
+      console.error('Get associate request by ID error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  };
+  
+  module.exports = {
+    submitAssociateRequest,
+    getAllAssociateRequests,
+    reviewAssociateRequest,
+    getAssociateRequestById
+  }; 
   
   
 
