@@ -138,6 +138,131 @@ const getAllAssociateRequests = async (req, res) => {
       });
     }
   };
+
+  // Review associate request (ESC Admin only)
+const reviewAssociateRequest = async (req, res) => {
+    const client = await db.pool.connect();
+    
+    try {
+      const { requestId } = req.params;
+      const { status, review_notes, password } = req.body;
+      const adminUserId = req.user.user_id;
+  
+      // Validate status
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Status must be either "approved" or "rejected"'
+        });
+      }
+  
+      // Get the request
+      const requestResult = await client.query(
+        'SELECT * FROM "Associate_Request" WHERE request_id = $1',
+        [requestId]
+      );
+  
+      if (requestResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Associate request not found'
+        });
+      }
+  
+      const request = requestResult.rows[0];
+  
+      // Check if already reviewed
+      if (request.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          message: 'Request has already been reviewed'
+        });
+      }
+  
+      // Begin transaction
+      await client.query('BEGIN');
+  
+      // Update request status
+      await client.query(
+        `UPDATE "Associate_Request" 
+         SET status = $1, reviewed_at = NOW(), reviewed_by = $2, review_notes = $3 
+         WHERE request_id = $4`,
+        [status, adminUserId, review_notes || null, requestId]
+      );
+  
+      // If approved, create the associate account
+      if (status === 'approved') {
+        if (!password) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: 'Password is required when approving a request'
+          });
+        }
+  
+        // Import bcrypt for password hashing
+        const bcrypt = require('bcryptjs');
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+  
+        // Create user record
+        const userResult = await client.query(
+          'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id',
+          [request.email, hashedPassword, 'associate', true, true]
+        );
+  
+        const userId = userResult.rows[0].user_id;
+  
+        // Create associate record
+        await client.query(
+          'INSERT INTO "Associate" (user_id, industry, contact_person, phone, address, website, verified) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [userId, request.industry, request.contact_person, request.phone, request.address, request.website, true]
+        );
+  
+        // Log activity
+        await logActivity({
+          user_id: adminUserId,
+          role: 'admin',
+          activity_type: 'associate_request_approved',
+          details: `Approved associate request for ${request.email}`
+        });
+      } else {
+        // Log rejection
+        await logActivity({
+          user_id: adminUserId,
+          role: 'admin',
+          activity_type: 'associate_request_rejected',
+          details: `Rejected associate request for ${request.email}`
+        });
+      }
+  
+      // Commit transaction
+      await client.query('COMMIT');
+  
+      return res.status(200).json({
+        success: true,
+        message: `Associate request ${status} successfully`,
+        data: {
+          request_id: requestId,
+          status: status
+        }
+      });
+    } catch (error) {
+      // Rollback transaction on error
+      await client.query('ROLLBACK');
+      
+      console.error('Review associate request error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    } finally {
+      // Release client back to pool
+      client.release();
+    }
+  };
+  
   
 
 
