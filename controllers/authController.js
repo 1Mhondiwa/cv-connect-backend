@@ -482,8 +482,6 @@ const verifyEmail = async (req, res) => {
 
 // Change password for authenticated user
 const changePassword = async (req, res) => {
-  const client = await db.pool.connect();
-  
   try {
     const { oldPassword, newPassword, confirmPassword } = req.body;
     const userId = req.user.userId; // From JWT token
@@ -511,7 +509,7 @@ const changePassword = async (req, res) => {
     }
     
     // Get current user's hashed password
-    const userResult = await client.query(
+    const userResult = await db.query(
       'SELECT hashed_password FROM "User" WHERE user_id = $1',
       [userId]
     );
@@ -540,7 +538,7 @@ const changePassword = async (req, res) => {
     const newHashedPassword = await bcrypt.hash(newPassword, salt);
     
     // Update password in database
-    await client.query(
+    await db.query(
       'UPDATE "User" SET hashed_password = $1 WHERE user_id = $2',
       [newHashedPassword, userId]
     );
@@ -557,8 +555,6 @@ const changePassword = async (req, res) => {
       message: 'Internal server error',
       error: error.message
     });
-  } finally {
-    client.release();
   }
 };
 
