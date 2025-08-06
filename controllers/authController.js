@@ -480,84 +480,6 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-// Change password for authenticated user
-const changePassword = async (req, res) => {
-  try {
-    const { oldPassword, newPassword, confirmPassword } = req.body;
-    const userId = req.user.userId; // From JWT token
-    
-    // Validate input
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'All password fields are required'
-      });
-    }
-    
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'New password and confirm password do not match'
-      });
-    }
-    
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'New password must be at least 6 characters long'
-      });
-    }
-    
-    // Get current user's hashed password
-    const userResult = await db.query(
-      'SELECT hashed_password FROM "User" WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (userResult.rowCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    
-    const currentHashedPassword = userResult.rows[0].hashed_password;
-    
-    // Verify old password
-    const isOldPasswordValid = await bcrypt.compare(oldPassword, currentHashedPassword);
-    
-    if (!isOldPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Old password is incorrect'
-      });
-    }
-    
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const newHashedPassword = await bcrypt.hash(newPassword, salt);
-    
-    // Update password in database
-    await db.query(
-      'UPDATE "User" SET hashed_password = $1 WHERE user_id = $2',
-      [newHashedPassword, userId]
-    );
-    
-    return res.status(200).json({
-      success: true,
-      message: 'Password changed successfully'
-    });
-    
-  } catch (error) {
-    console.error('Change password error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-};
-
 module.exports = {
   registerFreelancer,
   addAssociate,
@@ -565,6 +487,5 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   createAdmin,
-  verifyEmail,
-  changePassword
+  verifyEmail
 };

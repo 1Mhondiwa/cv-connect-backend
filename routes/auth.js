@@ -42,7 +42,4 @@ router.get('/verify', authenticateToken, (req, res) => {
   });
 });
 
-// Change password route (requires authentication)
-router.put('/change-password', authenticateToken, authController.changePassword);
-
 module.exports = router;
