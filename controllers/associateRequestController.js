@@ -1,6 +1,7 @@
 // controllers/associateRequestController.js
 const db = require('../config/database');
 const { logActivity } = require('../utils/activityLogger');
+const { sendEmail } = require('../utils/email');
 
 // Submit associate request (public endpoint)
 const submitAssociateRequest = async (req, res) => {
@@ -226,6 +227,20 @@ const reviewAssociateRequest = async (req, res) => {
           activity_type: 'associate_request_approved',
           details: `Approved associate request for ${request.email}`
         });
+
+        // --- EMAIL NOTIFICATION (APPROVED) ---
+        await sendEmail({
+          to: request.email,
+          subject: 'Your CV-Connect Associate Account is Approved!',
+          html: `
+            <h2>Welcome to CV-Connect!</h2>
+            <p>Your associate account has been <b>approved</b> by ESC.</p>
+            <p><b>Login Email:</b> ${request.email}</p>
+            <p><b>Temporary Password:</b> ${password}</p>
+            <p><a href="https://yourdomain.com/login">Login here</a></p>
+            <p style="color:#888;font-size:13px;">Please change your password after logging in for the first time.</p>
+          `
+        });
       } else {
         // Log rejection
         await logActivity({
@@ -233,6 +248,18 @@ const reviewAssociateRequest = async (req, res) => {
           role: 'admin',
           activity_type: 'associate_request_rejected',
           details: `Rejected associate request for ${request.email}`
+        });
+
+        // --- EMAIL NOTIFICATION (REJECTED) ---
+        await sendEmail({
+          to: request.email,
+          subject: 'Your CV-Connect Associate Request',
+          html: `
+            <h2>Request Update</h2>
+            <p>We regret to inform you that your request to join CV-Connect as an associate was <b>not approved</b>.</p>
+            <p><b>Reason:</b> ${review_notes || 'Not specified'}</p>
+            <p>If you have questions, you may reply to this email.</p>
+          `
         });
       }
   
