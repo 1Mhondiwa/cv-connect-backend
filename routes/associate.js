@@ -7,6 +7,7 @@ const db = require('../config/database');
 const fs = require('fs-extra');
 const path = require('path');
 const { logActivity } = require('../utils/activityLogger');
+const bcrypt = require('bcryptjs');
 
 // Get associate profile
 router.get('/profile', authenticateToken, requireRole(['associate']), async (req, res) => {
@@ -443,6 +444,82 @@ router.get('/activity', authenticateToken, requireRole(['associate']), async (re
     res.json({ success: true, activities: result.rows });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch activity', error: error.message });
+  }
+});
+
+// Change password for associate
+router.post('/change-password', authenticateToken, requireRole(['associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { oldPassword, newPassword } = req.body;
+    
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old password and new password are required'
+      });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
+    }
+    
+    // Get current user with hashed password
+    const userResult = await db.query(
+      'SELECT hashed_password FROM "User" WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const currentHashedPassword = userResult.rows[0].hashed_password;
+    
+    // Verify old password
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, currentHashedPassword);
+    
+    if (!isOldPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old password is incorrect'
+      });
+    }
+    
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const newHashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    // Update password
+    await db.query(
+      'UPDATE "User" SET hashed_password = $1 WHERE user_id = $2',
+      [newHashedPassword, userId]
+    );
+    
+    // Log the activity
+    await logActivity({
+      user_id: userId,
+      role: 'associate',
+      activity_type: 'Password Changed'
+    });
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 });
 
