@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
+const { validatePassword } = require('../utils/passwordValidator');
 
 // Generate JWT token
 const generateToken = (userId) => {
@@ -333,6 +334,15 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Token and new password are required'
+      });
+    }
+    
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: passwordValidation.errors[0] // Return first error
       });
     }
     

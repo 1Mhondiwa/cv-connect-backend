@@ -8,6 +8,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const { logActivity } = require('../utils/activityLogger');
 const bcrypt = require('bcryptjs');
+const { validatePassword } = require('../utils/passwordValidator');
 
 // Get associate profile
 router.get('/profile', authenticateToken, requireRole(['associate']), async (req, res) => {
@@ -460,10 +461,12 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
       });
     }
     
-    if (newPassword.length < 6) {
+    // Validate new password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters long'
+        message: passwordValidation.errors[0] // Return first error
       });
     }
     
