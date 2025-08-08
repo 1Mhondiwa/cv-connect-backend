@@ -40,11 +40,18 @@ const validateAssociateCreation = [
   validateRequest
 ];
 
-// Freelancer profile validation
+// Freelancer profile validation (allow partial updates)
 const validateFreelancerProfile = [
-  check('first_name').notEmpty().withMessage('First name is required'),
-  check('last_name').notEmpty().withMessage('Last name is required'),
-  check('phone').notEmpty().withMessage('Phone number is required'),
+  check('first_name').optional().trim(),
+  check('last_name').optional().trim(),
+  check('phone').optional().trim(),
+  check('address').optional().trim(),
+  check('years_experience').optional(),
+  check('summary').optional().trim(),
+  check('headline').optional().trim(),
+  check('current_status').optional().trim(),
+  check('linkedin_url').optional().isURL().withMessage('Invalid LinkedIn URL'),
+  check('github_url').optional().isURL().withMessage('Invalid GitHub URL'),
   validateRequest
 ];
 
