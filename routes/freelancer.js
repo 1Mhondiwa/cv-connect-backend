@@ -108,46 +108,51 @@ router.put('/profile', authenticateToken, requireRole(['freelancer']), validateF
     
     const freelancerId = checkResult.rows[0].freelancer_id;
     
-    // Update profile
+  // Build dynamic update for only provided fields
+  const fieldsToUpdate = [];
+  const values = [];
+  let idx = 1;
+  const pushField = (dbField, value) => {
+    if (typeof value !== 'undefined') {
+      fieldsToUpdate.push(`${dbField} = $${idx++}`);
+      values.push(value);
+    }
+  };
+
+  pushField('first_name', first_name);
+  pushField('last_name', last_name);
+  pushField('phone', phone);
+  pushField('address', address);
+  pushField('years_experience', years_experience);
+  pushField('summary', summary);
+  pushField('headline', headline);
+  pushField('current_status', current_status);
+  pushField('linkedin_url', linkedin_url);
+  pushField('github_url', github_url);
+
+  if (fieldsToUpdate.length > 0) {
+    values.push(freelancerId);
     await db.query(
-      `UPDATE "Freelancer" 
-       SET first_name = $1, 
-           last_name = $2, 
-           phone = $3, 
-           address = $4, 
-           years_experience = $5, 
-           summary = $6, 
-           headline = $7, 
-           current_status = $8, 
-           linkedin_url = $9, 
-           github_url = $10 
-       WHERE freelancer_id = $11`,
-      [
-        first_name,
-        last_name,
-        phone,
-        address,
-        years_experience,
-        summary,
-        headline,
-        current_status,
-        linkedin_url,
-        github_url,
-        freelancerId
-      ]
+      `UPDATE "Freelancer" SET ${fieldsToUpdate.join(', ')} WHERE freelancer_id = $${idx}`,
+      values
     );
-    
     // After successful profile update
     await logActivity({
       user_id: userId,
       role: 'freelancer',
       activity_type: 'Profile Updated'
     });
-    
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully'
     });
+  } else {
+    // Nothing to update; allow frontend to proceed with other sections (e.g., CV parsed data)
+    return res.status(200).json({
+      success: true,
+      message: 'No profile changes detected'
+    });
+  }
   } catch (error) {
     console.error('Error updating profile:', error);
     return res.status(500).json({
