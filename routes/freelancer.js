@@ -48,18 +48,22 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       [freelancerResult.rows[0].freelancer_id]
     );
     
-    // Get freelancer CV
+    // Get latest freelancer CV and normalize parsed_data
     const cvResult = await db.query(
-      'SELECT * FROM "CV" WHERE freelancer_id = $1',
+      'SELECT * FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
       [freelancerResult.rows[0].freelancer_id]
     );
+    let cvRow = cvResult.rows[0] || null;
+    if (cvRow && cvRow.parsed_data) {
+      cvRow = { ...cvRow, parsed_data: (typeof cvRow.parsed_data === 'string') ? JSON.parse(cvRow.parsed_data) : cvRow.parsed_data };
+    }
     
     // Combine all data
     const profileData = {
       ...userResult.rows[0],
       ...freelancerResult.rows[0],
       skills: skillsResult.rows,
-      cv: cvResult.rows[0] || null
+      cv: cvRow
     };
     
     return res.status(200).json({
@@ -742,21 +746,42 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       const freelancerId = freelancerResult.rows[0].freelancer_id;
       
-      // Get existing CV record
-      const cvResult = await db.query(
+      // Get existing CV record (latest)
+      let cvResult = await db.query(
         'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
         [freelancerId]
       );
       
+      // If no CV exists yet, create a minimal manual entry to store parsed_data
       if (cvResult.rowCount === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'No CV found. Please upload a CV first.'
-        });
+        const insertCv = await db.query(
+          `INSERT INTO "CV" (
+            freelancer_id,
+            original_filename,
+            stored_filename,
+            file_type,
+            file_size,
+            parsed_data,
+            is_approved,
+            parsing_status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING cv_id, parsed_data`,
+          [
+            freelancerId,
+            'manual-entry',
+            'manual-entry.json',
+            'MANUAL',
+            0,
+            JSON.stringify({}),
+            false,
+            'completed'
+          ]
+        );
+        cvResult = { rowCount: 1, rows: [insertCv.rows[0]] };
       }
       
       const cvId = cvResult.rows[0].cv_id;
-      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      const rawParsed = cvResult.rows[0].parsed_data;
+      const existingParsedData = typeof rawParsed === 'string' ? (rawParsed ? JSON.parse(rawParsed) : {}) : (rawParsed || {});
       
       // Merge existing parsed data with new data
       const updatedParsedData = {
