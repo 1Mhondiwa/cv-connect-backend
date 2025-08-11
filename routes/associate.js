@@ -539,6 +539,285 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
   }
 });
 
+// Submit freelancer service request
+router.post('/freelancer-request', authenticateToken, requireRole(['associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { title, description, required_skills, min_experience, preferred_location, budget_range, urgency_level } = req.body;
+
+    console.log(`🔍 Associate ${userId} submitting freelancer request:`, { title, required_skills });
+
+    // Validate required fields
+    if (!title || !description || !required_skills || required_skills.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title, description, and required skills are required'
+      });
+    }
+
+    // Get associate ID
+    const associateResult = await db.query(
+      'SELECT associate_id FROM "Associate" WHERE user_id = $1',
+      [userId]
+    );
+
+    if (associateResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associate profile not found'
+      });
+    }
+
+    const associateId = associateResult.rows[0].associate_id;
+
+    // Create the request
+    const requestResult = await db.query(
+      `INSERT INTO "Associate_Freelancer_Request" 
+       (associate_id, title, description, required_skills, min_experience, preferred_location, budget_range, urgency_level)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING request_id`,
+      [associateId, title, description, required_skills, min_experience || 0, preferred_location, budget_range, urgency_level || 'normal']
+    );
+
+    const requestId = requestResult.rows[0].request_id;
+
+    // Log the activity
+    await logActivity({
+      user_id: userId,
+      role: 'associate',
+      activity_type: 'Freelancer Request Submitted',
+      details: `Request ID: ${requestId}, Title: ${title}`
+    });
+
+    console.log(`✅ Freelancer request ${requestId} submitted successfully by associate ${userId}`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Freelancer request submitted successfully',
+      request_id: requestId
+    });
+  } catch (error) {
+    console.error('❌ Freelancer request submission error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get associate's freelancer requests
+router.get('/freelancer-requests', authenticateToken, requireRole(['associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    console.log(`🔍 Fetching freelancer requests for associate ${userId}`);
+
+    // Get associate ID
+    const associateResult = await db.query(
+      'SELECT associate_id FROM "Associate" WHERE user_id = $1',
+      [userId]
+    );
+
+    if (associateResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associate profile not found'
+      });
+    }
+
+    const associateId = associateResult.rows[0].associate_id;
+
+    // Get all requests for this associate
+    const requestsResult = await db.query(
+      `SELECT 
+         r.*,
+         COUNT(fr.recommendation_id) as recommendation_count,
+         COUNT(rr.response_id) as response_count
+       FROM "Associate_Freelancer_Request" r
+       LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
+       LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
+       WHERE r.associate_id = $1
+       GROUP BY r.request_id
+       ORDER BY r.created_at DESC`,
+      [associateId]
+    );
+
+    console.log(`✅ Found ${requestsResult.rowCount} freelancer requests for associate ${userId}`);
+
+    return res.status(200).json({
+      success: true,
+      requests: requestsResult.rows
+    });
+  } catch (error) {
+    console.error('❌ Fetch freelancer requests error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get freelancer recommendations for a specific request
+router.get('/freelancer-requests/:requestId/recommendations', authenticateToken, requireRole(['associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { requestId } = req.params;
+
+    console.log(`🔍 Associate ${userId} fetching recommendations for request ${requestId}`);
+
+    // Verify the request belongs to this associate
+    const requestResult = await db.query(
+      `SELECT r.*, a.user_id as associate_user_id 
+       FROM "Associate_Freelancer_Request" r
+       JOIN "Associate" a ON r.associate_id = a.associate_id
+       WHERE r.request_id = $1`,
+      [requestId]
+    );
+
+    if (requestResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request not found'
+      });
+    }
+
+    if (requestResult.rows[0].associate_user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Get recommendations with freelancer details
+    const recommendationsResult = await db.query(
+      `SELECT 
+         fr.*,
+         f.first_name,
+         f.last_name,
+         f.headline,
+         f.phone,
+         f.admin_rating,
+         u.email,
+         u.is_verified
+       FROM "Freelancer_Recommendation" fr
+       JOIN "Freelancer" f ON fr.freelancer_id = f.freelancer_id
+       JOIN "User" u ON f.user_id = u.user_id
+       WHERE fr.request_id = $1
+       ORDER BY fr.is_highlighted DESC, fr.admin_rating DESC`,
+      [requestId]
+    );
+
+    console.log(`✅ Found ${recommendationsResult.rowCount} recommendations for request ${requestId}`);
+
+    return res.status(200).json({
+      success: true,
+      recommendations: recommendationsResult.rows
+    });
+  } catch (error) {
+    console.error('❌ Fetch recommendations error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Submit response to a freelancer recommendation
+router.post('/freelancer-requests/:requestId/respond', authenticateToken, requireRole(['associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { requestId } = req.params;
+    const { freelancer_id, response, notes } = req.body;
+
+    console.log(`🔍 Associate ${userId} responding to recommendation for request ${requestId}, freelancer ${freelancer_id}`);
+
+    if (!freelancer_id || !response) {
+      return res.status(400).json({
+        success: false,
+        message: 'Freelancer ID and response are required'
+      });
+    }
+
+    if (!['interested', 'not_interested', 'hired'].includes(response)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid response type'
+      });
+    }
+
+    // Verify the request belongs to this associate
+    const requestResult = await db.query(
+      `SELECT r.*, a.user_id as associate_user_id 
+       FROM "Associate_Freelancer_Request" r
+       JOIN "Associate" a ON r.associate_id = a.associate_id
+       WHERE r.request_id = $1`,
+      [requestId]
+    );
+
+    if (requestResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request not found'
+      });
+    }
+
+    if (requestResult.rows[0].associate_user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Check if response already exists
+    const existingResponse = await db.query(
+      'SELECT response_id FROM "Request_Response" WHERE request_id = $1 AND freelancer_id = $2',
+      [requestId, freelancer_id]
+    );
+
+    if (existingResponse.rowCount > 0) {
+      // Update existing response
+      await db.query(
+        `UPDATE "Request_Response" 
+         SET associate_response = $1, associate_notes = $2, response_date = CURRENT_TIMESTAMP
+         WHERE request_id = $3 AND freelancer_id = $4`,
+        [response, notes, requestId, freelancer_id]
+      );
+    } else {
+      // Create new response
+      await db.query(
+        `INSERT INTO "Request_Response" 
+         (request_id, freelancer_id, associate_response, associate_notes)
+         VALUES ($1, $2, $3, $4)`,
+        [requestId, freelancer_id, response, notes]
+      );
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: userId,
+      role: 'associate',
+      activity_type: 'Freelancer Recommendation Response',
+      details: `Request ID: ${requestId}, Freelancer ID: ${freelancer_id}, Response: ${response}`
+    });
+
+    console.log(`✅ Response submitted successfully for request ${requestId}, freelancer ${freelancer_id}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Response submitted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Submit response error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
 
 
 module.exports = router;

@@ -634,4 +634,376 @@ router.put('/freelancers/:freelancerId/availability', authenticateToken, require
   }
 });
 
+// Get all associate freelancer requests (ESC Admin)
+router.get('/associate-requests', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    const params = [];
+
+    // Filter by status
+    if (status && status !== 'all') {
+      whereConditions.push(`r.status = $${params.length + 1}`);
+      params.push(status);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM "Associate_Freelancer_Request" r
+      JOIN "Associate" a ON r.associate_id = a.associate_id
+      JOIN "User" u ON a.user_id = u.user_id
+      ${whereClause}
+    `;
+    const countResult = await db.query(countQuery, params);
+    const totalCount = parseInt(countResult.rows[0].count);
+
+    // Main query
+    const requestsResult = await db.query(
+      `SELECT 
+         r.*,
+         a.contact_person,
+         a.industry,
+         u.email as associate_email,
+         COUNT(fr.recommendation_id) as recommendation_count,
+         COUNT(rr.response_id) as response_count
+       FROM "Associate_Freelancer_Request" r
+       JOIN "Associate" a ON r.associate_id = a.associate_id
+       JOIN "User" u ON a.user_id = u.user_id
+       LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
+       LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
+       ${whereClause}
+       GROUP BY r.request_id, a.contact_person, a.industry, u.email
+       ORDER BY r.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    console.log(`✅ Found ${requestsResult.rowCount} associate freelancer requests`);
+
+    return res.status(200).json({
+      success: true,
+      requests: requestsResult.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get associate requests error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get specific associate request with details (ESC Admin)
+router.get('/associate-requests/:requestId', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔍 ECS Admin ${adminUserId} fetching associate request ${requestId}`);
+
+    // Get request details
+    const requestResult = await db.query(
+      `SELECT 
+         r.*,
+         a.contact_person,
+         a.industry,
+         a.phone,
+         a.address,
+         u.email as associate_email
+       FROM "Associate_Freelancer_Request" r
+       JOIN "Associate" a ON r.associate_id = a.associate_id
+       JOIN "User" u ON a.user_id = u.user_id
+       WHERE r.request_id = $1`,
+      [requestId]
+    );
+
+    if (requestResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request not found'
+      });
+    }
+
+    const request = requestResult.rows[0];
+
+    // Get existing recommendations
+    const recommendationsResult = await db.query(
+      `SELECT 
+         fr.*,
+         f.first_name,
+         f.last_name,
+         f.headline,
+         f.admin_rating,
+         f.is_available,
+         u.email as freelancer_email
+       FROM "Freelancer_Recommendation" fr
+       JOIN "Freelancer" f ON fr.freelancer_id = f.freelancer_id
+       JOIN "User" u ON f.user_id = u.user_id
+       WHERE fr.request_id = $1
+       ORDER BY fr.is_highlighted DESC, fr.admin_rating DESC`,
+      [requestId]
+    );
+
+    // Get associate responses
+    const responsesResult = await db.query(
+      `SELECT 
+         rr.*,
+         f.first_name,
+         f.last_name,
+         u.email as freelancer_email
+       FROM "Request_Response" rr
+       JOIN "Freelancer" f ON rr.freelancer_id = f.freelancer_id
+       JOIN "User" u ON f.user_id = u.user_id
+       WHERE rr.request_id = $1`,
+      [requestId]
+    );
+
+    console.log(`✅ Request ${requestId} details fetched successfully`);
+
+    return res.status(200).json({
+      success: true,
+      request,
+      recommendations: recommendationsResult.rows,
+      responses: responsesResult.rows
+    });
+  } catch (error) {
+    console.error('❌ Get request details error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Add freelancer recommendations to a request (ESC Admin)
+router.post('/associate-requests/:requestId/recommendations', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { freelancer_ids, admin_notes, highlighted_freelancers } = req.body;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔍 ECS Admin ${adminUserId} adding recommendations to request ${requestId}`);
+
+    if (!freelancer_ids || freelancer_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one freelancer must be selected'
+      });
+    }
+
+    // Verify the request exists
+    const requestResult = await db.query(
+      'SELECT status FROM "Associate_Freelancer_Request" WHERE request_id = $1',
+      [requestId]
+    );
+
+    if (requestResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request not found'
+      });
+    }
+
+    // Check if request is already reviewed
+    if (requestResult.rows[0].status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Request has already been reviewed'
+      });
+    }
+
+    // Clear existing recommendations
+    await db.query(
+      'DELETE FROM "Freelancer_Recommendation" WHERE request_id = $1',
+      [requestId]
+    );
+
+    // Add new recommendations
+    for (let i = 0; i < freelancer_ids.length; i++) {
+      const freelancerId = freelancer_ids[i];
+      const isHighlighted = highlighted_freelancers && highlighted_freelancers.includes(freelancerId);
+      
+      await db.query(
+        `INSERT INTO "Freelancer_Recommendation" 
+         (request_id, freelancer_id, admin_notes, is_highlighted)
+         VALUES ($1, $2, $3, $4)`,
+        [requestId, freelancerId, admin_notes || '', isHighlighted]
+      );
+    }
+
+    // Update request status
+    await db.query(
+      `UPDATE "Associate_Freelancer_Request" 
+       SET status = 'provided', 
+           reviewed_at = CURRENT_TIMESTAMP,
+           reviewed_by = $1
+       WHERE request_id = $2`,
+      [adminUserId, requestId]
+    );
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Freelancer Recommendations Provided',
+      details: `Request ID: ${requestId}, Freelancers: ${freelancer_ids.length}`
+    });
+
+    console.log(`✅ ${freelancer_ids.length} recommendations added to request ${requestId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Recommendations added successfully'
+    });
+  } catch (error) {
+    console.error('❌ Add recommendations error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Update request status (ESC Admin)
+router.put('/associate-requests/:requestId/status', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { status, admin_notes } = req.body;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔍 ECS Admin ${adminUserId} updating request ${requestId} status to ${status}`);
+
+    if (!['pending', 'reviewed', 'provided', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status'
+      });
+    }
+
+    // Update request
+    const result = await db.query(
+      `UPDATE "Associate_Freelancer_Request" 
+       SET status = $1, 
+           admin_notes = $2,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE request_id = $3`,
+      [status, admin_notes, requestId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request not found'
+      });
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Request Status Updated',
+      details: `Request ID: ${requestId}, New Status: ${status}`
+    });
+
+    console.log(`✅ Request ${requestId} status updated to ${status}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Request status updated successfully'
+    });
+  } catch (error) {
+    console.error('❌ Update request status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Get all associate freelancer requests (ESC Admin)
+router.get('/associate-requests', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    const params = [];
+
+    // Filter by status
+    if (status && status !== 'all') {
+      whereConditions.push(`r.status = $${params.length + 1}`);
+      params.push(status);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM "Associate_Freelancer_Request" r
+      JOIN "Associate" a ON r.associate_id = a.associate_id
+      JOIN "User" u ON a.user_id = u.user_id
+      ${whereClause}
+    `;
+    const countResult = await db.query(countQuery, params);
+    const totalCount = parseInt(countResult.rows[0].count);
+
+    // Main query
+    const requestsResult = await db.query(
+      `SELECT 
+         r.*,
+         a.contact_person,
+         a.industry,
+         u.email as associate_email,
+         COUNT(fr.recommendation_id) as recommendation_count,
+         COUNT(rr.response_id) as response_count
+       FROM "Associate_Freelancer_Request" r
+       JOIN "Associate" a ON r.associate_id = a.associate_id
+       JOIN "User" u ON a.user_id = u.user_id
+       LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
+       LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
+       ${whereClause}
+       GROUP BY r.request_id, a.contact_person, a.industry, u.email
+       ORDER BY r.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    console.log(`✅ Found ${requestsResult.rowCount} associate freelancer requests`);
+
+    return res.status(200).json({
+      success: true,
+      requests: requestsResult.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get associate requests error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
