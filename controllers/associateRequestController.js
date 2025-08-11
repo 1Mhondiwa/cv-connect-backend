@@ -2,6 +2,7 @@
 const db = require('../config/database');
 const { logActivity } = require('../utils/activityLogger');
 const { sendEmail } = require('../utils/email');
+const bcrypt = require('bcryptjs');
 
 // Submit associate request (public endpoint)
 const submitAssociateRequest = async (req, res) => {
@@ -142,12 +143,25 @@ const getAllAssociateRequests = async (req, res) => {
 
   // Review associate request (ESC Admin only)
 const reviewAssociateRequest = async (req, res) => {
-    const client = await db.pool.connect();
+    let client;
     
     try {
+      // Get database client
+      client = await db.pool.connect();
+      console.log(`🔌 Database client connected for request ${req.params.requestId}`);
+      
       const { requestId } = req.params;
       const { status, review_notes, password } = req.body;
       const adminUserId = req.user.user_id;
+      
+      console.log(`📝 Review request parameters:`, {
+        requestId,
+        status,
+        hasPassword: !!password,
+        passwordLength: password ? password.length : 0,
+        adminUserId,
+        hasReviewNotes: !!review_notes
+      });
   
       // Validate status
       if (!['approved', 'rejected'].includes(status)) {
@@ -193,32 +207,36 @@ const reviewAssociateRequest = async (req, res) => {
   
       // If approved, create the associate account
       if (status === 'approved') {
-        if (!password) {
+        if (!password || password.trim().length < 6) {
           await client.query('ROLLBACK');
           return res.status(400).json({
             success: false,
-            message: 'Password is required when approving a request'
+            message: 'Password is required and must be at least 6 characters when approving a request'
           });
         }
   
-        // Import bcrypt for password hashing
-        const bcrypt = require('bcryptjs');
+        console.log(`🔐 Generating password hash for ${request.email}`);
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        console.log(`✅ Password hash generated successfully`);
   
         // Create user record
+        console.log(`👤 Creating user record for ${request.email}`);
         const userResult = await client.query(
           'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id',
           [request.email, hashedPassword, 'associate', true, true]
         );
   
         const userId = userResult.rows[0].user_id;
+        console.log(`✅ User record created with ID: ${userId}`);
   
         // Create associate record
+        console.log(`🏢 Creating associate record for user ${userId}`);
         await client.query(
           'INSERT INTO "Associate" (user_id, industry, contact_person, phone, address, website, verified) VALUES ($1, $2, $3, $4, $5, $6, $7)',
           [userId, request.industry, request.contact_person, request.phone, request.address, request.website, true]
         );
+        console.log(`✅ Associate record created successfully`);
   
         // Log activity
         await logActivity({
@@ -266,6 +284,8 @@ const reviewAssociateRequest = async (req, res) => {
       // Commit transaction
       await client.query('COMMIT');
   
+      console.log(`✅ Successfully ${status} associate request ${requestId} for ${request.email}`);
+      
       return res.status(200).json({
         success: true,
         message: `Associate request ${status} successfully`,
@@ -278,10 +298,18 @@ const reviewAssociateRequest = async (req, res) => {
       // Rollback transaction on error
       await client.query('ROLLBACK');
       
-      console.error('Review associate request error:', error);
+      console.error('❌ Review associate request error:', error);
+      console.error('Error details:', {
+        requestId,
+        status,
+        adminUserId,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
+      
       return res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: 'Failed to review request. Please try again.',
         error: error.message
       });
     } finally {
