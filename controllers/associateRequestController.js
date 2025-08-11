@@ -223,8 +223,8 @@ const reviewAssociateRequest = async (req, res) => {
         // Create user record
         console.log(`👤 Creating user record for ${request.email}`);
         const userResult = await client.query(
-          'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id',
-          [request.email, hashedPassword, 'associate', true, true]
+          'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified, has_changed_temp_password) VALUES ($1, $2, $3, $4, $5, $6) RETURNING user_id',
+          [request.email, hashedPassword, 'associate', true, true, false]
         );
   
         const userId = userResult.rows[0].user_id;

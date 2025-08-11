@@ -454,10 +454,10 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     const userId = req.user.user_id;
     const { oldPassword, newPassword } = req.body;
     
-    if (!oldPassword || !newPassword) {
+    if (!newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Old password and new password are required'
+        message: 'New password is required'
       });
     }
     
@@ -470,9 +470,9 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
       });
     }
     
-    // Get current user with hashed password
+    // Get current user with hashed password and temp password status
     const userResult = await db.query(
-      'SELECT hashed_password FROM "User" WHERE user_id = $1',
+      'SELECT hashed_password, has_changed_temp_password FROM "User" WHERE user_id = $1',
       [userId]
     );
     
@@ -484,37 +484,52 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     }
     
     const currentHashedPassword = userResult.rows[0].hashed_password;
+    const hasChangedTempPassword = userResult.rows[0].has_changed_temp_password;
     
-    // Verify old password
-    const isOldPasswordValid = await bcrypt.compare(oldPassword, currentHashedPassword);
-    
-    if (!isOldPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Old password is incorrect'
-      });
+    // If this is a temporary password change (first time), skip old password verification
+    if (!hasChangedTempPassword) {
+      console.log(`🔐 First-time password change for user ${userId}`);
+    } else {
+      // For subsequent password changes, require old password
+      if (!oldPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Old password is required for password changes'
+        });
+      }
+      
+      // Verify old password
+      const isOldPasswordValid = await bcrypt.compare(oldPassword, currentHashedPassword);
+      
+      if (!isOldPasswordValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Old password is incorrect'
+        });
+      }
     }
     
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     const newHashedPassword = await bcrypt.hash(newPassword, salt);
     
-    // Update password
+    // Update password and mark temp password as changed
     await db.query(
-      'UPDATE "User" SET hashed_password = $1 WHERE user_id = $2',
-      [newHashedPassword, userId]
+      'UPDATE "User" SET hashed_password = $1, has_changed_temp_password = $2 WHERE user_id = $3',
+      [newHashedPassword, true, userId]
     );
     
     // Log the activity
     await logActivity({
       user_id: userId,
       role: 'associate',
-      activity_type: 'Password Changed'
+      activity_type: hasChangedTempPassword ? 'Password Changed' : 'Temporary Password Changed'
     });
     
     return res.status(200).json({
       success: true,
-      message: 'Password changed successfully'
+      message: hasChangedTempPassword ? 'Password changed successfully' : 'Temporary password changed successfully',
+      isFirstTime: !hasChangedTempPassword
     });
   } catch (error) {
     console.error('Change password error:', error);
