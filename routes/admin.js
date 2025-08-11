@@ -6,6 +6,7 @@ const db = require('../config/database');
 const { uploadProfileImage } = require('../middleware/upload');
 const fs = require('fs-extra');
 const path = require('path');
+const { logActivity } = require('../utils/activityLogger'); // Added for new endpoints
 
 // Get system stats (ESC Admin)
 router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res) => {
@@ -81,19 +82,31 @@ router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res)
   }
 });
 
-// Get all freelancers with availability status (ESC Admin)
+// Get all freelancers with ECS Admin management fields (ESC Admin)
 router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { availability_status, page = 1, limit = 10 } = req.query;
+    const { availability_status, approval_status, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
     let whereConditions = ['u.is_active = true'];
     const params = [];
 
-    // Filter by availability status
+    // Filter by availability status (new field)
     if (availability_status && availability_status !== 'all') {
-      whereConditions.push(`f.availability_status = $${params.length + 1}`);
-      params.push(availability_status);
+      if (availability_status === 'available') {
+        whereConditions.push(`f.is_available = true`);
+      } else if (availability_status === 'unavailable') {
+        whereConditions.push(`f.is_available = false`);
+      }
+    }
+
+    // Filter by approval status
+    if (approval_status && approval_status !== 'all') {
+      if (approval_status === 'approved') {
+        whereConditions.push(`f.is_approved = true`);
+      } else if (approval_status === 'pending') {
+        whereConditions.push(`f.is_approved = false`);
+      }
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
@@ -108,13 +121,32 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     const countResult = await db.query(countQuery, params);
     const totalCount = parseInt(countResult.rows[0].count);
 
-    // Main query with availability status
+    // Main query with all new ECS Admin management fields
     const freelancersResult = await db.query(
-      `SELECT f.*, u.email, u.created_at, u.last_login, u.is_active, u.is_verified
+      `SELECT 
+         f.freelancer_id,
+         f.user_id,
+         f.first_name,
+         f.last_name,
+         f.headline,
+         f.phone,
+         f.is_approved,
+         f.approval_date,
+         f.approved_by,
+         f.is_available,
+         f.availability_notes,
+         f.admin_rating,
+         f.admin_notes,
+         f.last_admin_review,
+         u.email,
+         u.created_at,
+         u.last_login,
+         u.is_active,
+         u.is_verified
        FROM "Freelancer" f
        JOIN "User" u ON f.user_id = u.user_id
        ${whereClause}
-       ORDER BY f.freelancer_id DESC
+       ORDER BY f.is_approved DESC, f.admin_rating DESC, f.freelancer_id DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
     );
@@ -340,6 +372,260 @@ router.delete('/profile-image', authenticateToken, requireRole(['admin']), async
     });
   } catch (error) {
     console.error('Admin profile image deletion error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Freelancer approval endpoint
+router.put('/freelancers/:freelancerId/approve', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { freelancerId } = req.params;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔐 ECS Admin ${adminUserId} approving freelancer ${freelancerId}`);
+
+    // Update freelancer approval status
+    const result = await db.query(
+      `UPDATE "Freelancer" 
+       SET is_approved = TRUE, 
+           approval_date = CURRENT_TIMESTAMP, 
+           approved_by = $1,
+           last_admin_review = CURRENT_TIMESTAMP
+       WHERE freelancer_id = $2`,
+      [adminUserId, freelancerId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer not found'
+      });
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Freelancer Approved',
+      details: `Approved freelancer ID: ${freelancerId}`
+    });
+
+    console.log(`✅ Freelancer ${freelancerId} approved successfully by ECS Admin ${adminUserId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Freelancer approved successfully'
+    });
+  } catch (error) {
+    console.error('❌ Freelancer approval error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Freelancer rejection endpoint
+router.put('/freelancers/:freelancerId/reject', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { freelancerId } = req.params;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔐 ECS Admin ${adminUserId} rejecting freelancer ${freelancerId}`);
+
+    // Update freelancer approval status
+    const result = await db.query(
+      `UPDATE "Freelancer" 
+       SET is_approved = FALSE, 
+           approval_date = NULL, 
+           approved_by = NULL,
+           last_admin_review = CURRENT_TIMESTAMP
+       WHERE freelancer_id = $2`,
+      [adminUserId, freelancerId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer not found'
+      });
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Freelancer Rejected',
+      details: `Rejected freelancer ID: ${freelancerId}`
+    });
+
+    console.log(`✅ Freelancer ${freelancerId} rejected successfully by ECS Admin ${adminUserId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Freelancer rejected successfully'
+    });
+  } catch (error) {
+    console.error('❌ Freelancer rejection error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Update freelancer admin rating
+router.put('/freelancers/:freelancerId/rating', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { freelancerId } = req.params;
+    const { rating } = req.body;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔐 ECS Admin ${adminUserId} updating rating for freelancer ${freelancerId} to ${rating}`);
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be between 1 and 5'
+      });
+    }
+
+    // Update freelancer rating
+    const result = await db.query(
+      `UPDATE "Freelancer" 
+       SET admin_rating = $1, 
+           last_admin_review = CURRENT_TIMESTAMP
+       WHERE freelancer_id = $2`,
+      [rating, freelancerId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer not found'
+      });
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Freelancer Rating Updated',
+      details: `Updated rating to ${rating}/5 for freelancer ID: ${freelancerId}`
+    });
+
+    console.log(`✅ Freelancer ${freelancerId} rating updated to ${rating} by ECS Admin ${adminUserId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Freelancer rating updated successfully'
+    });
+  } catch (error) {
+    console.error('❌ Freelancer rating update error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Update freelancer admin notes
+router.put('/freelancers/:freelancerId/notes', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { freelancerId } = req.params;
+    const { notes } = req.body;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔐 ECS Admin ${adminUserId} updating notes for freelancer ${freelancerId}`);
+
+    // Update freelancer notes
+    const result = await db.query(
+      `UPDATE "Freelancer" 
+       SET admin_notes = $1, 
+           last_admin_review = CURRENT_TIMESTAMP
+       WHERE freelancer_id = $2`,
+      [notes, freelancerId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer not found'
+      });
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Freelancer Notes Updated',
+      details: `Updated admin notes for freelancer ID: ${freelancerId}`
+    });
+
+    console.log(`✅ Freelancer ${freelancerId} notes updated by ECS Admin ${adminUserId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Freelancer notes updated successfully'
+    });
+  } catch (error) {
+    console.error('❌ Freelancer notes update error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Update freelancer availability
+router.put('/freelancers/:freelancerId/availability', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { freelancerId } = req.params;
+    const { is_available } = req.body;
+    const adminUserId = req.user.user_id;
+
+    console.log(`🔐 ECS Admin ${adminUserId} updating availability for freelancer ${freelancerId} to ${is_available}`);
+
+    // Update freelancer availability
+    const result = await db.query(
+      `UPDATE "Freelancer" 
+       SET is_available = $1, 
+           last_admin_review = CURRENT_TIMESTAMP
+       WHERE freelancer_id = $2`,
+      [is_available, freelancerId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer not found'
+      });
+    }
+
+    // Log the activity
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Freelancer Availability Updated',
+      details: `Updated availability to ${is_available ? 'Available' : 'Unavailable'} for freelancer ID: ${freelancerId}`
+    });
+
+    console.log(`✅ Freelancer ${freelancerId} availability updated to ${is_available} by ECS Admin ${adminUserId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Freelancer availability updated successfully'
+    });
+  } catch (error) {
+    console.error('❌ Freelancer availability update error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
