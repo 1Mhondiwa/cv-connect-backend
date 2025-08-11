@@ -118,10 +118,10 @@ const addAssociate = async (req, res) => {
     // Begin transaction
     await client.query('BEGIN');
     
-    // Create user record
+    // Create user record with temporary password flag
     const userResult = await client.query(
-      'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id',
-      [email, hashedPassword, 'associate', true, true]
+      'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified, has_changed_temp_password) VALUES ($1, $2, $3, $4, $5, $6) RETURNING user_id',
+      [email, hashedPassword, 'associate', true, true, false]
     );
     
     const userId = userResult.rows[0].user_id;
@@ -226,7 +226,8 @@ const login = async (req, res) => {
       email: user.email,
       user_type: user.user_type,
       is_active: user.is_active,
-      is_verified: user.is_verified
+      is_verified: user.is_verified,
+      has_changed_temp_password: user.has_changed_temp_password
     };
     
     if (user.user_type === 'freelancer') {
