@@ -452,7 +452,9 @@ router.get('/activity', authenticateToken, requireRole(['associate']), async (re
 router.post('/change-password', authenticateToken, requireRole(['associate']), async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const { oldPassword, newPassword, isTemporaryPasswordChange } = req.body;
+    const { oldPassword, newPassword } = req.body;
+    
+    console.log(`🔍 Change password request for user ${userId}`);
     
     if (!newPassword) {
       return res.status(400).json({
@@ -486,27 +488,24 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     const currentHashedPassword = userResult.rows[0].hashed_password;
     const hasChangedTempPassword = userResult.rows[0].has_changed_temp_password;
     
-    // If this is a temporary password change (first time), skip old password verification
-    if (isTemporaryPasswordChange || !hasChangedTempPassword) {
-      console.log(`🔐 First-time password change for user ${userId}`);
-    } else {
-      // For subsequent password changes, require old password
-      if (!oldPassword) {
-        return res.status(400).json({
-          success: false,
-          message: 'Old password is required for password changes'
-        });
-      }
-      
-      // Verify old password
-      const isOldPasswordValid = await bcrypt.compare(oldPassword, currentHashedPassword);
-      
-      if (!isOldPasswordValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Old password is incorrect'
-        });
-      }
+
+    
+    // Always require old password (for first-time users, this will be their temporary password)
+    if (!oldPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old password is required'
+      });
+    }
+    
+    // Verify old password
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, currentHashedPassword);
+    
+    if (!isOldPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old password is incorrect'
+      });
     }
     
     // Hash new password
@@ -523,13 +522,12 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     await logActivity({
       user_id: userId,
       role: 'associate',
-      activity_type: hasChangedTempPassword ? 'Password Changed' : 'Temporary Password Changed'
+      activity_type: 'Password Changed'
     });
     
     return res.status(200).json({
       success: true,
-      message: hasChangedTempPassword ? 'Password changed successfully' : 'Temporary password changed successfully',
-      isFirstTime: !hasChangedTempPassword
+      message: 'Password changed successfully'
     });
   } catch (error) {
     console.error('Change password error:', error);
@@ -540,5 +538,7 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     });
   }
 });
+
+
 
 module.exports = router;
