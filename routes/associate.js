@@ -452,7 +452,7 @@ router.get('/activity', authenticateToken, requireRole(['associate']), async (re
 router.post('/change-password', authenticateToken, requireRole(['associate']), async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, newPassword, isTemporaryPasswordChange } = req.body;
     
     if (!newPassword) {
       return res.status(400).json({
@@ -487,7 +487,7 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     const hasChangedTempPassword = userResult.rows[0].has_changed_temp_password;
     
     // If this is a temporary password change (first time), skip old password verification
-    if (!hasChangedTempPassword) {
+    if (isTemporaryPasswordChange || !hasChangedTempPassword) {
       console.log(`🔐 First-time password change for user ${userId}`);
     } else {
       // For subsequent password changes, require old password
