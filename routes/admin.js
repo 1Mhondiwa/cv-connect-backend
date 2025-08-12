@@ -85,8 +85,10 @@ router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res)
 // Get all freelancers with ECS Admin management fields (ESC Admin)
 router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { availability_status, approval_status, page = 1, limit = 10 } = req.query;
+    const { availability_status, approval_status, page = 1, limit = 100 } = req.query;
     const offset = (page - 1) * limit;
+
+    console.log('🔍 Admin freelancers query - Query params:', { availability_status, approval_status, page, limit });
 
     let whereConditions = ['u.is_active = true'];
     const params = [];
@@ -99,6 +101,7 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
         whereConditions.push(`f.is_available = false`);
       }
     }
+    // If availability_status is 'all' or not provided, don't filter by availability
 
     // Filter by approval status
     if (approval_status && approval_status !== 'all') {
@@ -108,8 +111,13 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
         whereConditions.push(`f.is_approved = false`);
       }
     }
+    // If approval_status is 'all' or not provided, don't filter by approval status
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+    
+    console.log('🔍 Admin freelancers query - Where conditions:', whereConditions);
+    console.log('🔍 Admin freelancers query - Final WHERE clause:', whereClause);
+    console.log('🔍 Admin freelancers query - Params:', params);
 
     // Count query
     const countQuery = `
@@ -118,12 +126,14 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
       JOIN "User" u ON f.user_id = u.user_id
       ${whereClause}
     `;
+    console.log('🔍 Admin freelancers query - Count query:', countQuery);
     const countResult = await db.query(countQuery, params);
     const totalCount = parseInt(countResult.rows[0].count);
+    console.log('🔍 Admin freelancers query - Count result:', totalCount);
 
     // Main query with all new ECS Admin management fields
-    const freelancersResult = await db.query(
-      `SELECT 
+    const mainQuery = `
+      SELECT 
          f.freelancer_id,
          f.user_id,
          f.first_name,
@@ -138,6 +148,17 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
          f.admin_rating,
          f.admin_notes,
          f.last_admin_review,
+         f.years_experience as experience_years,
+         f.summary,
+         f.profile_picture_url,
+         f.current_status,
+         f.linkedin_url,
+         f.github_url,
+         f.education_summary,
+         f.work_history,
+         f.availability_status,
+         ARRAY[f.headline, f.current_status] as skills,
+         f.address as location,
          u.email,
          u.created_at,
          u.last_login,
@@ -147,11 +168,15 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
        JOIN "User" u ON f.user_id = u.user_id
        ${whereClause}
        ORDER BY f.is_approved DESC, f.admin_rating DESC, f.freelancer_id DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, limit, offset]
-    );
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     
-    return res.status(200).json({
+    console.log('🔍 Admin freelancers query - Main query:', mainQuery);
+    console.log('🔍 Admin freelancers query - Query params:', [...params, limit, offset]);
+    
+    const freelancersResult = await db.query(mainQuery, [...params, limit, offset]);
+    console.log('🔍 Admin freelancers query - Results count:', freelancersResult.rows.length);
+    
+    const response = {
       success: true,
       freelancers: freelancersResult.rows,
       pagination: {
@@ -160,7 +185,15 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
         total: totalCount,
         pages: Math.ceil(totalCount / limit)
       }
+    };
+    
+    console.log('🔍 Admin freelancers query - Final response:', {
+      success: response.success,
+      freelancerCount: response.freelancers.length,
+      totalCount: response.pagination.total
     });
+    
+    return res.status(200).json(response);
   } catch (error) {
     console.error('Get freelancers error:', error);
     return res.status(500).json({
