@@ -1039,4 +1039,313 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin']), asy
   }
 });
 
+// Analytics Endpoints for Real-time Data
+// Get registration trends with real-time dates
+router.get('/analytics/registration-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    // Get registration data for the last N days
+    const result = await db.query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN user_type = 'associate' THEN 1 END) as associates,
+        COUNT(CASE WHEN user_type = 'freelancer' THEN 1 END) as freelancers,
+        COUNT(CASE WHEN user_type = 'admin' THEN 1 END) as admins
+      FROM "User"
+      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+
+    // Format the data for the chart
+    const trends = result.rows.map(row => ({
+      date: row.date,
+      users: parseInt(row.total_users),
+      associates: parseInt(row.associates),
+      freelancers: parseInt(row.freelancers),
+      admins: parseInt(row.admins)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: trends
+    });
+  } catch (error) {
+    console.error('Analytics registration trends error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch registration trends',
+      error: error.message
+    });
+  }
+});
+
+// Get user type distribution
+router.get('/analytics/user-type-distribution', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        user_type as type,
+        COUNT(*) as count,
+        CASE 
+          WHEN user_type = 'freelancer' THEN '#fd680e'
+          WHEN user_type = 'associate' THEN '#10b981'
+          WHEN user_type = 'admin' THEN '#3b82f6'
+          ELSE '#6b7280'
+        END as fill
+      FROM "User"
+      WHERE is_active = true
+      GROUP BY user_type
+      ORDER BY count DESC
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows.map(row => ({
+        type: row.type.charAt(0).toUpperCase() + row.type.slice(1) + 's',
+        count: parseInt(row.count),
+        fill: row.fill
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics user type distribution error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user type distribution',
+      error: error.message
+    });
+  }
+});
+
+// Get user activity status
+router.get('/analytics/user-activity-status', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        CASE 
+          WHEN is_active = true THEN 'Active'
+          ELSE 'Inactive'
+        END as status,
+        COUNT(*) as count,
+        CASE 
+          WHEN is_active = true THEN '#10b981'
+          ELSE '#6b7280'
+        END as fill
+      FROM "User"
+      GROUP BY is_active
+      ORDER BY count DESC
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows.map(row => ({
+        status: row.status,
+        count: parseInt(row.count),
+        fill: row.fill
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics user activity status error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user activity status',
+      error: error.message
+    });
+  }
+});
+
+// Get CV upload trends
+router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    const result = await db.query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as uploads,
+        COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
+        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected
+      FROM "CV"
+      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+
+    const trends = result.rows.map(row => ({
+      date: row.date,
+      uploads: parseInt(row.uploads),
+      approved: parseInt(row.approved),
+      rejected: parseInt(row.rejected)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: trends
+    });
+  } catch (error) {
+    console.error('Analytics CV upload trends error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch CV upload trends',
+      error: error.message
+    });
+  }
+});
+
+// Get top skills
+router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        skill_name as skill,
+        COUNT(*) as count,
+        CASE 
+          WHEN skill_name = 'JavaScript' THEN '#fd680e'
+          WHEN skill_name = 'React' THEN '#10b981'
+          WHEN skill_name = 'Python' THEN '#3b82f6'
+          WHEN skill_name = 'Node.js' THEN '#8b5cf6'
+          WHEN skill_name = 'SQL' THEN '#f59e0b'
+          WHEN skill_name = 'AWS' THEN '#ef4444'
+          ELSE '#6b7280'
+        END as fill
+      FROM "Skill"
+      GROUP BY skill_name
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows.map(row => ({
+        skill: row.skill,
+        count: parseInt(row.count),
+        fill: row.fill
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics top skills error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch top skills',
+      error: error.message
+    });
+  }
+});
+
+// Get CV file types
+router.get('/analytics/cv-file-types', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        file_type as type,
+        COUNT(*) as count,
+        CASE 
+          WHEN file_type = 'PDF' THEN '#ef4444'
+          WHEN file_type = 'DOCX' THEN '#3b82f6'
+          WHEN file_type = 'DOC' THEN '#10b981'
+          WHEN file_type = 'TXT' THEN '#f59e0b'
+          ELSE '#6b7280'
+        END as fill
+      FROM "CV"
+      GROUP BY file_type
+      ORDER BY count DESC
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows.map(row => ({
+        type: row.type,
+        count: parseInt(row.count),
+        fill: row.fill
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics CV file types error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch CV file types',
+      error: error.message
+    });
+  }
+});
+
+// Get message trends
+router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    const result = await db.query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as messages,
+        COUNT(DISTINCT conversation_id) as conversations
+      FROM "Message"
+      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+
+    const trends = result.rows.map(row => ({
+      date: row.date,
+      messages: parseInt(row.messages),
+      conversations: parseInt(row.conversations)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: trends
+    });
+  } catch (error) {
+ console.error('Analytics message trends error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch message trends',
+      error: error.message
+    });
+  }
+});
+
+// Get user communication activity
+router.get('/analytics/user-communication-activity', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        u.first_name || ' ' || u.last_name as user,
+        COUNT(m.message_id) as messages,
+        COUNT(DISTINCT m.conversation_id) as conversations,
+        CASE 
+          WHEN u.user_type = 'freelancer' THEN '#fd680e'
+          WHEN u.user_type = 'associate' THEN '#10b981'
+          WHEN u.user_type = 'admin' THEN '#3b82f6'
+          ELSE '#6b7280'
+        END as fill
+      FROM "User" u
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id
+      WHERE u.is_active = true
+      GROUP BY u.user_id, u.first_name, u.last_name, u.user_type
+      ORDER BY messages DESC
+      LIMIT 10
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows.map(row => ({
+        user: row.user,
+        messages: parseInt(row.messages),
+        conversations: parseInt(row.conversations),
+        fill: row.fill
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics user communication activity error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user communication activity',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
