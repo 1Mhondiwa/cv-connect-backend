@@ -1766,6 +1766,667 @@ router.get('/reports/business-intelligence', authenticateToken, requireRole(['ad
   }
 });
 
+// ============================================================================
+// ENHANCED SECURITY & MONITORING ENDPOINTS
+// ============================================================================
+
+// Get detailed message content for security review
+router.get('/security/message/:messageId', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    
+    const result = await db.query(`
+      SELECT 
+        m.*,
+        u.email as sender_email,
+        u.user_type as sender_type,
+        u.is_active as sender_active,
+        u.created_at as sender_created,
+        u.last_login as sender_last_login,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as sender_name,
+        c.conversation_id,
+        -- Get conversation context
+        (
+          SELECT COUNT(*) 
+          FROM "Message" 
+          WHERE conversation_id = m.conversation_id
+        ) as conversation_message_count,
+        -- Get sender's message history
+        (
+          SELECT COUNT(*) 
+          FROM "Message" 
+          WHERE sender_id = m.sender_id
+        ) as sender_total_messages,
+        -- Get sender's recent activity
+        (
+          SELECT COUNT(*) 
+          FROM "Message" 
+          WHERE sender_id = m.sender_id 
+          AND sent_at >= CURRENT_DATE - INTERVAL '7 days'
+        ) as sender_recent_messages
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      LEFT JOIN "Associate" a ON u.user_type = 'associate' AND u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_type = 'freelancer' AND u.user_id = f.user_id
+      LEFT JOIN "Conversation" c ON m.conversation_id = c.conversation_id
+      WHERE m.message_id = $1
+    `, [messageId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    const message = result.rows[0];
+    
+    // Enhanced security analysis
+    const securityAnalysis = {
+      risk_score: calculateRiskScore(message),
+      content_flags: analyzeContent(message.content),
+      user_risk_profile: analyzeUserRisk(message),
+      conversation_context: analyzeConversationContext(message),
+      recommended_actions: generateSecurityRecommendations(message)
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        message,
+        security_analysis: securityAnalysis
+      }
+    });
+  } catch (error) {
+    console.error('Get message details error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get message details',
+      error: error.message
+    });
+  }
+});
+
+// Flag suspicious message for review
+router.post('/security/flag-message/:messageId', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { flag_reason, admin_notes, risk_level } = req.body;
+    const adminUserId = req.user.user_id;
+
+    // Create security flag record
+    const flagResult = await db.query(`
+      INSERT INTO "Security_Flag" (
+        message_id, 
+        flagged_by, 
+        flag_reason, 
+        risk_level, 
+        admin_notes, 
+        flagged_at
+      ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      RETURNING flag_id
+    `, [messageId, adminUserId, flag_reason, risk_level, admin_notes]);
+
+    // Log the security action
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Message Flagged',
+      details: `Message ${messageId} flagged as ${risk_level}: ${flag_reason}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message flagged successfully',
+      flag_id: flagResult.rows[0].flag_id
+    });
+  } catch (error) {
+    console.error('Flag message error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to flag message',
+      error: error.message
+    });
+  }
+});
+
+// Block user for security reasons
+router.post('/security/block-user/:userId', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { block_reason, admin_notes, block_duration } = req.body;
+    const adminUserId = req.user.user_id;
+
+    // Update user status
+    await db.query(`
+      UPDATE "User" 
+      SET is_active = false, 
+          blocked_at = CURRENT_TIMESTAMP,
+          block_reason = $1,
+          blocked_by = $2
+      WHERE user_id = $3
+    `, [block_reason, adminUserId, userId]);
+
+    // Create block record
+    await db.query(`
+      INSERT INTO "User_Block" (
+        user_id, 
+        blocked_by, 
+        block_reason, 
+        admin_notes, 
+        block_duration,
+        blocked_at
+      ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+    `, [userId, adminUserId, block_reason, admin_notes, block_duration]);
+
+    // Log the security action
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'User Blocked',
+      details: `User ${userId} blocked: ${block_reason}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'User blocked successfully'
+    });
+  } catch (error) {
+    console.error('Block user error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to block user',
+      error: error.message
+    });
+  }
+});
+
+// Get security audit log
+router.get('/security/audit-log', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { days = 30, page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const result = await db.query(`
+      SELECT 
+        a.*,
+        u.email as user_email,
+        u.user_type as user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN ass.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as user_display_name
+      FROM "Activity" a
+      LEFT JOIN "User" u ON a.user_id = u.user_id
+      LEFT JOIN "Associate" ass ON u.user_type = 'associate' AND u.user_id = ass.user_id
+      LEFT JOIN "Freelancer" f ON u.user_type = 'freelancer' AND u.user_id = f.user_id
+      WHERE a.activity_date >= CURRENT_DATE - INTERVAL '${days} days'
+        AND a.activity_type IN ('Message Flagged', 'User Blocked', 'Login Attempt', 'Suspicious Activity')
+      ORDER BY a.activity_date DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    // Get total count
+    const countResult = await db.query(`
+      SELECT COUNT(*) 
+      FROM "Activity" 
+      WHERE activity_date >= CURRENT_DATE - INTERVAL '${days} days'
+        AND activity_type IN ('Message Flagged', 'User Blocked', 'Login Attempt', 'Suspicious Activity')
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        activities: result.rows,
+        pagination: {
+          total: parseInt(countResult.rows[0].count),
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get audit log error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get audit log',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// AUTOMATED SECURITY ALERTS SYSTEM
+// ============================================================================
+
+// Get active security alerts
+router.get('/security/alerts', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { status = 'active', page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = '';
+    if (status === 'active') {
+      whereClause = 'WHERE resolved_at IS NULL';
+    } else if (status === 'resolved') {
+      whereClause = 'WHERE resolved_at IS NOT NULL';
+    } else if (status === 'acknowledged') {
+      whereClause = 'WHERE acknowledged_at IS NOT NULL AND resolved_at IS NULL';
+    }
+
+    const result = await db.query(`
+      SELECT 
+        sa.*,
+        u.email as related_user_email,
+        u.user_type as related_user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as related_user_name,
+        m.content as message_content,
+        m.sent_at as message_sent_at
+      FROM "Security_Alert" sa
+      LEFT JOIN "User" u ON sa.related_user_id = u.user_id
+      LEFT JOIN "Associate" a ON u.user_type = 'associate' AND u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_type = 'freelancer' AND u.user_id = f.user_id
+      LEFT JOIN "Message" m ON sa.related_message_id = m.message_id
+      ${whereClause}
+      ORDER BY 
+        CASE 
+          WHEN sa.severity = 'critical' THEN 1
+          WHEN sa.severity = 'high' THEN 2
+          WHEN sa.severity = 'medium' THEN 3
+          WHEN sa.severity = 'low' THEN 4
+        END,
+        sa.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    // Get total count
+    const countResult = await db.query(`
+      SELECT COUNT(*) 
+      FROM "Security_Alert" sa
+      ${whereClause}
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        alerts: result.rows,
+        pagination: {
+          total: parseInt(countResult.rows[0].count),
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total_pages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get security alerts error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get security alerts',
+      error: error.message
+    });
+  }
+});
+
+// Acknowledge security alert
+router.put('/security/alerts/:alertId/acknowledge', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { alertId } = req.params;
+    const { admin_notes } = req.body;
+    const adminUserId = req.user.user_id;
+
+    const result = await db.query(`
+      UPDATE "Security_Alert" 
+      SET acknowledged_at = CURRENT_TIMESTAMP,
+          acknowledged_by = $1
+      WHERE alert_id = $2 AND acknowledged_at IS NULL
+      RETURNING *
+    `, [adminUserId, alertId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Alert not found or already acknowledged'
+      });
+    }
+
+    // Log the action
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Alert Acknowledged',
+      details: `Security alert ${alertId} acknowledged`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Alert acknowledged successfully',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Acknowledge alert error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to acknowledge alert',
+      error: error.message
+    });
+  }
+});
+
+// Resolve security alert
+router.put('/security/alerts/:alertId/resolve', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { alertId } = req.params;
+    const { resolution_notes } = req.body;
+    const adminUserId = req.user.user_id;
+
+    const result = await db.query(`
+      UPDATE "Security_Alert" 
+      SET resolved_at = CURRENT_TIMESTAMP,
+          resolved_by = $1,
+          resolution_notes = $2
+      WHERE alert_id = $3 AND resolved_at IS NULL
+      RETURNING *
+    `, [adminUserId, resolution_notes, alertId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Alert not found or already resolved'
+      });
+    }
+
+    // Log the action
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Alert Resolved',
+      details: `Security alert ${alertId} resolved: ${resolution_notes}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Alert resolved successfully',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Resolve alert error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resolve alert',
+      error: error.message
+    });
+  }
+});
+
+// Get security alerts summary (for dashboard)
+router.get('/security/alerts/summary', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const summaryResult = await db.query(`
+      SELECT 
+        severity,
+        COUNT(*) as count,
+        COUNT(CASE WHEN resolved_at IS NULL THEN 1 END) as active_count,
+        COUNT(CASE WHEN acknowledged_at IS NULL AND resolved_at IS NULL THEN 1 END) as unacknowledged_count
+      FROM "Security_Alert"
+      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY severity
+      ORDER BY 
+        CASE 
+          WHEN severity = 'critical' THEN 1
+          WHEN severity = 'high' THEN 2
+          WHEN severity = 'medium' THEN 3
+          WHEN severity = 'low' THEN 4
+        END
+    `);
+
+    const totalAlertsResult = await db.query(`
+      SELECT 
+        COUNT(*) as total_alerts,
+        COUNT(CASE WHEN resolved_at IS NULL THEN 1 END) as active_alerts,
+        COUNT(CASE WHEN acknowledged_at IS NULL AND resolved_at IS NULL THEN 1 END) as unacknowledged_alerts,
+        COUNT(CASE WHEN created_at >= CURRENT_DATE THEN 1 END) as today_alerts
+      FROM "Security_Alert"
+    `);
+
+    const recentAlertsResult = await db.query(`
+      SELECT 
+        alert_id,
+        alert_type,
+        severity,
+        title,
+        created_at,
+        related_user_id,
+        related_message_id
+      FROM "Security_Alert"
+      WHERE resolved_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 5
+      `);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        summary: summaryResult.rows,
+        totals: totalAlertsResult.rows[0],
+        recent_alerts: recentAlertsResult.rows
+      }
+    });
+  } catch (error) {
+    console.error('Get alerts summary error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get alerts summary',
+      error: error.message
+    });
+  }
+});
+
+// Run automated security scan and generate alerts
+router.post('/security/scan', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const adminUserId = req.user.user_id;
+    const alertsGenerated = [];
+
+    // 1. Scan for suspicious messages
+    const suspiciousMessagesResult = await db.query(`
+      SELECT 
+        m.message_id,
+        m.content,
+        m.sent_at,
+        m.sender_id,
+        u.email as sender_email,
+        u.user_type as sender_type
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '24 hours'
+        AND m.message_id NOT IN (
+          SELECT DISTINCT related_message_id 
+          FROM "Security_Alert" 
+          WHERE alert_type = 'suspicious_message'
+        )
+    `);
+
+    for (const message of suspiciousMessagesResult.rows) {
+      const riskScore = calculateRiskScore(message);
+      if (riskScore >= 30) { // Medium risk threshold
+        const alertResult = await db.query(`
+          INSERT INTO "Security_Alert" (
+            alert_type, severity, title, description, 
+            related_user_id, related_message_id, alert_data
+          ) VALUES (
+            'suspicious_message',
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6
+          ) RETURNING alert_id
+        `, [
+          riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low',
+          `Suspicious Message Detected (Risk: ${riskScore}/100)`,
+          `Message from ${message.sender_email} contains suspicious content with risk score ${riskScore}`,
+          message.sender_id,
+          message.message_id,
+          JSON.stringify({
+            risk_score: riskScore,
+            content_preview: message.content.substring(0, 100),
+            sender_type: message.sender_type,
+            sent_at: message.sent_at
+          })
+        ]);
+
+        if (alertResult.rowCount > 0) {
+          alertsGenerated.push({
+            type: 'suspicious_message',
+            alert_id: alertResult.rows[0].alert_id,
+            risk_score: riskScore
+          });
+        }
+      }
+    }
+
+    // 2. Scan for high-risk users
+    const highRiskUsersResult = await db.query(`
+      SELECT 
+        u.user_id,
+        u.email,
+        u.user_type,
+        u.last_login,
+        COUNT(m.message_id) as message_count_24h
+      FROM "User" u
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id 
+        AND m.sent_at >= CURRENT_DATE - INTERVAL '24 hours'
+      WHERE u.is_active = true
+        AND u.user_id NOT IN (
+          SELECT DISTINCT related_user_id 
+          FROM "Security_Alert" 
+          WHERE alert_type = 'high_risk_user'
+          AND created_at >= CURRENT_DATE - INTERVAL '1 hour'
+        )
+      GROUP BY u.user_id, u.email, u.user_type, u.last_login
+      HAVING COUNT(m.message_id) > 50
+    `);
+
+    for (const user of highRiskUsersResult.rows) {
+      const alertResult = await db.query(`
+        INSERT INTO "Security_Alert" (
+          alert_type, severity, title, description, 
+          related_user_id, alert_data
+        ) VALUES (
+          'high_risk_user',
+          'medium',
+          'High Message Volume User',
+          'User ${user.email} sent ${user.message_count_24h} messages in 24 hours',
+          $1,
+          $2
+        ) RETURNING alert_id
+      `, [
+        user.user_id,
+        JSON.stringify({
+          message_count_24h: user.message_count_24h,
+          user_type: user.user_type,
+          last_login: user.last_login
+        })
+      ]);
+
+      if (alertResult.rowCount > 0) {
+        alertsGenerated.push({
+          type: 'high_risk_user',
+          alert_id: alertResult.rows[0].alert_id,
+          user_email: user.email
+        });
+      }
+    }
+
+    // 3. Scan for unusual activity patterns
+    const unusualActivityResult = await db.query(`
+      SELECT 
+        u.user_id,
+        u.email,
+        u.user_type,
+        u.last_login,
+        u.created_at
+      FROM "User" u
+      WHERE u.is_active = true
+        AND u.last_login < CURRENT_DATE - INTERVAL '30 days'
+        AND u.user_id NOT IN (
+          SELECT DISTINCT related_user_id 
+          FROM "Security_Alert" 
+          WHERE alert_type = 'unusual_activity'
+          AND created_at >= CURRENT_DATE - INTERVAL '1 day'
+        )
+    `);
+
+    for (const user of unusualActivityResult.rows) {
+      const alertResult = await db.query(`
+        INSERT INTO "Security_Alert" (
+          alert_type, severity, title, description, 
+          related_user_id, alert_data
+        )         VALUES (
+          'unusual_activity',
+          'low',
+          'Inactive User Activity',
+          'User ' || $3 || ' has been inactive for over 30 days',
+          $1,
+          $2
+        ) RETURNING alert_id
+      `, [
+        user.user_id,
+        JSON.stringify({
+          days_inactive: Math.floor((Date.now() - new Date(user.last_login).getTime()) / (1000 * 60 * 60 * 24)),
+          user_type: user.user_type,
+          created_at: user.created_at
+        }),
+        user.email
+      ]);
+
+      if (alertResult.rowCount > 0) {
+        alertsGenerated.push({
+          type: 'unusual_activity',
+          alert_id: alertResult.rows[0].alert_id,
+          user_email: user.email
+        });
+      }
+    }
+
+    // Log the security scan
+    await logActivity({
+      user_id: adminUserId,
+      role: 'admin',
+      activity_type: 'Security Scan Executed',
+      details: `Generated ${alertsGenerated.length} new security alerts`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Security scan completed. Generated ${alertsGenerated.length} new alerts.`,
+      data: {
+        alerts_generated: alertsGenerated,
+        scan_timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Security scan error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to execute security scan',
+      error: error.message
+    });
+  }
+});
+
 // Export comprehensive report data for documentation
 router.get('/reports/export/:type', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
@@ -1820,6 +2481,105 @@ router.get('/reports/export/:type', authenticateToken, requireRole(['admin']), a
     });
   }
 });
+
+// ============================================================================
+// SECURITY ANALYSIS HELPER FUNCTIONS
+// ============================================================================
+
+function calculateRiskScore(message) {
+  let score = 0;
+  
+  // Content-based scoring
+  const suspiciousKeywords = ['spam', 'scam', 'phishing', 'urgent', 'click here', 'verify', 'confirm'];
+  const content = message.content.toLowerCase();
+  
+  suspiciousKeywords.forEach(keyword => {
+    if (content.includes(keyword)) score += 10;
+  });
+  
+  // User behavior scoring
+  if (message.sender_recent_messages > 50) score += 20; // High message volume
+  if (message.sender_total_messages > 200) score += 15; // Very active user
+  
+  // Time-based scoring
+  const messageTime = new Date(message.sent_at);
+  const hour = messageTime.getHours();
+  if (hour < 6 || hour > 22) score += 5; // Unusual hours
+  
+  return Math.min(score, 100); // Cap at 100
+}
+
+function analyzeContent(content) {
+  const flags = [];
+  const text = content.toLowerCase();
+  
+  if (text.match(/[A-Z]{5,}/)) flags.push('excessive_caps');
+  if (text.match(/[!]{2,}/)) flags.push('excessive_punctuation');
+  if (text.match(/https?:\/\/[^\s]+/)) flags.push('contains_links');
+  if (text.includes('spam') || text.includes('scam')) flags.push('suspicious_keywords');
+  if (text.includes('urgent') || text.includes('immediate')) flags.push('urgency_indicators');
+  
+  return flags;
+}
+
+function analyzeUserRisk(message) {
+  const risk = {
+    level: 'low',
+    factors: []
+  };
+  
+  if (message.sender_recent_messages > 50) {
+    risk.factors.push('high_message_volume');
+    risk.level = 'medium';
+  }
+  
+  if (message.sender_total_messages > 200) {
+    risk.factors.push('very_active_user');
+    risk.level = 'medium';
+  }
+  
+  if (!message.sender_active) {
+    risk.factors.push('inactive_account');
+    risk.level = 'high';
+  }
+  
+  if (message.sender_last_login < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
+    risk.factors.push('no_recent_login');
+    risk.level = 'high';
+  }
+  
+  return risk;
+}
+
+function analyzeConversationContext(message) {
+  return {
+    message_count: message.conversation_message_count,
+    context: message.conversation_message_count > 10 ? 'established_conversation' : 'new_conversation',
+    risk_indicator: message.conversation_message_count === 1 ? 'first_message' : 'ongoing_discussion'
+  };
+}
+
+function generateSecurityRecommendations(message) {
+  const recommendations = [];
+  
+  if (message.sender_recent_messages > 50) {
+    recommendations.push('Monitor user message volume for spam patterns');
+  }
+  
+  if (!message.sender_active) {
+    recommendations.push('Investigate inactive account sending messages');
+  }
+  
+  if (message.sender_last_login < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
+    recommendations.push('Check for account compromise - no recent login');
+  }
+  
+  if (message.content.toLowerCase().includes('spam') || message.content.toLowerCase().includes('scam')) {
+    recommendations.push('Immediate review required - contains suspicious keywords');
+  }
+  
+  return recommendations;
+}
 
 // Helper function to convert data to CSV
 function convertToCSV(data) {
