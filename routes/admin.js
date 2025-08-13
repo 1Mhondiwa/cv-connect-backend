@@ -1278,12 +1278,12 @@ router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']
     
     const result = await db.query(`
       SELECT 
-        DATE(created_at) as date,
+        DATE(sent_at) as date,
         COUNT(*) as messages,
         COUNT(DISTINCT conversation_id) as conversations
       FROM "Message"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
-      GROUP BY DATE(created_at)
+      WHERE sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      GROUP BY DATE(sent_at)
       ORDER BY date ASC
     `);
 
@@ -1298,7 +1298,7 @@ router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']
       data: trends
     });
   } catch (error) {
- console.error('Analytics message trends error:', error);
+    console.error('Analytics message trends error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch message trends',
@@ -1312,7 +1312,11 @@ router.get('/analytics/user-communication-activity', authenticateToken, requireR
   try {
     const result = await db.query(`
       SELECT 
-        u.first_name || ' ' || u.last_name as user,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as user,
         COUNT(m.message_id) as messages,
         COUNT(DISTINCT m.conversation_id) as conversations,
         CASE 
@@ -1322,9 +1326,11 @@ router.get('/analytics/user-communication-activity', authenticateToken, requireR
           ELSE '#6b7280'
         END as fill
       FROM "User" u
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
       LEFT JOIN "Message" m ON u.user_id = m.sender_id
       WHERE u.is_active = true
-      GROUP BY u.user_id, u.first_name, u.last_name, u.user_type
+      GROUP BY u.user_id, u.user_type, a.contact_person, f.first_name, f.last_name
       ORDER BY messages DESC
       LIMIT 10
     `);
