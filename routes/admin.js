@@ -1354,4 +1354,80 @@ router.get('/analytics/user-communication-activity', authenticateToken, requireR
   }
 });
 
+// Get visitor analytics data (web vs mobile activity)
+router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { days = 90 } = req.query;
+    
+    // Get user activity data grouped by date and device type
+    // For now, we'll simulate web vs mobile based on user activity patterns
+    // In a real implementation, you'd track actual device types from login logs
+    
+    // First, check if we have any users at all
+    const userCountResult = await db.query('SELECT COUNT(*) FROM "User"');
+    const totalUsers = parseInt(userCountResult.rows[0].count);
+    
+    if (totalUsers === 0) {
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // Get the date range of existing users
+    const dateRangeResult = await db.query(`
+      SELECT 
+        MIN(created_at) as earliest,
+        MAX(created_at) as latest
+      FROM "User"
+    `);
+    
+    const earliestDate = dateRangeResult.rows[0].earliest;
+    const latestDate = dateRangeResult.rows[0].latest;
+    
+    // Calculate the actual date range to use
+    let startDate;
+    if (days === 7) {
+      startDate = new Date(latestDate);
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (days === 30) {
+      startDate = new Date(latestDate);
+      startDate.setDate(startDate.getDate() - 30);
+    } else {
+      startDate = new Date(earliestDate);
+    }
+    
+    const result = await db.query(`
+      SELECT 
+        DATE(u.created_at) as date,
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN u.user_type = 'associate' THEN 1 END) as web_users,
+        COUNT(CASE WHEN u.user_type = 'freelancer' THEN 1 END) as mobile_users
+      FROM "User" u
+      WHERE u.created_at >= $1
+      GROUP BY DATE(u.created_at)
+      ORDER BY date ASC
+    `, [startDate]);
+
+    // Format the data for the chart
+    const visitorData = result.rows.map(row => ({
+      date: row.date,
+      desktop: parseInt(row.web_users), // Associates typically use web
+      mobile: parseInt(row.mobile_users) // Freelancers may use mobile more
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: visitorData
+    });
+  } catch (error) {
+    console.error('Analytics visitor data error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch visitor data',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
