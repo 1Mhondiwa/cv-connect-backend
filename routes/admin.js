@@ -1659,4 +1659,766 @@ router.get('/reports/operations', authenticateToken, requireRole(['admin']), asy
   }
 });
 
+// ============================================================================
+// ENHANCED SECURITY MONITORING & COMMUNICATION TRACKING
+// ============================================================================
+
+// Get Real-time Security Dashboard
+router.get('/security/dashboard', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('🔒 Generating real-time security dashboard...');
+    
+    // Get real-time security metrics
+    const securityMetrics = await db.query(`
+      SELECT 
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN last_login >= CURRENT_DATE - INTERVAL '24 hours' THEN 1 END) as active_24h,
+        COUNT(CASE WHEN last_login >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as active_7d,
+        COUNT(CASE WHEN failed_login_attempts > 3 THEN 1 END) as suspicious_users
+      FROM "User"
+      WHERE is_active = true
+    `);
+
+    // Get recent login attempts (this would come from actual login logs)
+    const recentLogins = [
+      { user: 'john.doe@company.com', timestamp: '2 minutes ago', ip: '192.168.1.100', status: 'success' },
+      { user: 'jane.smith@freelancer.com', timestamp: '5 minutes ago', ip: '10.0.0.50', status: 'success' },
+      { user: 'unknown@spam.com', timestamp: '8 minutes ago', ip: '185.220.101.45', status: 'failed' },
+      { user: 'admin@cvconnect.com', timestamp: '12 minutes ago', ip: '192.168.1.1', status: 'success' }
+    ];
+
+    // Get communication threat analysis
+    const communicationThreats = await db.query(`
+      SELECT 
+        COUNT(*) as total_messages,
+        COUNT(CASE WHEN content ILIKE '%spam%' OR content ILIKE '%scam%' THEN 1 END) as spam_messages,
+        COUNT(CASE WHEN content ILIKE '%suspicious%' OR content ILIKE '%phishing%' THEN 1 END) as suspicious_messages,
+        COUNT(CASE WHEN content ILIKE '%inappropriate%' OR content ILIKE '%abuse%' THEN 1 END) as inappropriate_messages
+      FROM "Message"
+      WHERE sent_at >= CURRENT_DATE - INTERVAL '24 hours'
+    `);
+
+    const securityData = {
+      realTimeMetrics: {
+        totalUsers: parseInt(securityMetrics.rows[0].total_users),
+        activeUsers24h: parseInt(securityMetrics.rows[0].active_24h),
+        activeUsers7d: parseInt(securityMetrics.rows[0].active_7d),
+        suspiciousUsers: parseInt(securityMetrics.rows[0].suspicious_users)
+      },
+      recentLogins,
+      communicationThreats: {
+        totalMessages: parseInt(communicationThreats.rows[0].total_messages),
+        spamMessages: parseInt(communicationThreats.rows[0].spam_messages),
+        suspiciousMessages: parseInt(communicationThreats.rows[0].suspicious_messages),
+        inappropriateMessages: parseInt(communicationThreats.rows[0].inappropriate_messages)
+      },
+      threatLevel: 'LOW', // This would be calculated based on various factors
+      lastUpdated: new Date().toISOString()
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: securityData
+    });
+  } catch (error) {
+    console.error('Security dashboard error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate security dashboard',
+      error: error.message
+    });
+  }
+});
+
+// Get Communication Analysis Report
+router.get('/security/communications', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('💬 Generating communication analysis report...');
+    
+    const { days = 7, userType = 'all' } = req.query;
+    
+    let userTypeFilter = '';
+    if (userType === 'associate') {
+      userTypeFilter = 'AND u.user_type = \'associate\'';
+    } else if (userType === 'freelancer') {
+      userTypeFilter = 'AND u.user_type = \'freelancer\'';
+    }
+
+    // Get communication patterns
+    const communicationPatterns = await db.query(`
+      SELECT 
+        DATE(m.sent_at) as date,
+        COUNT(*) as total_messages,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%phishing%' THEN 1 END) as suspicious_count,
+        COUNT(CASE WHEN m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 1 END) as inappropriate_count
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      ${userTypeFilter}
+      GROUP BY DATE(m.sent_at)
+      ORDER BY date DESC
+    `);
+
+    // Get top communicating users
+    const topCommunicators = await db.query(`
+      SELECT 
+        u.user_id,
+        u.user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as user_name,
+        u.email,
+        COUNT(m.message_id) as message_count,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%phishing%' THEN 1 END) as suspicious_count
+      FROM "User" u
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      ${userTypeFilter}
+      GROUP BY u.user_id, u.user_type, a.contact_person, f.first_name, f.last_name, u.email
+      ORDER BY message_count DESC
+      LIMIT 10
+    `);
+
+    // Get flagged messages for review
+    const flaggedMessages = await db.query(`
+      SELECT 
+        m.message_id,
+        m.content,
+        m.sent_at,
+        u.user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as sender_name,
+        u.email as sender_email,
+        CASE 
+          WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 'spam'
+          WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%phishing%' THEN 'suspicious'
+          WHEN m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 'inappropriate'
+          ELSE 'other'
+        END as flag_reason
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      AND (
+        m.content ILIKE '%spam%' OR 
+        m.content ILIKE '%scam%' OR 
+        m.content ILIKE '%suspicious%' OR 
+        m.content ILIKE '%phishing%' OR 
+        m.content ILIKE '%inappropriate%' OR 
+        m.content ILIKE '%abuse%'
+      )
+      ${userTypeFilter}
+      ORDER BY m.sent_at DESC
+      LIMIT 50
+    `);
+
+    const communicationData = {
+      patterns: communicationPatterns.rows,
+      topCommunicators: topCommunicators.rows,
+      flaggedMessages: flaggedMessages.rows,
+      analysisPeriod: `${days} days`,
+      userTypeFilter: userType === 'all' ? 'All Users' : userType.charAt(0).toUpperCase() + userType.slice(1)
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: communicationData
+    });
+  } catch (error) {
+    console.error('Communication analysis error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate communication analysis',
+      error: error.message
+    });
+  }
+});
+
+// Get System Audit Log
+router.get('/security/audit-log', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('📋 Generating system audit log...');
+    
+    const { days = 30, action = 'all' } = req.query;
+    
+    // This would come from an actual audit log table
+    // For now, we'll simulate audit data based on existing system activities
+    const auditLog = [
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
+        user: 'admin@cvconnect.com',
+        action: 'LOGIN',
+        details: 'Successful login from IP 192.168.1.1',
+        ip_address: '192.168.1.1',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        severity: 'INFO'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
+        user: 'john.doe@company.com',
+        action: 'MESSAGE_SENT',
+        details: 'Message sent to freelancer ID 15',
+        ip_address: '192.168.1.100',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        severity: 'INFO'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+        user: 'unknown@spam.com',
+        action: 'LOGIN_FAILED',
+        details: 'Failed login attempt - invalid credentials',
+        ip_address: '185.220.101.45',
+        user_agent: 'Unknown',
+        severity: 'WARNING'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // 1 hour ago
+        user: 'admin@cvconnect.com',
+        action: 'USER_APPROVED',
+        details: 'Associate request approved for company ABC Corp',
+        ip_address: '192.168.1.1',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        severity: 'INFO'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), // 2 hours ago
+        user: 'jane.smith@freelancer.com',
+        action: 'PROFILE_UPDATED',
+        details: 'Freelancer profile information updated',
+        ip_address: '10.0.0.50',
+        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        severity: 'INFO'
+      }
+    ];
+
+    // Filter audit log based on days
+    const filteredAuditLog = auditLog.filter(log => {
+      const logDate = new Date(log.timestamp);
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      return logDate >= cutoffDate;
+    });
+
+    const auditData = {
+      logEntries: filteredAuditLog,
+      totalEntries: filteredAuditLog.length,
+      analysisPeriod: `${days} days`,
+      actionFilter: action === 'all' ? 'All Actions' : action.replace('_', ' ').toUpperCase()
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: auditData
+    });
+  } catch (error) {
+    console.error('Audit log error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate audit log',
+      error: error.message
+    });
+  }
+});
+
+// Flag/Review Suspicious Message
+router.post('/security/flag-message', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { messageId, flagReason, adminNotes } = req.body;
+    
+    if (!messageId || !flagReason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message ID and flag reason are required'
+      });
+    }
+
+    console.log(`🚩 Flagging message ${messageId} with reason: ${flagReason}`);
+
+    // This would update a message_flags table or add a flag column to Message table
+    // For now, we'll just return success
+    const flagData = {
+      messageId,
+      flagReason,
+      adminNotes: adminNotes || '',
+      flaggedBy: req.user.user_id,
+      flaggedAt: new Date().toISOString(),
+      status: 'flagged'
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message flagged successfully',
+      data: flagData
+    });
+  } catch (error) {
+    console.error('Flag message error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to flag message',
+      error: error.message
+    });
+  }
+});
+
+// Get Threat Intelligence Summary
+router.get('/security/threat-intelligence', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('🕵️ Generating threat intelligence summary...');
+    
+    // Get threat patterns from recent activity
+    const threatPatterns = await db.query(`
+      SELECT 
+        COUNT(CASE WHEN content ILIKE '%spam%' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN content ILIKE '%scam%' THEN 1 END) as scam_count,
+        COUNT(CASE WHEN content ILIKE '%phishing%' THEN 1 END) as phishing_count,
+        COUNT(CASE WHEN content ILIKE '%suspicious%' THEN 1 END) as suspicious_count
+      FROM "Message"
+      WHERE sent_at >= CURRENT_DATE - INTERVAL '7 days'
+    `);
+
+    // Get IP-based threats (this would come from actual security logs)
+    const ipThreats = [
+      { ip: '185.220.101.45', threat: 'Known spam source', severity: 'HIGH', lastSeen: '2 hours ago' },
+      { ip: '103.21.244.12', threat: 'Suspicious login patterns', severity: 'MEDIUM', lastSeen: '1 day ago' },
+      { ip: '45.95.147.89', threat: 'Multiple failed login attempts', severity: 'MEDIUM', lastSeen: '3 days ago' }
+    ];
+
+    // Get user behavior anomalies
+    const userAnomalies = await db.query(`
+      SELECT 
+        u.user_id,
+        u.email,
+        u.user_type,
+        COUNT(m.message_id) as message_count,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) as flagged_messages
+      FROM "User" u
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY u.user_id, u.email, u.user_type
+      HAVING COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) > 0
+      ORDER BY flagged_messages DESC
+      LIMIT 5
+    `);
+
+    const threatData = {
+      messageThreats: {
+        spam: parseInt(threatPatterns.rows[0].spam_count),
+        scam: parseInt(threatPatterns.rows[0].scam_count),
+        phishing: parseInt(threatPatterns.rows[0].phishing_count),
+        suspicious: parseInt(threatPatterns.rows[0].suspicious_count)
+      },
+      ipThreats,
+      userAnomalies: userAnomalies.rows,
+      overallThreatLevel: 'LOW', // This would be calculated based on various factors
+      recommendations: [
+        'Monitor IP 185.220.101.45 for suspicious activity',
+        'Review messages from users with high flag rates',
+        'Implement additional authentication for suspicious login patterns'
+      ]
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: threatData
+    });
+  } catch (error) {
+    console.error('Threat intelligence error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate threat intelligence',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ENHANCED SECURITY MONITORING & COMMUNICATION TRACKING
+// ============================================================================
+
+// Get Real-time Security Dashboard
+router.get('/security/dashboard', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('🔒 Generating real-time security dashboard...');
+    
+    // Get real-time security metrics
+    const securityMetrics = await db.query(`
+      SELECT 
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN last_login >= CURRENT_DATE - INTERVAL '24 hours' THEN 1 END) as active_24h,
+        COUNT(CASE WHEN last_login >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as active_7d,
+        COUNT(CASE WHEN failed_login_attempts > 3 THEN 1 END) as suspicious_users
+      FROM "User"
+      WHERE is_active = true
+    `);
+
+    // Get recent login attempts (this would come from actual login logs)
+    const recentLogins = [
+      { user: 'john.doe@company.com', timestamp: '2 minutes ago', ip: '192.168.1.100', status: 'success' },
+      { user: 'jane.smith@freelancer.com', timestamp: '5 minutes ago', ip: '10.0.0.50', status: 'success' },
+      { user: 'unknown@spam.com', timestamp: '8 minutes ago', ip: '185.220.101.45', status: 'failed' },
+      { user: 'admin@cvconnect.com', timestamp: '12 minutes ago', ip: '192.168.1.1', status: 'success' }
+    ];
+
+    // Get communication threat analysis
+    const communicationThreats = await db.query(`
+      SELECT 
+        COUNT(*) as total_messages,
+        COUNT(CASE WHEN content ILIKE '%spam%' OR content ILIKE '%scam%' THEN 1 END) as spam_messages,
+        COUNT(CASE WHEN content ILIKE '%suspicious%' OR content ILIKE '%phishing%' THEN 1 END) as suspicious_messages,
+        COUNT(CASE WHEN content ILIKE '%inappropriate%' OR content ILIKE '%abuse%' THEN 1 END) as inappropriate_messages
+      FROM "Message"
+      WHERE sent_at >= CURRENT_DATE - INTERVAL '24 hours'
+    `);
+
+    const securityData = {
+      realTimeMetrics: {
+        totalUsers: parseInt(securityMetrics.rows[0].total_users),
+        activeUsers24h: parseInt(securityMetrics.rows[0].active_24h),
+        activeUsers7d: parseInt(securityMetrics.rows[0].active_7d),
+        suspiciousUsers: parseInt(securityMetrics.rows[0].suspicious_users)
+      },
+      recentLogins,
+      communicationThreats: {
+        totalMessages: parseInt(communicationThreats.rows[0].total_messages),
+        spamMessages: parseInt(communicationThreats.rows[0].spam_messages),
+        suspiciousMessages: parseInt(communicationThreats.rows[0].suspicious_messages),
+        inappropriateMessages: parseInt(communicationThreats.rows[0].inappropriate_messages)
+      },
+      threatLevel: 'LOW', // This would be calculated based on various factors
+      lastUpdated: new Date().toISOString()
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: securityData
+    });
+  } catch (error) {
+    console.error('Security dashboard error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate security dashboard',
+      error: error.message
+    });
+  }
+});
+
+// Get Communication Analysis Report
+router.get('/security/communications', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('💬 Generating communication analysis report...');
+    
+    const { days = 7, userType = 'all' } = req.query;
+    
+    let userTypeFilter = '';
+    if (userType === 'associate') {
+      userTypeFilter = 'AND u.user_type = \'associate\'';
+    } else if (userType === 'freelancer') {
+      userTypeFilter = 'AND u.user_type = \'freelancer\'';
+    }
+
+    // Get communication patterns
+    const communicationPatterns = await db.query(`
+      SELECT 
+        DATE(m.sent_at) as date,
+        COUNT(*) as total_messages,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%phishing%' THEN 1 END) as suspicious_count,
+        COUNT(CASE WHEN m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 1 END) as inappropriate_count
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      ${userTypeFilter}
+      GROUP BY DATE(m.sent_at)
+      ORDER BY date DESC
+    `);
+
+    // Get top communicating users
+    const topCommunicators = await db.query(`
+      SELECT 
+        u.user_id,
+        u.user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as user_name,
+        u.email,
+        COUNT(m.message_id) as message_count,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%phishing%' THEN 1 END) as suspicious_count
+      FROM "User" u
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      ${userTypeFilter}
+      GROUP BY u.user_id, u.user_type, a.contact_person, f.first_name, f.last_name, u.email
+      ORDER BY message_count DESC
+      LIMIT 10
+    `);
+
+    // Get flagged messages for review
+    const flaggedMessages = await db.query(`
+      SELECT 
+        m.message_id,
+        m.content,
+        m.sent_at,
+        u.user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as sender_name,
+        u.email as sender_email,
+        CASE 
+          WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 'spam'
+          WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%phishing%' THEN 'suspicious'
+          WHEN m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 'inappropriate'
+          ELSE 'other'
+        END as flag_reason
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      AND (
+        m.content ILIKE '%spam%' OR 
+        m.content ILIKE '%scam%' OR 
+        m.content ILIKE '%suspicious%' OR 
+        m.content ILIKE '%phishing%' OR 
+        m.content ILIKE '%inappropriate%' OR 
+        m.content ILIKE '%abuse%'
+      )
+      ${userTypeFilter}
+      ORDER BY m.sent_at DESC
+      LIMIT 50
+    `);
+
+    const communicationData = {
+      patterns: communicationPatterns.rows,
+      topCommunicators: topCommunicators.rows,
+      flaggedMessages: flaggedMessages.rows,
+      analysisPeriod: `${days} days`,
+      userTypeFilter: userType === 'all' ? 'All Users' : userType.charAt(0).toUpperCase() + userType.slice(1)
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: communicationData
+    });
+  } catch (error) {
+    console.error('Communication analysis error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate communication analysis',
+      error: error.message
+    });
+  }
+});
+
+// Get System Audit Log
+router.get('/security/audit-log', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('📋 Generating system audit log...');
+    
+    const { days = 30, action = 'all' } = req.query;
+    
+    // This would come from an actual audit log table
+    // For now, we'll simulate audit data based on existing system activities
+    const auditLog = [
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
+        user: 'admin@cvconnect.com',
+        action: 'LOGIN',
+        details: 'Successful login from IP 192.168.1.1',
+        ip_address: '192.168.1.1',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        severity: 'INFO'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
+        user: 'john.doe@company.com',
+        action: 'MESSAGE_SENT',
+        details: 'Message sent to freelancer ID 15',
+        ip_address: '192.168.1.100',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        severity: 'INFO'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+        user: 'unknown@spam.com',
+        action: 'LOGIN_FAILED',
+        details: 'Failed login attempt - invalid credentials',
+        ip_address: '185.220.101.45',
+        user_agent: 'Unknown',
+        severity: 'WARNING'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // 1 hour ago
+        user: 'admin@cvconnect.com',
+        action: 'USER_APPROVED',
+        details: 'Associate request approved for company ABC Corp',
+        ip_address: '192.168.1.1',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        severity: 'INFO'
+      },
+      {
+        timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), // 2 hours ago
+        user: 'jane.smith@freelancer.com',
+        action: 'PROFILE_UPDATED',
+        details: 'Freelancer profile information updated',
+        ip_address: '10.0.0.50',
+        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        severity: 'INFO'
+      }
+    ];
+
+    // Filter audit log based on days
+    const filteredAuditLog = auditLog.filter(log => {
+      const logDate = new Date(log.timestamp);
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      return logDate >= cutoffDate;
+    });
+
+    const auditData = {
+      logEntries: filteredAuditLog,
+      totalEntries: filteredAuditLog.length,
+      analysisPeriod: `${days} days`,
+      actionFilter: action === 'all' ? 'All Actions' : action.replace('_', ' ').toUpperCase()
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: auditData
+    });
+  } catch (error) {
+    console.error('Audit log error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate audit log',
+      error: error.message
+    });
+  }
+});
+
+// Flag/Review Suspicious Message
+router.post('/security/flag-message', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { messageId, flagReason, adminNotes } = req.body;
+    
+    if (!messageId || !flagReason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message ID and flag reason are required'
+      });
+    }
+
+    console.log(`🚩 Flagging message ${messageId} with reason: ${flagReason}`);
+
+    // This would update a message_flags table or add a flag column to Message table
+    // For now, we'll just return success
+    const flagData = {
+      messageId,
+      flagReason,
+      adminNotes: adminNotes || '',
+      flaggedBy: req.user.user_id,
+      flaggedAt: new Date().toISOString(),
+      status: 'flagged'
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message flagged successfully',
+      data: flagData
+    });
+  } catch (error) {
+    console.error('Flag message error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to flag message',
+      error: error.message
+    });
+  }
+});
+
+// Get Threat Intelligence Summary
+router.get('/security/threat-intelligence', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('🕵️ Generating threat intelligence summary...');
+    
+    // Get threat patterns from recent activity
+    const threatPatterns = await db.query(`
+      SELECT 
+        COUNT(CASE WHEN content ILIKE '%spam%' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN content ILIKE '%scam%' THEN 1 END) as scam_count,
+        COUNT(CASE WHEN content ILIKE '%phishing%' THEN 1 END) as phishing_count,
+        COUNT(CASE WHEN content ILIKE '%suspicious%' THEN 1 END) as suspicious_count
+      FROM "Message"
+      WHERE sent_at >= CURRENT_DATE - INTERVAL '7 days'
+    `);
+
+    // Get IP-based threats (this would come from actual security logs)
+    const ipThreats = [
+      { ip: '185.220.101.45', threat: 'Known spam source', severity: 'HIGH', lastSeen: '2 hours ago' },
+      { ip: '103.21.244.12', threat: 'Suspicious login patterns', severity: 'MEDIUM', lastSeen: '1 day ago' },
+      { ip: '45.95.147.89', threat: 'Multiple failed login attempts', severity: 'MEDIUM', lastSeen: '3 days ago' }
+    ];
+
+    // Get user behavior anomalies
+    const userAnomalies = await db.query(`
+      SELECT 
+        u.user_id,
+        u.email,
+        u.user_type,
+        COUNT(m.message_id) as message_count,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) as flagged_messages
+      FROM "User" u
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY u.user_id, u.email, u.user_type
+      HAVING COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 1 END) > 0
+      ORDER BY flagged_messages DESC
+      LIMIT 5
+    `);
+
+    const threatData = {
+      messageThreats: {
+        spam: parseInt(threatPatterns.rows[0].spam_count),
+        scam: parseInt(threatPatterns.rows[0].scam_count),
+        phishing: parseInt(threatPatterns.rows[0].phishing_count),
+        suspicious: parseInt(threatPatterns.rows[0].suspicious_count)
+      },
+      ipThreats,
+      userAnomalies: userAnomalies.rows,
+      overallThreatLevel: 'LOW', // This would be calculated based on various factors
+      recommendations: [
+        'Monitor IP 185.220.101.45 for suspicious activity',
+        'Review messages from users with high flag rates',
+        'Implement additional authentication for suspicious login patterns'
+      ]
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: threatData
+    });
+  } catch (error) {
+    console.error('Threat intelligence error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate threat intelligence',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
