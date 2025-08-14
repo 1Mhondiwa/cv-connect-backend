@@ -1,50 +1,28 @@
-// Run database migrations
-const db = require('./config/database');
-const fs = require('fs');
-const path = require('path');
+const { setupPerformanceMonitoring } = require('./migrations/setup-performance-monitoring');
 
-const runMigrations = async () => {
-  try {
-    console.log('🔍 Starting database migrations...');
-    
-    // Get all migration files
-    const migrationsDir = path.join(__dirname, 'migrations');
-    const migrationFiles = fs.readdirSync(migrationsDir)
-      .filter(file => file.endsWith('.sql'))
-      .sort(); // Ensure migrations run in order
-    
-    console.log(`📁 Found ${migrationFiles.length} migration files:`, migrationFiles);
-    
-    for (const file of migrationFiles) {
-      console.log(`\n🔄 Running migration: ${file}`);
-      
-      const migrationPath = path.join(migrationsDir, file);
-      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-      
-      try {
-        await db.query(migrationSQL);
-        console.log(`✅ Migration ${file} completed successfully`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('does not exist')) {
-          console.log(`⚠️  Migration ${file} skipped (already applied or not applicable)`);
-        } else {
-          console.error(`❌ Migration ${file} failed:`, error.message);
-          throw error;
-        }
-      }
-    }
-    
-    console.log('\n🎉 All migrations completed successfully!');
-    
-  } catch (error) {
-    console.error('❌ Migration process failed:', error);
-    process.exit(1);
-  } finally {
+console.log('🚀 Starting Performance Monitoring Database Setup...');
+console.log('This will create all necessary tables, extensions, and functions for real-time monitoring.');
+
+setupPerformanceMonitoring()
+  .then(() => {
+    console.log('');
+    console.log('🎉 Setup completed successfully!');
+    console.log('Your System Performance reports will now show real data from your database.');
+    console.log('');
+    console.log('Next steps:');
+    console.log('1. Restart your backend server: npm start');
+    console.log('2. Test the System Performance reports in your Admin Dashboard');
     process.exit(0);
-  }
-};
-
-// Run migrations
-runMigrations();
+  })
+  .catch((error) => {
+    console.error('');
+    console.error('❌ Setup failed:', error.message);
+    console.error('');
+    console.error('If you see permission errors for pg_stat_statements extension:');
+    console.error('1. Connect to PostgreSQL as superuser');
+    console.error('2. Run: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;');
+    console.error('3. Then run this migration again');
+    process.exit(1);
+  });
 
 
