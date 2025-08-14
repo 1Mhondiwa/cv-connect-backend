@@ -1781,21 +1781,44 @@ router.get('/reports/business', authenticateToken, requireRole(['admin']), async
 // Get Security & Compliance Report
 router.get('/reports/security', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔒 Generating security & compliance report...');
+    console.log('🔒 Generating comprehensive security & compliance report...');
     
-    // Get security overview
+    // Get real-time security overview from database
+    const securityOverviewResult = await db.query(`
+      SELECT 
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' OR m.content ILIKE '%phishing%' THEN 1 END) as total_threats,
+        COUNT(CASE WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 1 END) as blocked_attempts,
+        COUNT(DISTINCT m.sender_id) as total_users_communicating,
+        MAX(m.sent_at) as last_activity
+      FROM "Message" m
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '30 days'
+    `);
+
+    // Calculate security score based on real metrics
+    const totalMessages = await db.query(`SELECT COUNT(*) as count FROM "Message" WHERE sent_at >= CURRENT_DATE - INTERVAL '30 days'`);
+    const totalMsgCount = parseInt(totalMessages.rows[0].count);
+    const threatCount = parseInt(securityOverviewResult.rows[0].total_threats);
+    const blockedCount = parseInt(securityOverviewResult.rows[0].blocked_attempts);
+    
+    const securityScore = totalMsgCount > 0 ? 
+      Math.max(0, Math.min(100, 100 - ((threatCount + blockedCount) / totalMsgCount * 100))) : 100;
+    
     const securityOverview = {
-      totalThreats: 3, // This would come from actual security monitoring
-      blockedAttempts: 12, // This would come from actual security logs
-      securityScore: 'A+', // This would be calculated from various security metrics
-      lastAudit: '2 days ago' // This would come from actual audit logs
+      totalThreats: threatCount,
+      blockedAttempts: blockedCount,
+      securityScore: `${Math.round(securityScore)}%`,
+      lastAudit: securityOverviewResult.rows[0].last_activity ? 
+        new Date(securityOverviewResult.rows[0].last_activity).toLocaleDateString() : 'Never',
+      totalUsersCommunicating: parseInt(securityOverviewResult.rows[0].total_users_communicating)
     };
 
-    // Get communication monitoring data
+    // Get comprehensive communication monitoring data
     const communicationResult = await db.query(`
       SELECT 
         COUNT(*) as total_messages,
-        COUNT(CASE WHEN content ILIKE '%suspicious%' OR content ILIKE '%spam%' THEN 1 END) as flagged_messages
+        COUNT(CASE WHEN content ILIKE '%spam%' OR content ILIKE '%scam%' OR content ILIKE '%phishing%' THEN 1 END) as flagged_messages,
+        COUNT(CASE WHEN content ILIKE '%suspicious%' OR content ILIKE '%inappropriate%' OR content ILIKE '%abuse%' THEN 1 END) as suspicious_messages,
+        COUNT(DISTINCT sender_id) as unique_senders
       FROM "Message"
       WHERE sent_at >= CURRENT_DATE - INTERVAL '30 days'
     `);
@@ -1803,20 +1826,109 @@ router.get('/reports/security', authenticateToken, requireRole(['admin']), async
     const communicationMonitoring = {
       totalMessages: parseInt(communicationResult.rows[0].total_messages),
       flaggedMessages: parseInt(communicationResult.rows[0].flagged_messages),
-      suspiciousUsers: 1, // This would come from actual security analysis
-      complianceScore: '98.5%' // This would be calculated from compliance metrics
+      suspiciousMessages: parseInt(communicationResult.rows[0].suspicious_messages),
+      suspiciousUsers: parseInt(communicationResult.rows[0].unique_senders),
+      complianceScore: totalMsgCount > 0 ? 
+        `${Math.round(((totalMsgCount - parseInt(communicationResult.rows[0].flagged_messages) - parseInt(communicationResult.rows[0].suspicious_messages)) / totalMsgCount) * 100)}%` : '100%'
     };
 
-    // Recent security alerts (this would come from actual security monitoring)
-    const recentAlerts = [
-      { alert: 'Suspicious login attempt detected', severity: 'medium', timestamp: '3 hours ago' },
-      { alert: 'Unusual message pattern detected', severity: 'low', timestamp: '1 day ago' }
-    ];
+    // Get real-time security alerts based on actual flagged messages
+    const flaggedMessagesResult = await db.query(`
+      SELECT 
+        m.message_id,
+        m.content,
+        m.sent_at,
+        u.user_type,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as sender_name,
+        u.email as sender_email,
+        CASE 
+          WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' THEN 'spam'
+          WHEN m.content ILIKE '%phishing%' THEN 'phishing'
+          WHEN m.content ILIKE '%suspicious%' THEN 'suspicious'
+          WHEN m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 'inappropriate'
+          ELSE 'other'
+        END as flag_reason
+      FROM "Message" m
+      JOIN "User" u ON m.sender_id = u.user_id
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '7 days'
+      AND (
+        m.content ILIKE '%spam%' OR 
+        m.content ILIKE '%scam%' OR 
+        m.content ILIKE '%phishing%' OR 
+        m.content ILIKE '%suspicious%' OR 
+        m.content ILIKE '%inappropriate%' OR 
+        m.content ILIKE '%abuse%'
+      )
+      ORDER BY m.sent_at DESC
+      LIMIT 20
+    `);
+
+    // Generate real security alerts from flagged messages
+    const recentAlerts = flaggedMessagesResult.rows.map(msg => ({
+      alert: `Flagged message from ${msg.sender_name} (${msg.sender_email})`,
+      severity: msg.flag_reason === 'phishing' || msg.flag_reason === 'abuse' ? 'high' : 
+                msg.flag_reason === 'spam' || msg.flag_reason === 'suspicious' ? 'medium' : 'low',
+      timestamp: new Date(msg.sent_at).toLocaleString(),
+      messageId: msg.message_id,
+      flagReason: msg.flag_reason,
+      senderName: msg.sender_name,
+      senderEmail: msg.sender_email,
+      content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : '')
+    }));
+
+    // Get all communicating users for accountability
+    const allCommunicatingUsers = await db.query(`
+      SELECT 
+        u.user_id,
+        u.user_type,
+        u.email,
+        CASE 
+          WHEN u.user_type = 'associate' THEN a.contact_person
+          WHEN u.user_type = 'freelancer' THEN f.first_name || ' ' || f.last_name
+          ELSE u.email
+        END as display_name,
+        COUNT(m.message_id) as message_count,
+        MAX(m.sent_at) as last_message,
+        COUNT(CASE WHEN m.content ILIKE '%spam%' OR m.content ILIKE '%scam%' OR m.content ILIKE '%phishing%' THEN 1 END) as threat_count,
+        COUNT(CASE WHEN m.content ILIKE '%suspicious%' OR m.content ILIKE '%inappropriate%' OR m.content ILIKE '%abuse%' THEN 1 END) as suspicious_count
+      FROM "User" u
+      LEFT JOIN "Associate" a ON u.user_id = a.user_id
+      LEFT JOIN "Freelancer" f ON u.user_id = f.user_id
+      LEFT JOIN "Message" m ON u.user_id = m.sender_id
+      WHERE m.sent_at >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY u.user_id, u.user_type, u.email, a.contact_person, f.first_name, f.last_name
+      ORDER BY message_count DESC
+    `);
 
     const securityData = {
       securityOverview,
       communicationMonitoring,
-      recentAlerts
+      recentAlerts,
+      allCommunicatingUsers: allCommunicatingUsers.rows,
+      reportGenerated: new Date().toISOString(),
+      auditTrail: {
+        totalMessagesAnalyzed: totalMsgCount,
+        threatsDetected: threatCount,
+        suspiciousActivity: parseInt(communicationResult.rows[0].suspicious_messages),
+        complianceStatus: securityScore >= 90 ? 'Excellent' : securityScore >= 70 ? 'Good' : 'Needs Attention'
+      },
+      realTimeMetrics: {
+        systemStatus: 'Active',
+        lastMessageTime: securityOverviewResult.rows[0].last_activity ? 
+          new Date(securityOverviewResult.rows[0].last_activity).toLocaleString() : 'Never',
+        activeConversations: await db.query(`SELECT COUNT(DISTINCT conversation_id) as count FROM "Message" WHERE sent_at >= CURRENT_DATE - INTERVAL '7 days'`).then(result => result.rows[0].count),
+        messageVolume: {
+          today: await db.query(`SELECT COUNT(*) as count FROM "Message" WHERE DATE(sent_at) = CURRENT_DATE`).then(result => result.rows[0].count),
+          week: await db.query(`SELECT COUNT(*) as count FROM "Message" WHERE sent_at >= CURRENT_DATE - INTERVAL '7 days'`).then(result => result.rows[0].count),
+          month: totalMsgCount
+        }
+      }
     };
 
     return res.status(200).json({
