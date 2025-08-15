@@ -102,6 +102,11 @@ const requireRole = (roles) => {
       });
     }
     
+    // ECS Employees have the same permissions as admins
+    if (req.user.user_type === 'ecs_employee') {
+      req.user.user_type = 'admin'; // Temporarily elevate for role checking
+    }
+    
     if (!roles.includes(req.user.user_type)) {
       return res.status(403).json({ 
         success: false, 

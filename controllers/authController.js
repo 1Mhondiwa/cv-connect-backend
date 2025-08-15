@@ -451,6 +451,109 @@ const createAdmin = async (req, res) => {
   }
 };
 
+// Create ECS Employee user (ESC Admin only)
+const createECSEmployee = async (req, res) => {
+  const client = await db.pool.connect();
+  
+  try {
+    const { email, password, first_name, last_name, phone, department, position, employee_id_number, secretKey } = req.body;
+    
+    // Check if secret key matches ECS Employee secret key
+    if (secretKey !== process.env.ECS_EMPLOYEE_SECRET_KEY) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid secret key'
+      });
+    }
+    
+    // Check if email already exists
+    const existingUser = await client.query(
+      'SELECT * FROM "User" WHERE email = $1',
+      [email]
+    );
+    
+    if (existingUser.rowCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already exists'
+      });
+    }
+    
+    // Check if employee ID number already exists
+    if (employee_id_number) {
+      const existingEmployee = await client.query(
+        'SELECT * FROM "ECS_Employee" WHERE employee_id_number = $1',
+        [employee_id_number]
+      );
+      
+      if (existingEmployee.rowCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Employee ID number already exists'
+        });
+      }
+    }
+    
+    // Begin transaction
+    await client.query('BEGIN');
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Create user record
+    const userResult = await client.query(
+      'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id',
+      [email, hashedPassword, 'ecs_employee', true, true]
+    );
+    
+    const userId = userResult.rows[0].user_id;
+    
+    // Create ECS Employee record
+    const employeeResult = await client.query(
+      'INSERT INTO "ECS_Employee" (user_id, first_name, last_name, phone, department, position, employee_id_number) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING employee_id',
+      [userId, first_name, last_name, phone || null, department || null, position || null, employee_id_number || null]
+    );
+    
+    const employeeId = employeeResult.rows[0].employee_id;
+    
+    // Commit transaction
+    await client.query('COMMIT');
+    
+    // Generate JWT token
+    const token = generateToken(userId);
+    
+    return res.status(201).json({
+      success: true,
+      message: 'ECS Employee created successfully',
+      data: {
+        user_id: userId,
+        employee_id: employeeId,
+        email,
+        first_name,
+        last_name,
+        phone,
+        department,
+        position,
+        employee_id_number,
+        token
+      }
+    });
+  } catch (error) {
+    // Rollback transaction on error
+    await client.query('ROLLBACK');
+    console.error('ECS Employee creation error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  } finally {
+    // Release client back to pool
+    client.release();
+  }
+};
+
 // Verify email token
 const verifyEmail = async (req, res) => {
   try {
@@ -498,5 +601,6 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   createAdmin,
+  createECSEmployee,
   verifyEmail
 };
