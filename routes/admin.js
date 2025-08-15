@@ -667,8 +667,8 @@ router.put('/freelancers/:freelancerId/availability', authenticateToken, require
   }
 });
 
-// Get all associate freelancer requests (ESC Admin)
-router.get('/associate-requests', authenticateToken, requireRole(['admin']), async (req, res) => {
+// Get all associate freelancer requests (ESC Admin and ECS Employee)
+router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
@@ -738,13 +738,13 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin']), asy
   }
 });
 
-// Get specific associate request with details (ESC Admin)
-router.get('/associate-requests/:requestId', authenticateToken, requireRole(['admin']), async (req, res) => {
+// Get specific associate request with details (ESC Admin and ECS Employee)
+router.get('/associate-requests/:requestId', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
   try {
     const { requestId } = req.params;
-    const adminUserId = req.user.user_id;
+    const reviewerUserId = req.user.user_id;
 
-    console.log(`🔍 ECS Admin ${adminUserId} fetching associate request ${requestId}`);
+    console.log(`🔍 ECS Admin/Employee ${reviewerUserId} fetching associate request ${requestId}`);
 
     // Get request details
     const requestResult = await db.query(
@@ -821,14 +821,14 @@ router.get('/associate-requests/:requestId', authenticateToken, requireRole(['ad
   }
 });
 
-// Add freelancer recommendations to a request (ESC Admin)
-router.post('/associate-requests/:requestId/recommendations', authenticateToken, requireRole(['admin']), async (req, res) => {
+// Add freelancer recommendations to a request (ESC Admin and ECS Employee)
+router.post('/associate-requests/:requestId/recommendations', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
   try {
     const { requestId } = req.params;
     const { freelancer_ids, admin_notes, highlighted_freelancers } = req.body;
-    const adminUserId = req.user.user_id;
+    const reviewerUserId = req.user.user_id;
 
-    console.log(`🔍 ECS Admin ${adminUserId} adding recommendations to request ${requestId}`);
+    console.log(`🔍 ECS Admin/Employee ${reviewerUserId} adding recommendations to request ${requestId}`);
 
     if (!freelancer_ids || freelancer_ids.length === 0) {
       return res.status(400).json({
@@ -884,13 +884,13 @@ router.post('/associate-requests/:requestId/recommendations', authenticateToken,
            reviewed_at = CURRENT_TIMESTAMP,
            reviewed_by = $1
        WHERE request_id = $2`,
-      [adminUserId, requestId]
+      [reviewerUserId, requestId]
     );
 
     // Log the activity
     await logActivity({
-      user_id: adminUserId,
-      role: 'admin',
+      user_id: reviewerUserId,
+      role: req.user.user_type,
       activity_type: 'Freelancer Recommendations Provided',
       details: `Request ID: ${requestId}, Freelancers: ${freelancer_ids.length}`
     });
@@ -911,14 +911,14 @@ router.post('/associate-requests/:requestId/recommendations', authenticateToken,
   }
 });
 
-// Update request status (ESC Admin)
-router.put('/associate-requests/:requestId/status', authenticateToken, requireRole(['admin']), async (req, res) => {
+// Update request status (ESC Admin and ECS Employee)
+router.put('/associate-requests/:requestId/status', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
   try {
     const { requestId } = req.params;
     const { status, admin_notes } = req.body;
-    const adminUserId = req.user.user_id;
+    const reviewerUserId = req.user.user_id;
 
-    console.log(`🔍 ECS Admin ${adminUserId} updating request ${requestId} status to ${status}`);
+    console.log(`🔍 ECS Admin/Employee ${reviewerUserId} updating request ${requestId} status to ${status}`);
 
     if (!['pending', 'reviewed', 'provided', 'completed', 'cancelled'].includes(status)) {
       return res.status(400).json({
@@ -946,8 +946,8 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
 
     // Log the activity
     await logActivity({
-      user_id: adminUserId,
-      role: 'admin',
+      user_id: reviewerUserId,
+      role: req.user.user_type,
       activity_type: 'Request Status Updated',
       details: `Request ID: ${requestId}, New Status: ${status}`
     });
@@ -968,76 +968,7 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
   }
 });
 
-// Get all associate freelancer requests (ESC Admin)
-router.get('/associate-requests', authenticateToken, requireRole(['admin']), async (req, res) => {
-  try {
-    const { status, page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
 
-    let whereConditions = [];
-    const params = [];
-
-    // Filter by status
-    if (status && status !== 'all') {
-      whereConditions.push(`r.status = $${params.length + 1}`);
-      params.push(status);
-    }
-
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-
-    // Count query
-    const countQuery = `
-      SELECT COUNT(*) 
-      FROM "Associate_Freelancer_Request" r
-      JOIN "Associate" a ON r.associate_id = a.associate_id
-      JOIN "User" u ON a.user_id = u.user_id
-      ${whereClause}
-    `;
-    const countResult = await db.query(countQuery, params);
-    const totalCount = parseInt(countResult.rows[0].count);
-
-    // Main query
-    const requestsResult = await db.query(
-      `SELECT 
-         r.*,
-         a.contact_person,
-         a.industry,
-         u.email as associate_email,
-         COUNT(fr.recommendation_id) as recommendation_count,
-         COUNT(rr.response_id) as response_count
-       FROM "Associate_Freelancer_Request" r
-       JOIN "Associate" a ON r.associate_id = a.associate_id
-       JOIN "User" u ON a.user_id = u.user_id
-       LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
-       LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
-       ${whereClause}
-       GROUP BY r.request_id, a.contact_person, a.industry, u.email
-       ORDER BY r.created_at DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, limit, offset]
-    );
-
-    console.log(`✅ Found ${requestsResult.rowCount} associate freelancer requests`);
-
-    return res.status(200).json({
-      success: true,
-      requests: requestsResult.rows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: totalCount,
-        pages: Math.ceil(totalCount / limit)
-      }
-    });
-  } catch (error) {
-    console.error('❌ Get associate requests error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-});
 
 // Analytics Endpoints for Real-time Data
 // Get registration trends with real-time dates
