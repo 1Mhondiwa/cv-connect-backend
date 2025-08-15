@@ -1290,9 +1290,9 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
   try {
     const { days = 90 } = req.query;
     
-    // Calculate the start date based on the requested days
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    // Always start from June 19, 2025 (system start date) regardless of days parameter
+    const systemStartDate = new Date('2025-06-19');
+    const today = new Date();
     
     // Get hired freelancers data grouped by date
     const result = await db.query(`
@@ -1302,18 +1302,45 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
         COUNT(CASE WHEN h.status = 'active' THEN 1 END) as active_hires,
         COUNT(CASE WHEN h.status = 'completed' THEN 1 END) as completed_hires
       FROM "Freelancer_Hire" h
-      WHERE h.hire_date >= $1
+      WHERE h.hire_date >= $1 AND h.hire_date <= $2
       GROUP BY DATE(h.hire_date)
       ORDER BY date ASC
-    `, [startDate]);
+    `, [systemStartDate, today]);
 
-    // Format the data for the chart
-    const hiredTrends = result.rows.map(row => ({
-      date: row.date,
-      hires: parseInt(row.hires),
-      active_hires: parseInt(row.active_hires),
-      completed_hires: parseInt(row.completed_hires)
-    }));
+    // Create a map of existing data
+    const dataMap = new Map();
+    result.rows.forEach(row => {
+      dataMap.set(row.date.toISOString().split('T')[0], {
+        date: row.date,
+        hires: parseInt(row.hires),
+        active_hires: parseInt(row.active_hires),
+        completed_hires: parseInt(row.completed_hires)
+      });
+    });
+
+    // Generate complete date range from June 19, 2025 to today
+    const hiredTrends = [];
+    const currentDate = new Date(systemStartDate);
+    
+    while (currentDate <= today) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      const existingData = dataMap.get(dateString);
+      
+      if (existingData) {
+        hiredTrends.push(existingData);
+      } else {
+        // Add zero values for dates with no hires
+        hiredTrends.push({
+          date: new Date(currentDate),
+          hires: 0,
+          active_hires: 0,
+          completed_hires: 0
+        });
+      }
+      
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
 
     return res.status(200).json({
       success: true,
