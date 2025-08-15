@@ -10,7 +10,9 @@
         "migrate:performance": "node migrations/setup-performance-monitoring.js",
         "migrate:ecs-employee": "node run-ecs-employee-migration.js",
         "check:ecs-employee": "node check-ecs-employee-table.js",
-        "fix:ecs-employee": "node fix-ecs-employee-table.js"
+        "fix:ecs-employee": "node fix-ecs-employee-table.js",
+        "check:user-types": "node check-user-types.js",
+        "fix:user-enum": "node fix-user-type-enum.js"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
