@@ -16,6 +16,7 @@
     "test:recommendations": "node test-recommendation-system.js",
     "test:isolation": "node test-recommendation-isolation.js",
     "test:counts": "node test-recommendation-counts.js",
+    "test:conversation": "node test-conversation-table.js",
     "migrate:hiring": "node run-hiring-migration.js"
     },
     "dependencies": {

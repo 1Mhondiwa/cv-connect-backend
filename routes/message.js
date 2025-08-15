@@ -9,12 +9,18 @@ router.post('/conversations', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
     const userType = req.user.user_type;
-    const { recipient_id } = req.body;
+    const { recipient_id, freelancer_id } = req.body;
     
-    if (!recipient_id) {
+    console.log('🔍 Creating conversation:', { userId, userType, recipient_id, freelancer_id });
+    
+    // Handle both parameter names for backward compatibility
+    const targetId = recipient_id || freelancer_id;
+    
+    if (!targetId) {
+      console.log('❌ Missing target ID');
       return res.status(400).json({
         success: false,
-        message: 'Recipient ID is required'
+        message: 'Recipient ID or Freelancer ID is required'
       });
     }
     
@@ -22,6 +28,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
     
     // Determine which user is the freelancer and which is the associate
     if (userType === 'freelancer') {
+      console.log('👤 Current user is freelancer, target is associate');
       // Current user is the freelancer
       const freelancerResult = await db.query(
         'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
@@ -29,6 +36,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       );
       
       if (freelancerResult.rowCount === 0) {
+        console.log('❌ Freelancer profile not found for user:', userId);
         return res.status(404).json({
           success: false,
           message: 'Freelancer profile not found'
@@ -40,18 +48,20 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       // Recipient must be an associate
       const recipientUserResult = await db.query(
         'SELECT user_id FROM "Associate" WHERE associate_id = $1',
-        [recipient_id]
+        [targetId]
       );
       
       if (recipientUserResult.rowCount === 0) {
+        console.log('❌ Associate not found for ID:', targetId);
         return res.status(404).json({
           success: false,
           message: 'Associate not found'
         });
       }
       
-      associateId = recipient_id;
+      associateId = targetId;
     } else if (userType === 'associate') {
+      console.log('👤 Current user is associate, target is freelancer');
       // Current user is the associate
       const associateResult = await db.query(
         'SELECT associate_id FROM "Associate" WHERE user_id = $1',
@@ -59,6 +69,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       );
       
       if (associateResult.rowCount === 0) {
+        console.log('❌ Associate profile not found for user:', userId);
         return res.status(404).json({
           success: false,
           message: 'Associate profile not found'
@@ -70,23 +81,27 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       // Recipient must be a freelancer
       const recipientUserResult = await db.query(
         'SELECT user_id FROM "Freelancer" WHERE freelancer_id = $1',
-        [recipient_id]
+        [targetId]
       );
       
       if (recipientUserResult.rowCount === 0) {
+        console.log('❌ Freelancer not found for ID:', targetId);
         return res.status(404).json({
           success: false,
           message: 'Freelancer not found'
         });
       }
       
-      freelancerId = recipient_id;
+      freelancerId = targetId;
     } else {
+      console.log('❌ Invalid user type:', userType);
       return res.status(403).json({
         success: false,
         message: 'Only freelancers and associates can create conversations'
       });
     }
+    
+    console.log('✅ IDs determined:', { freelancerId, associateId });
     
     // Check if conversation already exists
     const existingConversationResult = await db.query(
@@ -95,26 +110,31 @@ router.post('/conversations', authenticateToken, async (req, res) => {
     );
     
     if (existingConversationResult.rowCount > 0) {
+      const conversationId = existingConversationResult.rows[0].conversation_id;
+      console.log('✅ Conversation already exists:', conversationId);
       return res.status(200).json({
         success: true,
         message: 'Conversation already exists',
-        conversation_id: existingConversationResult.rows[0].conversation_id
+        conversation: { conversation_id: conversationId }
       });
     }
     
     // Create new conversation
+    console.log('🆕 Creating new conversation...');
     const conversationResult = await db.query(
       'INSERT INTO "Conversation" (freelancer_id, associate_id, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()) RETURNING conversation_id',
       [freelancerId, associateId]
     );
     
+    const conversationId = conversationResult.rows[0].conversation_id;
+    console.log('✅ New conversation created:', conversationId);
     return res.status(201).json({
       success: true,
       message: 'Conversation created successfully',
-      conversation_id: conversationResult.rows[0].conversation_id
+      conversation: { conversation_id: conversationId }
     });
   } catch (error) {
-    console.error('Create conversation error:', error);
+    console.error('❌ Create conversation error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
