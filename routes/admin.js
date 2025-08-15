@@ -1285,6 +1285,50 @@ router.get('/analytics/user-communication-activity', authenticateToken, requireR
   }
 });
 
+// Get hired freelancers trends analytics
+router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
+  try {
+    const { days = 90 } = req.query;
+    
+    // Calculate the start date based on the requested days
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    // Get hired freelancers data grouped by date
+    const result = await db.query(`
+      SELECT 
+        DATE(h.hire_date) as date,
+        COUNT(*) as hires,
+        COUNT(CASE WHEN h.status = 'active' THEN 1 END) as active_hires,
+        COUNT(CASE WHEN h.status = 'completed' THEN 1 END) as completed_hires
+      FROM "Freelancer_Hire" h
+      WHERE h.hire_date >= $1
+      GROUP BY DATE(h.hire_date)
+      ORDER BY date ASC
+    `, [startDate]);
+
+    // Format the data for the chart
+    const hiredTrends = result.rows.map(row => ({
+      date: row.date,
+      hires: parseInt(row.hires),
+      active_hires: parseInt(row.active_hires),
+      completed_hires: parseInt(row.completed_hires)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: hiredTrends
+    });
+  } catch (error) {
+    console.error('Analytics hired freelancers trends error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hired freelancers trends',
+      error: error.message
+    });
+  }
+});
+
 // Get visitor analytics data (web vs mobile activity)
 router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
