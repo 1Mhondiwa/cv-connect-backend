@@ -18,7 +18,6 @@ const adminRoutes = require('./routes/admin');
 const searchRoutes = require('./routes/search');
 const messageRoutes = require('./routes/message');
 const associateRequestRoutes = require('./routes/associateRequest');
-const ecsEmployeeRoutes = require('./routes/ecsEmployee');
 
 // Initialize express app
 const app = express();
@@ -80,7 +79,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/freelancer', freelancerRoutes);
 app.use('/api/associate', associateRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/ecs-employee', ecsEmployeeRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/message', messageRoutes);
 app.use('/api/associate-request', associateRequestRoutes);
