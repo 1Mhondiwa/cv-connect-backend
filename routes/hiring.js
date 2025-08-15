@@ -14,3 +14,4 @@ router.get('/recent-hires', authenticateToken, requireRole(['admin', 'ecs_employ
 router.get('/stats', authenticateToken, requireRole(['admin', 'ecs_employee']), hiringController.getHiringStats);
 
 module.exports = router;
+

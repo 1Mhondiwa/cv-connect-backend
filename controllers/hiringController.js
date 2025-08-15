@@ -277,3 +277,4 @@ module.exports = {
   getRecentHires,
   getHiringStats
 };
+

@@ -48,3 +48,4 @@ COMMENT ON COLUMN "Freelancer_Hire".agreed_terms IS 'Terms agreed upon between a
 COMMENT ON COLUMN "Freelancer_Hire".agreed_rate IS 'Agreed payment rate for the project';
 COMMENT ON COLUMN "Freelancer_Hire".rate_type IS 'Type of rate: hourly, fixed, or monthly';
 COMMENT ON COLUMN "Freelancer_Hire".status IS 'Current status of the hiring relationship';
+

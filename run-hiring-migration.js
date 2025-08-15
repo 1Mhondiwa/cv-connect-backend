@@ -73,3 +73,4 @@ async function runHiringMigration() {
 
 // Run the migration
 runHiringMigration();
+
