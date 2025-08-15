@@ -193,11 +193,15 @@ const getRecentHires = async (req, res) => {
     // Get recent hires with associate and freelancer details
     const hiresResult = await db.query(
       `SELECT 
-         h.*,
+         h.hire_id,
+         h.hire_date,
+         h.project_title,
+         h.status,
          a.contact_person as associate_name,
          f.first_name as freelancer_first_name,
          f.last_name as freelancer_last_name,
-         r.title as project_title,
+         f.headline as freelancer_role,
+         r.title as request_title,
          u.email as associate_email
        FROM "Freelancer_Hire" h
        JOIN "Associate" a ON h.associate_id = a.associate_id
