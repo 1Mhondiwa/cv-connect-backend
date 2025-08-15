@@ -26,6 +26,9 @@ router.post(
 // Add admin creation route
 router.post('/create-admin', authController.createAdmin);
 
+// Add ECS Employee creation route
+router.post('/create-ecs-employee', authController.createECSEmployee);
+
 // Add password reset routes
 router.post('/request-reset', authController.requestPasswordReset);
 router.post('/reset-password', authController.resetPassword);

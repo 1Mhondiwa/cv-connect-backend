@@ -451,6 +451,71 @@ const createAdmin = async (req, res) => {
   }
 };
 
+// Create ECS Employee user
+const createECSEmployee = async (req, res) => {
+  const client = await db.pool.connect();
+  
+  try {
+    const { email, password, secretKey } = req.body;
+    
+    // Check if secret key matches
+    if (secretKey !== process.env.ECS_EMPLOYEE_SECRET_KEY) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid secret key'
+      });
+    }
+    
+    // Check if email already exists
+    const existingUser = await client.query(
+      'SELECT * FROM "User" WHERE email = $1',
+      [email]
+    );
+    
+    if (existingUser.rowCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already exists'
+      });
+    }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Create ECS Employee user
+    const userResult = await client.query(
+      'INSERT INTO "User" (email, hashed_password, user_type, is_active, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id',
+      [email, hashedPassword, 'ecs_employee', true, true]
+    );
+    
+    const userId = userResult.rows[0].user_id;
+    
+    // Generate JWT token
+    const token = generateToken(userId);
+    
+    return res.status(201).json({
+      success: true,
+      message: 'ECS Employee user created successfully',
+      data: {
+        user_id: userId,
+        email,
+        token
+      }
+    });
+  } catch (error) {
+    console.error('ECS Employee creation error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  } finally {
+    // Release client back to pool
+    client.release();
+  }
+};
+
 // Verify email token
 const verifyEmail = async (req, res) => {
   try {
@@ -498,5 +563,6 @@ module.exports = {
   requestPasswordReset,
   resetPassword,
   createAdmin,
+  createECSEmployee,
   verifyEmail
 };
