@@ -628,22 +628,38 @@ router.get('/freelancer-requests', authenticateToken, requireRole(['associate'])
 
     const associateId = associateResult.rows[0].associate_id;
 
-    // Get all requests for this associate
+    // Get all requests for this associate with accurate recommendation counts
     const requestsResult = await db.query(
       `SELECT 
          r.*,
-         COUNT(fr.recommendation_id) as recommendation_count,
-         COUNT(rr.response_id) as response_count
+         COALESCE(rec_counts.rec_count, 0) as recommendation_count,
+         COALESCE(resp_counts.resp_count, 0) as response_count
        FROM "Associate_Freelancer_Request" r
-       LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
-       LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
+       LEFT JOIN (
+         SELECT 
+           request_id, 
+           COUNT(*) as rec_count
+         FROM "Freelancer_Recommendation"
+         GROUP BY request_id
+       ) rec_counts ON r.request_id = rec_counts.request_id
+       LEFT JOIN (
+         SELECT 
+           request_id, 
+           COUNT(*) as resp_count
+         FROM "Request_Response"
+         GROUP BY request_id
+       ) resp_counts ON r.request_id = resp_counts.request_id
        WHERE r.associate_id = $1
-       GROUP BY r.request_id
        ORDER BY r.created_at DESC`,
       [associateId]
     );
 
     console.log(`✅ Found ${requestsResult.rowCount} freelancer requests for associate ${userId}`);
+    
+    // Log recommendation counts for debugging
+    requestsResult.rows.forEach(request => {
+      console.log(`   Request ID: ${request.request_id} - "${request.title}" - Recommendations: ${request.recommendation_count}`);
+    });
 
     return res.status(200).json({
       success: true,
@@ -710,6 +726,11 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
     );
 
     console.log(`✅ Found ${recommendationsResult.rowCount} recommendations for request ${requestId}`);
+    
+    // Log each recommendation for debugging
+    recommendationsResult.rows.forEach((rec, index) => {
+      console.log(`   ${index + 1}. ${rec.first_name} ${rec.last_name} (${rec.headline})`);
+    });
 
     return res.status(200).json({
       success: true,

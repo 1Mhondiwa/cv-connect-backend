@@ -12,7 +12,10 @@
         "check:ecs-employee": "node check-ecs-employee-table.js",
         "fix:ecs-employee": "node fix-ecs-employee-table.js",
         "check:user-types": "node check-user-types.js",
-        "fix:user-enum": "node fix-user-type-enum.js"
+        "fix:user-enum": "node fix-user-type-enum.js",
+    "test:recommendations": "node test-recommendation-system.js",
+    "test:isolation": "node test-recommendation-isolation.js",
+    "test:counts": "node test-recommendation-counts.js"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
