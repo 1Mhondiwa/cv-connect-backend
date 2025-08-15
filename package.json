@@ -15,7 +15,8 @@
         "fix:user-enum": "node fix-user-type-enum.js",
     "test:recommendations": "node test-recommendation-system.js",
     "test:isolation": "node test-recommendation-isolation.js",
-    "test:counts": "node test-recommendation-counts.js"
+    "test:counts": "node test-recommendation-counts.js",
+    "migrate:hiring": "node run-hiring-migration.js"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
