@@ -7,9 +7,9 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 // Public endpoint - Submit associate request (no authentication required)
 router.post('/submit', associateRequestController.submitAssociateRequest);
 
-// ESC Admin endpoints - All require authentication and admin role
-router.get('/requests', authenticateToken, requireRole(['admin']), associateRequestController.getAllAssociateRequests);
-router.get('/requests/:requestId', authenticateToken, requireRole(['admin']), associateRequestController.getAssociateRequestById);
-router.put('/requests/:requestId/review', authenticateToken, requireRole(['admin']), associateRequestController.reviewAssociateRequest);
+// ESC Admin and ECS Employee endpoints - All require authentication and appropriate role
+router.get('/requests', authenticateToken, requireRole(['admin', 'ecs_employee']), associateRequestController.getAllAssociateRequests);
+router.get('/requests/:requestId', authenticateToken, requireRole(['admin', 'ecs_employee']), associateRequestController.getAssociateRequestById);
+router.put('/requests/:requestId/review', authenticateToken, requireRole(['admin', 'ecs_employee']), associateRequestController.reviewAssociateRequest);
 
 module.exports = router; 

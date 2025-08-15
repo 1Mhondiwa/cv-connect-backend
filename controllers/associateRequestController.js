@@ -81,7 +81,7 @@ const submitAssociateRequest = async (req, res) => {
   }
 };
 
-// Get all associate requests (ESC Admin only)
+// Get all associate requests (ESC Admin and ECS Employee only)
 const getAllAssociateRequests = async (req, res) => {
     try {
       const { status, page = 1, limit = 10 } = req.query;
@@ -141,7 +141,7 @@ const getAllAssociateRequests = async (req, res) => {
     }
   };
 
-  // Review associate request (ESC Admin only)
+  // Review associate request (ESC Admin and ECS Employee only)
 const reviewAssociateRequest = async (req, res) => {
     let client;
     
@@ -152,14 +152,14 @@ const reviewAssociateRequest = async (req, res) => {
       
       const { requestId } = req.params;
       const { status, review_notes, password } = req.body;
-      const adminUserId = req.user.user_id;
+      const reviewerUserId = req.user.user_id;
       
       console.log(`📝 Review request parameters:`, {
         requestId,
         status,
         hasPassword: !!password,
         passwordLength: password ? password.length : 0,
-        adminUserId,
+        reviewerUserId,
         hasReviewNotes: !!review_notes
       });
   
@@ -198,12 +198,12 @@ const reviewAssociateRequest = async (req, res) => {
       await client.query('BEGIN');
   
       // Update request status
-      await client.query(
-        `UPDATE "Associate_Request" 
-         SET status = $1, reviewed_at = NOW(), reviewed_by = $2, review_notes = $3 
-         WHERE request_id = $4`,
-        [status, adminUserId, review_notes || null, requestId]
-      );
+              await client.query(
+          `UPDATE "Associate_Request" 
+           SET status = $1, reviewed_at = NOW(), reviewed_by = $2, review_notes = $3 
+           WHERE request_id = $4`,
+          [status, reviewerUserId, review_notes || null, requestId]
+        );
   
       // If approved, create the associate account
       if (status === 'approved') {
@@ -240,8 +240,8 @@ const reviewAssociateRequest = async (req, res) => {
   
         // Log activity
         await logActivity({
-          user_id: adminUserId,
-          role: 'admin',
+          user_id: reviewerUserId,
+          role: req.user.user_type,
           activity_type: 'associate_request_approved',
           details: `Approved associate request for ${request.email}`
         });
@@ -262,8 +262,8 @@ const reviewAssociateRequest = async (req, res) => {
       } else {
         // Log rejection
         await logActivity({
-          user_id: adminUserId,
-          role: 'admin',
+          user_id: reviewerUserId,
+          role: req.user.user_type,
           activity_type: 'associate_request_rejected',
           details: `Rejected associate request for ${request.email}`
         });
@@ -302,7 +302,7 @@ const reviewAssociateRequest = async (req, res) => {
       console.error('Error details:', {
         requestId,
         status,
-        adminUserId,
+        reviewerUserId,
         errorMessage: error.message,
         errorStack: error.stack
       });
@@ -318,7 +318,7 @@ const reviewAssociateRequest = async (req, res) => {
     }
   };
 
-  // Get associate request by ID (ESC Admin only)
+  // Get associate request by ID (ESC Admin and ECS Employee only)
 const getAssociateRequestById = async (req, res) => {
     try {
       const { requestId } = req.params;
