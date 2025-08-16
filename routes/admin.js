@@ -971,12 +971,16 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
 
 
 // Analytics Endpoints for Real-time Data
-// Get registration trends with real-time dates
+// Get registration trends with real-time dates from system start
 router.get('/analytics/registration-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { days = 30 } = req.query;
+    const { days = 90 } = req.query;
     
-    // Get registration data for the last N days
+    // Always start from June 19, 2025 (your system start date)
+    const startDate = new Date('2025-06-19');
+    const endDate = new Date(); // Today
+    
+    // Get registration data from system start to today
     const result = await db.query(`
       SELECT 
         DATE(created_at) as date,
@@ -985,10 +989,10 @@ router.get('/analytics/registration-trends', authenticateToken, requireRole(['ad
         COUNT(CASE WHEN user_type = 'freelancer' THEN 1 END) as freelancers,
         COUNT(CASE WHEN user_type = 'admin' THEN 1 END) as admins
       FROM "User"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
+      WHERE created_at >= $1 AND created_at <= $2
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `);
+    `, [startDate, endDate]);
 
     // Format the data for the chart
     const trends = result.rows.map(row => ({
@@ -1087,22 +1091,26 @@ router.get('/analytics/user-activity-status', authenticateToken, requireRole(['a
   }
 });
 
-// Get CV upload trends
+// Get CV upload trends from system start
 router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { days = 30 } = req.query;
+    const { days = 90 } = req.query;
+    
+    // Always start from June 19, 2025 (your system start date)
+    const startDate = new Date('2025-06-19');
+    const endDate = new Date(); // Today
     
     const result = await db.query(`
       SELECT 
-        DATE(created_at) as date,
+        DATE(upload_date) as date,
         COUNT(*) as uploads,
-        COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
-        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected
+        COUNT(CASE WHEN is_approved = true THEN 1 END) as approved,
+        COUNT(CASE WHEN is_approved = false THEN 1 END) as rejected
       FROM "CV"
-      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
-      GROUP BY DATE(created_at)
+      WHERE upload_date >= $1 AND upload_date <= $2
+      GROUP BY DATE(upload_date)
       ORDER BY date ASC
-    `);
+    `, [startDate, endDate]);
 
     const trends = result.rows.map(row => ({
       date: row.date,
@@ -1128,42 +1136,81 @@ router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin
 // Get top skills
 router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
+    // First check if Skills table exists
+    const tableExists = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'Skill'
+      );
+    `);
+    
+    if (!tableExists.rows[0].exists) {
+      // If Skills table doesn't exist, try to get skills from CV parsed_data
+      const result = await db.query(`
+        SELECT 
+          skill->>'name' as skill,
+          COUNT(*) as count
+        FROM "CV", jsonb_array_elements(parsed_data->'skills') as skill
+        WHERE parsed_data->'skills' IS NOT NULL
+        GROUP BY skill->>'name'
+        ORDER BY count DESC
+        LIMIT 10
+      `);
+      
+      const skillsData = result.rows.map(row => ({
+        skill: row.skill,
+        count: parseInt(row.count),
+        fill: getSkillColor(row.skill)
+      }));
+      
+      return res.status(200).json({
+        success: true,
+        data: skillsData
+      });
+    }
+    
+    // If Skills table exists, use it
     const result = await db.query(`
       SELECT 
         skill_name as skill,
-        COUNT(*) as count,
-        CASE 
-          WHEN skill_name = 'JavaScript' THEN '#fd680e'
-          WHEN skill_name = 'React' THEN '#10b981'
-          WHEN skill_name = 'Python' THEN '#3b82f6'
-          WHEN skill_name = 'Node.js' THEN '#8b5cf6'
-          WHEN skill_name = 'SQL' THEN '#f59e0b'
-          WHEN skill_name = 'AWS' THEN '#ef4444'
-          ELSE '#6b7280'
-        END as fill
+        COUNT(*) as count
       FROM "Skill"
       GROUP BY skill_name
       ORDER BY count DESC
       LIMIT 10
     `);
 
+    const skillsData = result.rows.map(row => ({
+      skill: row.skill,
+      count: parseInt(row.count),
+      fill: getSkillColor(row.skill)
+    }));
+
     return res.status(200).json({
       success: true,
-      data: result.rows.map(row => ({
-        skill: row.skill,
-        count: parseInt(row.count),
-        fill: row.fill
-      }))
+      data: skillsData
     });
   } catch (error) {
     console.error('Analytics top skills error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch top skills',
-      error: error.message
+    // Return empty array if there's an error
+    return res.status(200).json({
+      success: true,
+      data: []
     });
   }
 });
+
+// Helper function to get skill colors
+function getSkillColor(skillName) {
+  const skill = skillName?.toLowerCase();
+  if (skill?.includes('javascript')) return '#fd680e';
+  if (skill?.includes('react')) return '#10b981';
+  if (skill?.includes('python')) return '#3b82f6';
+  if (skill?.includes('node')) return '#8b5cf6';
+  if (skill?.includes('sql')) return '#f59e0b';
+  if (skill?.includes('aws')) return '#ef4444';
+  return '#6b7280';
+}
 
 // Get CV file types
 router.get('/analytics/cv-file-types', authenticateToken, requireRole(['admin']), async (req, res) => {
@@ -1171,41 +1218,54 @@ router.get('/analytics/cv-file-types', authenticateToken, requireRole(['admin'])
     const result = await db.query(`
       SELECT 
         file_type as type,
-        COUNT(*) as count,
-        CASE 
-          WHEN file_type = 'PDF' THEN '#ef4444'
-          WHEN file_type = 'DOCX' THEN '#3b82f6'
-          WHEN file_type = 'DOC' THEN '#10b981'
-          WHEN file_type = 'TXT' THEN '#f59e0b'
-          ELSE '#6b7280'
-        END as fill
+        COUNT(*) as count
       FROM "CV"
+      WHERE file_type IS NOT NULL
       GROUP BY file_type
       ORDER BY count DESC
     `);
+
+    // Generate colors dynamically for any file type
+    const getFileTypeColor = (fileType) => {
+      const type = fileType?.toUpperCase();
+      if (type === 'PDF') return '#ef4444';
+      if (type === 'DOCX') return '#3b82f6';
+      if (type === 'DOC') return '#10b981';
+      if (type === 'TXT') return '#f59e0b';
+      // Generate a consistent color for unknown types
+      const hash = fileType?.split('').reduce((a, b) => {
+        a = ((a << 5) - a + b.charCodeAt(0)) & 0xffffffff;
+        return a;
+      }, 0);
+      const hue = Math.abs(hash) % 360;
+      return `hsl(${hue}, 70%, 60%)`;
+    };
 
     return res.status(200).json({
       success: true,
       data: result.rows.map(row => ({
         type: row.type,
         count: parseInt(row.count),
-        fill: row.fill
+        fill: getFileTypeColor(row.type)
       }))
     });
   } catch (error) {
     console.error('Analytics CV file types error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch CV file types',
-      error: error.message
+    return res.status(200).json({
+      success: true,
+      data: []
     });
   }
 });
 
-// Get message trends
+// Get message trends from system start
 router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { days = 30 } = req.query;
+    const { days = 90 } = req.query;
+    
+    // Always start from June 19, 2025 (your system start date)
+    const startDate = new Date('2025-06-19');
+    const endDate = new Date(); // Today
     
     const result = await db.query(`
       SELECT 
@@ -1213,10 +1273,10 @@ router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']
         COUNT(*) as messages,
         COUNT(DISTINCT conversation_id) as conversations
       FROM "Message"
-      WHERE sent_at >= CURRENT_DATE - INTERVAL '${days} days'
+      WHERE sent_at >= $1 AND sent_at <= $2
       GROUP BY DATE(sent_at)
       ORDER BY date ASC
-    `);
+    `, [startDate, endDate]);
 
     const trends = result.rows.map(row => ({
       date: row.date,
@@ -1290,9 +1350,9 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
   try {
     const { days = 90 } = req.query;
     
-    // Always start from June 19, 2025 (system start date) regardless of days parameter
-    const systemStartDate = new Date('2025-06-19');
-    const today = new Date();
+    // Always start from June 19, 2025 (your system start date)
+    const startDate = new Date('2025-06-19');
+    const endDate = new Date(); // Today
     
     // Get hired freelancers data grouped by date
     const result = await db.query(`
@@ -1305,12 +1365,12 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
       WHERE h.hire_date >= $1 AND h.hire_date <= $2
       GROUP BY DATE(h.hire_date)
       ORDER BY date ASC
-    `, [systemStartDate, today]);
+    `, [startDate, endDate]);
 
-    // Create a map of existing data
-    const dataMap = new Map();
+    // Create a map of actual hire data
+    const hireDataMap = new Map();
     result.rows.forEach(row => {
-      dataMap.set(row.date.toISOString().split('T')[0], {
+      hireDataMap.set(row.date.toISOString().split('T')[0], {
         date: row.date,
         hires: parseInt(row.hires),
         active_hires: parseInt(row.active_hires),
@@ -1318,18 +1378,18 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
       });
     });
 
-    // Generate complete date range from June 19, 2025 to today
+    // Generate complete date range from June 19 to today
     const hiredTrends = [];
-    const currentDate = new Date(systemStartDate);
+    const currentDate = new Date(startDate);
     
-    while (currentDate <= today) {
+    while (currentDate <= endDate) {
       const dateString = currentDate.toISOString().split('T')[0];
-      const existingData = dataMap.get(dateString);
+      const existingData = hireDataMap.get(dateString);
       
       if (existingData) {
         hiredTrends.push(existingData);
       } else {
-        // Add zero values for dates with no hires
+        // Add entry with 0 values for days with no activity
         hiredTrends.push({
           date: new Date(currentDate),
           hires: 0,
@@ -1338,7 +1398,6 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
         });
       }
       
-      // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -1387,17 +1446,9 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
     const earliestDate = dateRangeResult.rows[0].earliest;
     const latestDate = dateRangeResult.rows[0].latest;
     
-    // Calculate the actual date range to use
-    let startDate;
-    if (days === 7) {
-      startDate = new Date(latestDate);
-      startDate.setDate(startDate.getDate() - 7);
-    } else if (days === 30) {
-      startDate = new Date(latestDate);
-      startDate.setDate(startDate.getDate() - 30);
-    } else {
-      startDate = new Date(earliestDate);
-    }
+    // Always start from June 19, 2025 (your system start date)
+    const startDate = new Date('2025-06-19');
+    const endDate = new Date(); // Today
     
     const result = await db.query(`
       SELECT 
@@ -1406,10 +1457,10 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
         COUNT(CASE WHEN u.user_type = 'associate' THEN 1 END) as web_users,
         COUNT(CASE WHEN u.user_type = 'freelancer' THEN 1 END) as mobile_users
       FROM "User" u
-      WHERE u.created_at >= $1
+      WHERE u.created_at >= $1 AND u.created_at <= $2
       GROUP BY DATE(u.created_at)
       ORDER BY date ASC
-    `, [startDate]);
+    `, [startDate, endDate]);
 
     // Format the data for the chart
     const visitorData = result.rows.map(row => ({

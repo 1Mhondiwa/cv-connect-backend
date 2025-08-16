@@ -18,7 +18,14 @@
     "test:counts": "node test-recommendation-counts.js",
     "test:conversation": "node test-conversation-table.js",
     "test:hired-trends": "node test-hired-trends.js",
-    "migrate:hiring": "node run-hiring-migration.js"
+    "migrate:hiring": "node run-hiring-migration.js",
+    "check:analytics": "node check-analytics-data.js",
+    "check:structure": "node check-table-structure.js",
+    "check:skills": "node check-skills-table.js",
+    "test:analytics": "node test-analytics-endpoints.js",
+    "test:access": "node test-analytics-access.js",
+    "test:connection": "node test-backend-connection.js",
+    "check:cv-types": "node check-cv-file-types.js"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",

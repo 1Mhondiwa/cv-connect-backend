@@ -1,11 +1,10 @@
-// test-hired-trends.js
 const db = require('./config/database');
 
 async function testHiredTrends() {
   try {
     console.log('🔍 Testing Hired Freelancers Trends...');
     
-    // Check if Freelancer_Hire table exists and has data
+    // Check if Freelancer_Hire table exists
     const tableCheck = await db.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -24,39 +23,26 @@ async function testHiredTrends() {
     const structureCheck = await db.query(`
       SELECT column_name, data_type 
       FROM information_schema.columns 
-      WHERE table_name = 'Freelancer_Hire'
+      WHERE table_name = 'Freelancer_Hire' 
       ORDER BY ordinal_position;
     `);
     
     console.log('📋 Table structure:');
-    structureCheck.rows.forEach(col => {
-      console.log(`  - ${col.column_name}: ${col.data_type}`);
+    structureCheck.rows.forEach(row => {
+      console.log(`  - ${row.column_name}: ${row.data_type}`);
     });
     
-    // Check row count
-    const countResult = await db.query('SELECT COUNT(*) FROM "Freelancer_Hire"');
-    console.log(`📊 Total hires in system: ${countResult.rows[0].count}`);
-    
-    // Check date range
-    const dateRangeResult = await db.query(`
-      SELECT 
-        MIN(hire_date) as earliest_hire,
-        MAX(hire_date) as latest_hire
-      FROM "Freelancer_Hire"
-    `);
-    
-    if (dateRangeResult.rows[0].earliest_hire) {
-      console.log(`📅 Date range: ${dateRangeResult.rows[0].earliest_hire} to ${dateRangeResult.rows[0].latest_hire}`);
-    } else {
-      console.log('📅 No hire dates found');
-    }
+    // Check total hires
+    const totalHires = await db.query('SELECT COUNT(*) FROM "Freelancer_Hire"');
+    console.log(`📊 Total hires in system: ${totalHires.rows[0].count}`);
     
     // Test the actual query logic
-    const systemStartDate = new Date('2025-06-19');
-    const today = new Date();
+    const startDate = new Date('2025-06-19');
+    const endDate = new Date();
     
-    console.log(`🔍 Testing query from ${systemStartDate.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`);
+    console.log(`📅 Date range: ${startDate} to ${endDate}`);
     
+    // Get hired freelancers data grouped by date
     const result = await db.query(`
       SELECT 
         DATE(h.hire_date) as date,
@@ -67,22 +53,23 @@ async function testHiredTrends() {
       WHERE h.hire_date >= $1 AND h.hire_date <= $2
       GROUP BY DATE(h.hire_date)
       ORDER BY date ASC
-    `, [systemStartDate, today]);
+    `, [startDate, endDate]);
     
+    console.log(`🔍 Testing query from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     console.log(`📊 Query returned ${result.rows.length} rows`);
     
     if (result.rows.length > 0) {
       console.log('📈 Sample data:');
-      result.rows.slice(0, 5).forEach(row => {
+      result.rows.forEach(row => {
         console.log(`  ${row.date}: ${row.hires} hires (${row.active_hires} active, ${row.completed_hires} completed)`);
       });
     }
     
     // Test date generation logic
     console.log('🔍 Testing date generation logic...');
-    const dataMap = new Map();
+    const hireDataMap = new Map();
     result.rows.forEach(row => {
-      dataMap.set(row.date.toISOString().split('T')[0], {
+      hireDataMap.set(row.date.toISOString().split('T')[0], {
         date: row.date,
         hires: parseInt(row.hires),
         active_hires: parseInt(row.active_hires),
@@ -90,16 +77,18 @@ async function testHiredTrends() {
       });
     });
     
+    // Generate complete date range from June 19 to today
     const hiredTrends = [];
-    const currentDate = new Date(systemStartDate);
+    const currentDate = new Date(startDate);
     
-    while (currentDate <= today) {
+    while (currentDate <= endDate) {
       const dateString = currentDate.toISOString().split('T')[0];
-      const existingData = dataMap.get(dateString);
+      const existingData = hireDataMap.get(dateString);
       
       if (existingData) {
         hiredTrends.push(existingData);
       } else {
+        // Add entry with 0 values for days with no activity
         hiredTrends.push({
           date: new Date(currentDate),
           hires: 0,
@@ -111,11 +100,15 @@ async function testHiredTrends() {
       currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    console.log(`📅 Generated ${hiredTrends.length} dates from ${systemStartDate.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`);
+    console.log(`📅 Generated ${hiredTrends.length} dates from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     console.log('📊 Final data sample:');
     hiredTrends.slice(0, 10).forEach(item => {
       console.log(`  ${item.date.toISOString().split('T')[0]}: ${item.hires} hires`);
     });
+    
+    if (hiredTrends.length > 10) {
+      console.log(`  ... and ${hiredTrends.length - 10} more dates`);
+    }
     
   } catch (error) {
     console.error('❌ Error testing hired trends:', error);
@@ -125,3 +118,4 @@ async function testHiredTrends() {
 }
 
 testHiredTrends();
+
