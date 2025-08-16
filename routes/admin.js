@@ -1119,26 +1119,49 @@ router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin
     
     // Always start from June 19, 2025 (your system start date)
     const startDate = new Date('2025-06-19');
-    const endDate = new Date(); // Today
+    // Ensure we include today by setting end time to end of day
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999); // Set to end of today
     
     const result = await db.query(`
       SELECT 
         DATE(upload_date) as date,
-        COUNT(*) as uploads,
-        COUNT(CASE WHEN is_approved = true THEN 1 END) as approved,
-        COUNT(CASE WHEN is_approved = false THEN 1 END) as rejected
+        COUNT(*) as uploads
       FROM "CV"
       WHERE upload_date >= $1 AND upload_date <= $2
       GROUP BY DATE(upload_date)
       ORDER BY date ASC
     `, [startDate, endDate]);
 
-    const trends = result.rows.map(row => ({
-      date: row.date,
-      uploads: parseInt(row.uploads),
-      approved: parseInt(row.approved),
-      rejected: parseInt(row.rejected)
-    }));
+    // Create a map of actual CV upload data
+    const uploadDataMap = new Map();
+    result.rows.forEach(row => {
+      uploadDataMap.set(row.date.toISOString().split('T')[0], {
+        date: row.date.toISOString().split('T')[0],
+        uploads: parseInt(row.uploads)
+      });
+    });
+
+    // Generate complete date range from June 19 to today with 0 values for missing dates
+    const trends = [];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const existingData = uploadDataMap.get(dateStr);
+      
+      if (existingData) {
+        trends.push(existingData);
+      } else {
+        // No CV uploads on this date
+        trends.push({
+          date: dateStr,
+          uploads: 0
+        });
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
 
     return res.status(200).json({
       success: true,
@@ -1233,51 +1256,7 @@ function getSkillColor(skillName) {
   return '#6b7280';
 }
 
-// Get CV file types
-router.get('/analytics/cv-file-types', authenticateToken, requireRole(['admin']), async (req, res) => {
-  try {
-    const result = await db.query(`
-      SELECT 
-        file_type as type,
-        COUNT(*) as count
-      FROM "CV"
-      WHERE file_type IS NOT NULL
-      GROUP BY file_type
-      ORDER BY count DESC
-    `);
 
-    // Generate colors dynamically for any file type
-    const getFileTypeColor = (fileType) => {
-      const type = fileType?.toUpperCase();
-      if (type === 'PDF') return '#ef4444';
-      if (type === 'DOCX') return '#3b82f6';
-      if (type === 'DOC') return '#10b981';
-      if (type === 'TXT') return '#f59e0b';
-      // Generate a consistent color for unknown types
-      const hash = fileType?.split('').reduce((a, b) => {
-        a = ((a << 5) - a + b.charCodeAt(0)) & 0xffffffff;
-        return a;
-      }, 0);
-      const hue = Math.abs(hash) % 360;
-      return `hsl(${hue}, 70%, 60%)`;
-    };
-
-    return res.status(200).json({
-      success: true,
-      data: result.rows.map(row => ({
-        type: row.type,
-        count: parseInt(row.count),
-        fill: getFileTypeColor(row.type)
-      }))
-    });
-  } catch (error) {
-    console.error('Analytics CV file types error:', error);
-    return res.status(200).json({
-      success: true,
-      data: []
-    });
-  }
-});
 
 // Get message trends from system start
 router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
@@ -1300,7 +1279,7 @@ router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']
     `, [startDate, endDate]);
 
     const trends = result.rows.map(row => ({
-      date: row.date,
+      date: row.date.toISOString().split('T')[0], // Format as YYYY-MM-DD string
       messages: parseInt(row.messages),
       conversations: parseInt(row.conversations)
     }));
