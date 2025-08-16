@@ -1180,46 +1180,17 @@ router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin
 // Get top skills
 router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    // First check if Skills table exists
-    const tableExists = await db.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'Skill'
-      );
-    `);
-    
-    if (!tableExists.rows[0].exists) {
-      // If Skills table doesn't exist, try to get skills from CV parsed_data
-      const result = await db.query(`
-        SELECT 
-          skill->>'name' as skill,
-          COUNT(*) as count
-        FROM "CV", jsonb_array_elements(parsed_data->'skills') as skill
-        WHERE parsed_data->'skills' IS NOT NULL
-        GROUP BY skill->>'name'
-        ORDER BY count DESC
-        LIMIT 10
-      `);
-      
-      const skillsData = result.rows.map(row => ({
-        skill: row.skill,
-        count: parseInt(row.count),
-        fill: getSkillColor(row.skill)
-      }));
-      
-      return res.status(200).json({
-        success: true,
-        data: skillsData
-      });
-    }
-    
-    // If Skills table exists, use it
+    // Get skills from CV parsed_data and count occurrences across all CVs
     const result = await db.query(`
       SELECT 
-        skill_name as skill,
+        skill->>'name' as skill,
         COUNT(*) as count
-      FROM "Skill"
-      GROUP BY skill_name
+      FROM "CV", 
+           jsonb_array_elements(parsed_data->'skills') as skill
+      WHERE parsed_data->'skills' IS NOT NULL 
+        AND skill->>'name' IS NOT NULL
+        AND skill->>'name' != ''
+      GROUP BY skill->>'name'
       ORDER BY count DESC
       LIMIT 10
     `);
@@ -1251,8 +1222,18 @@ function getSkillColor(skillName) {
   if (skill?.includes('react')) return '#10b981';
   if (skill?.includes('python')) return '#3b82f6';
   if (skill?.includes('node')) return '#8b5cf6';
-  if (skill?.includes('sql')) return '#f59e0b';
+  if (skill?.includes('sql') || skill?.includes('postgresql')) return '#f59e0b';
   if (skill?.includes('aws')) return '#ef4444';
+  if (skill?.includes('java')) return '#dc2626';
+  if (skill?.includes('html') || skill?.includes('css')) return '#7c3aed';
+  if (skill?.includes('git')) return '#059669';
+  if (skill?.includes('docker')) return '#2563eb';
+  if (skill?.includes('mongodb')) return '#16a34a';
+  if (skill?.includes('express')) return '#ea580c';
+  if (skill?.includes('vue') || skill?.includes('angular')) return '#be185d';
+  if (skill?.includes('typescript')) return '#0369a1';
+  if (skill?.includes('php')) return '#9333ea';
+  if (skill?.includes('c++') || skill?.includes('c#')) return '#0891b2';
   return '#6b7280';
 }
 
