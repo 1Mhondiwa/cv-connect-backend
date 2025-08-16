@@ -974,38 +974,61 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
 // Get registration trends with real-time dates from system start
 router.get('/analytics/registration-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { days = 90 } = req.query;
-    
     // Always start from June 19, 2025 (your system start date)
     const startDate = new Date('2025-06-19');
-    const endDate = new Date(); // Today
+    // Ensure we include today by setting end time to end of day
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999); // Set to end of today
     
-    // Get registration data from system start to today
+    // Get registration data for ALL users (not just those created after June 19)
     const result = await db.query(`
       SELECT 
         DATE(created_at) as date,
         COUNT(*) as total_users,
         COUNT(CASE WHEN user_type = 'associate' THEN 1 END) as associates,
         COUNT(CASE WHEN user_type = 'freelancer' THEN 1 END) as freelancers,
-        COUNT(CASE WHEN user_type = 'admin' THEN 1 END) as admins
+        COUNT(CASE WHEN user_type = 'admin' THEN 1 END) as admins,
+        COUNT(CASE WHEN user_type = 'ecs_employee' THEN 1 END) as ecs_employees
       FROM "User"
-      WHERE created_at >= $1 AND created_at <= $2
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `, [startDate, endDate]);
+    `);
 
-    // Format the data for the chart
-    const trends = result.rows.map(row => ({
-      date: row.date,
-      users: parseInt(row.total_users),
+    console.log(`📊 Raw query results: ${result.rows.length} rows`);
+    if (result.rows.length > 0) {
+      console.log('📊 Sample query results:', result.rows.slice(0, 3));
+    }
+
+    // Only include dates where we actually have data (no more filling with zeros)
+    const dateRange = result.rows.map(row => ({
+      date: row.date.toISOString().split('T')[0],
+      total_users: parseInt(row.total_users),
       associates: parseInt(row.associates),
       freelancers: parseInt(row.freelancers),
-      admins: parseInt(row.admins)
+      admins: parseInt(row.admins),
+      ecs_employees: parseInt(row.ecs_employees)
     }));
+    
+    // Always include today's date (even if no registrations)
+    const today = new Date().toISOString().split('T')[0];
+    const hasToday = dateRange.some(item => item.date === today);
+    
+    if (!hasToday) {
+      dateRange.push({
+        date: today,
+        total_users: 0,
+        associates: 0,
+        freelancers: 0,
+        admins: 0,
+        ecs_employees: 0
+      });
+    }
+
+    console.log(`📊 Registration trends: Generated ${dateRange.length} data points with actual user registrations`);
 
     return res.status(200).json({
       success: true,
-      data: trends
+      data: dateRange
     });
   } catch (error) {
     console.error('Analytics registration trends error:', error);
@@ -1028,6 +1051,7 @@ router.get('/analytics/user-type-distribution', authenticateToken, requireRole([
           WHEN user_type = 'freelancer' THEN '#fd680e'
           WHEN user_type = 'associate' THEN '#10b981'
           WHEN user_type = 'admin' THEN '#3b82f6'
+          WHEN user_type = 'ecs_employee' THEN '#8b5cf6'
           ELSE '#6b7280'
         END as fill
       FROM "User"
@@ -1039,7 +1063,7 @@ router.get('/analytics/user-type-distribution', authenticateToken, requireRole([
     return res.status(200).json({
       success: true,
       data: result.rows.map(row => ({
-        type: row.type.charAt(0).toUpperCase() + row.type.slice(1) + 's',
+        type: row.type === 'ecs_employee' ? 'ECS Employees' : row.type.charAt(0).toUpperCase() + row.type.slice(1) + 's',
         count: parseInt(row.count),
         fill: row.fill
       }))
