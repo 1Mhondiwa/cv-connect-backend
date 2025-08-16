@@ -994,10 +994,7 @@ router.get('/analytics/registration-trends', authenticateToken, requireRole(['ad
       ORDER BY date ASC
     `);
 
-    console.log(`📊 Raw query results: ${result.rows.length} rows`);
-    if (result.rows.length > 0) {
-      console.log('📊 Sample query results:', result.rows.slice(0, 3));
-    }
+
 
     // Only include dates where we actually have data (no more filling with zeros)
     const dateRange = result.rows.map(row => ({
@@ -1024,7 +1021,7 @@ router.get('/analytics/registration-trends', authenticateToken, requireRole(['ad
       });
     }
 
-    console.log(`📊 Registration trends: Generated ${dateRange.length} data points with actual user registrations`);
+
 
     return res.status(200).json({
       success: true,
@@ -1395,7 +1392,7 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
     const hireDataMap = new Map();
     result.rows.forEach(row => {
       hireDataMap.set(row.date.toISOString().split('T')[0], {
-        date: row.date,
+        date: row.date.toISOString().split('T')[0], // Format as YYYY-MM-DD string
         hires: parseInt(row.hires),
         active_hires: parseInt(row.active_hires),
         completed_hires: parseInt(row.completed_hires)
@@ -1415,7 +1412,7 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
       } else {
         // Add entry with 0 values for days with no activity
         hiredTrends.push({
-          date: new Date(currentDate),
+          date: currentDate.toISOString().split('T')[0], // Format as YYYY-MM-DD string
           hires: 0,
           active_hires: 0,
           completed_hires: 0
