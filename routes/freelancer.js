@@ -709,6 +709,280 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
     }
   });
   
+  // Work Experience CRUD Operations
+  
+  // Add work experience
+  router.post('/work-experience', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { title, company, start_date, end_date, description } = req.body;
+      
+      if (!title || !company) {
+        return res.status(400).json({
+          success: false,
+          message: 'Job title and company are required'
+        });
+      }
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      
+      // Create new work experience entry
+      const newWorkExperience = {
+        id: `work_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: title.trim(),
+        company: company.trim(),
+        start_date: start_date || '',
+        end_date: end_date || '',
+        description: description || ''
+      };
+      
+      // Add to existing work experience array or create new one
+      const updatedWorkExperience = [
+        ...(existingParsedData.work_experience || []),
+        newWorkExperience
+      ];
+      
+      // Update CV record with new work experience
+      const updatedParsedData = {
+        ...existingParsedData,
+        work_experience: updatedWorkExperience
+      };
+      
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // Log activity
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'Work Experience Added'
+      });
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Work experience added successfully',
+        work_experience: newWorkExperience
+      });
+    } catch (error) {
+      console.error('Add work experience error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
+  // Update work experience
+  router.put('/work-experience/:workId', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { workId } = req.params;
+      const { title, company, start_date, end_date, description } = req.body;
+      
+      if (!title || !company) {
+        return res.status(400).json({
+          success: false,
+          message: 'Job title and company are required'
+        });
+      }
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      
+      // Find and update the specific work experience entry
+      const workExperience = existingParsedData.work_experience || [];
+      const workIndex = workExperience.findIndex(work => work.id === workId);
+      
+      if (workIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Work experience not found'
+        });
+      }
+      
+      // Update the work experience entry
+      workExperience[workIndex] = {
+        ...workExperience[workIndex],
+        title: title.trim(),
+        company: company.trim(),
+        start_date: start_date || '',
+        end_date: end_date || '',
+        description: description || ''
+      };
+      
+      // Update CV record
+      const updatedParsedData = {
+        ...existingParsedData,
+        work_experience: workExperience
+      };
+      
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // Log activity
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'Work Experience Updated'
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Work experience updated successfully',
+        work_experience: workExperience[workIndex]
+      });
+    } catch (error) {
+      console.error('Update work experience error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
+  // Delete work experience
+  router.delete('/work-experience/:workId', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { workId } = req.params;
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      
+      // Remove the specific work experience entry
+      const workExperience = existingParsedData.work_experience || [];
+      const filteredWorkExperience = workExperience.filter(work => work.id !== workId);
+      
+      if (filteredWorkExperience.length === workExperience.length) {
+        return res.status(404).json({
+          success: false,
+          message: 'Work experience not found'
+        });
+      }
+      
+      // Update CV record
+      const updatedParsedData = {
+        ...existingParsedData,
+        work_experience: filteredWorkExperience
+      };
+      
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // Log activity
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'Work Experience Deleted'
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Work experience deleted successfully'
+      });
+    } catch (error) {
+      console.error('Delete work experience error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
   // Update CV parsed data (work experience and education)
   router.put('/cv/parsed-data', authenticateToken, requireRole(['freelancer']), async (req, res) => {
     try {
