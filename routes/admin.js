@@ -157,7 +157,6 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
          f.education_summary,
          f.work_history,
          f.availability_status,
-         ARRAY[f.headline, f.current_status] as skills,
          f.address as location,
          u.email,
          u.created_at,
@@ -176,9 +175,29 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     const freelancersResult = await db.query(mainQuery, [...params, limit, offset]);
     console.log('🔍 Admin freelancers query - Results count:', freelancersResult.rows.length);
     
+    // Get skills for each freelancer separately to avoid JSON aggregation issues
+    const freelancers = await Promise.all(
+      freelancersResult.rows.map(async (freelancer) => {
+        const skillsQuery = `
+          SELECT s.skill_id, s.skill_name, fs.proficiency_level, fs.years_experience
+          FROM "Freelancer_Skill" fs
+          JOIN "Skill" s ON fs.skill_id = s.skill_id
+          WHERE fs.freelancer_id = $1
+          ORDER BY fs.proficiency_level DESC, s.skill_name ASC
+        `;
+        
+        const skillsResult = await db.query(skillsQuery, [freelancer.freelancer_id]);
+        
+        return {
+          ...freelancer,
+          skills: skillsResult.rows
+        };
+      })
+    );
+    
     const response = {
       success: true,
-      freelancers: freelancersResult.rows,
+      freelancers: freelancers,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
