@@ -54,12 +54,55 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       [freelancerResult.rows[0].freelancer_id]
     );
     
+    // Ensure CV data has IDs for editing (backward compatibility)
+    let cvData = cvResult.rows[0];
+    if (cvData && cvData.parsed_data) {
+      let needsUpdate = false;
+      
+      // Add IDs to work experience if missing
+      if (cvData.parsed_data.work_experience && cvData.parsed_data.work_experience.length > 0) {
+        cvData.parsed_data.work_experience = cvData.parsed_data.work_experience.map((work, index) => {
+          if (!work.id) {
+            needsUpdate = true;
+            return {
+              ...work,
+              id: `work_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+            };
+          }
+          return work;
+        });
+      }
+      
+      // Add IDs to education if missing
+      if (cvData.parsed_data.education && cvData.parsed_data.education.length > 0) {
+        cvData.parsed_data.education = cvData.parsed_data.education.map((edu, index) => {
+          if (!edu.id) {
+            needsUpdate = true;
+            return {
+              ...edu,
+              id: `edu_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+            };
+          }
+          return edu;
+        });
+      }
+      
+      // Update database if IDs were added
+      if (needsUpdate) {
+        await db.query(
+          'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
+          [JSON.stringify(cvData.parsed_data), cvData.cv_id]
+        );
+        console.log('Added missing IDs to CV data for freelancer:', freelancerResult.rows[0].freelancer_id);
+      }
+    }
+    
     // Combine all data
     const profileData = {
       ...userResult.rows[0],
       ...freelancerResult.rows[0],
       skills: skillsResult.rows,
-      cv: cvResult.rows[0] || null
+      cv: cvData || null
     };
     
     return res.status(200).json({
@@ -212,6 +255,21 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
     let parsedData = {};
     try {
       parsedData = await cvParser.parseCV(req.file.path);
+      
+      // Assign IDs to work experience and education entries for editing
+      if (parsedData.work_experience && parsedData.work_experience.length > 0) {
+        parsedData.work_experience = parsedData.work_experience.map((work, index) => ({
+          ...work,
+          id: `work_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+        }));
+      }
+      
+      if (parsedData.education && parsedData.education.length > 0) {
+        parsedData.education = parsedData.education.map((edu, index) => ({
+          ...edu,
+          id: `edu_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+        }));
+      }
     } catch (parseError) {
       console.error('CV parsing error:', parseError);
       parsedData = { parsing_error: 'Failed to parse CV' };

@@ -702,15 +702,17 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
          a.contact_person,
          a.industry,
          u.email as associate_email,
+         ar.company_name,
          COUNT(fr.recommendation_id) as recommendation_count,
          COUNT(rr.response_id) as response_count
        FROM "Associate_Freelancer_Request" r
        JOIN "Associate" a ON r.associate_id = a.associate_id
        JOIN "User" u ON a.user_id = u.user_id
+       LEFT JOIN "Associate_Request" ar ON u.email = ar.email
        LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
        LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
        ${whereClause}
-       GROUP BY r.request_id, a.contact_person, a.industry, u.email
+       GROUP BY r.request_id, a.contact_person, a.industry, u.email, ar.company_name
        ORDER BY r.created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
@@ -754,10 +756,12 @@ router.get('/associate-requests/:requestId', authenticateToken, requireRole(['ad
          a.industry,
          a.phone,
          a.address,
-         u.email as associate_email
+         u.email as associate_email,
+         ar.company_name
        FROM "Associate_Freelancer_Request" r
        JOIN "Associate" a ON r.associate_id = a.associate_id
        JOIN "User" u ON a.user_id = u.user_id
+       LEFT JOIN "Associate_Request" ar ON u.email = ar.email
        WHERE r.request_id = $1`,
       [requestId]
     );
