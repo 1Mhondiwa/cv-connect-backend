@@ -741,7 +741,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       // Get existing CV record
       const cvResult = await db.query(
-        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
         [freelancerId]
       );
       
@@ -753,11 +753,13 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       }
       
       const cvId = cvResult.rows[0].cv_id;
-      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
       
-      // Create new work experience entry
+      // Create new work experience entry with a more robust ID
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substr(2, 9);
       const newWorkExperience = {
-        id: `work_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `work_${timestamp}_${randomId}`,
         title: title.trim(),
         company: company.trim(),
         start_date: start_date || '',
@@ -778,7 +780,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       };
       
       await db.query(
-        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
         [JSON.stringify(updatedParsedData), cvId]
       );
       
@@ -835,7 +837,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       // Get existing CV record
       const cvResult = await db.query(
-        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
         [freelancerId]
       );
       
@@ -847,11 +849,17 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       }
       
       const cvId = cvResult.rows[0].cv_id;
-      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
       
       // Find and update the specific work experience entry
       const workExperience = existingParsedData.work_experience || [];
-      const workIndex = workExperience.findIndex(work => work.id === workId);
+      
+      // Clean up any corrupted entries (remove undefined IDs)
+      const cleanWorkExperience = workExperience.filter(work => work && work.id && work.id !== undefined);
+      
+      console.log('Looking for workId:', workId);
+      console.log('Available work experience IDs:', cleanWorkExperience.map(w => w.id));
+      const workIndex = cleanWorkExperience.findIndex(work => work.id === workId);
       
       if (workIndex === -1) {
         return res.status(404).json({
@@ -861,8 +869,8 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       }
       
       // Update the work experience entry
-      workExperience[workIndex] = {
-        ...workExperience[workIndex],
+      cleanWorkExperience[workIndex] = {
+        ...cleanWorkExperience[workIndex],
         title: title.trim(),
         company: company.trim(),
         start_date: start_date || '',
@@ -870,14 +878,14 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         description: description || ''
       };
       
-      // Update CV record
+      // Update CV record with cleaned data
       const updatedParsedData = {
         ...existingParsedData,
-        work_experience: workExperience
+        work_experience: cleanWorkExperience
       };
       
       await db.query(
-        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
         [JSON.stringify(updatedParsedData), cvId]
       );
       
@@ -926,7 +934,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       // Get existing CV record
       const cvResult = await db.query(
-        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
         [freelancerId]
       );
       
@@ -938,13 +946,19 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       }
       
       const cvId = cvResult.rows[0].cv_id;
-      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
       
       // Remove the specific work experience entry
       const workExperience = existingParsedData.work_experience || [];
-      const filteredWorkExperience = workExperience.filter(work => work.id !== workId);
       
-      if (filteredWorkExperience.length === workExperience.length) {
+      // Clean up any corrupted entries (remove undefined IDs)
+      const cleanWorkExperience = workExperience.filter(work => work && work.id && work.id !== undefined);
+      
+      console.log('Looking for workId to delete:', workId);
+      console.log('Available work experience IDs:', cleanWorkExperience.map(w => w.id));
+      const filteredWorkExperience = cleanWorkExperience.filter(work => work.id !== workId);
+      
+      if (filteredWorkExperience.length === cleanWorkExperience.length) {
         return res.status(404).json({
           success: false,
           message: 'Work experience not found'
@@ -958,7 +972,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       };
       
       await db.query(
-        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
         [JSON.stringify(updatedParsedData), cvId]
       );
       
@@ -975,6 +989,276 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       });
     } catch (error) {
       console.error('Delete work experience error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
+  // Add education
+  router.post('/education', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { degree, institution, field, year } = req.body;
+      
+      // Validate required fields
+      if (!degree || !institution) {
+        return res.status(400).json({
+          success: false,
+          message: 'Degree and institution are required'
+        });
+      }
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
+      
+      // Create new education entry
+      const newEducation = {
+        id: `edu_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        degree: degree.trim(),
+        institution: institution.trim(),
+        field: field ? field.trim() : '',
+        year: year ? year.trim() : ''
+      };
+      
+      // Add to existing education array or create new one
+      const existingEducation = existingParsedData.education || [];
+      const updatedParsedData = {
+        ...existingParsedData,
+        education: [...existingEducation, newEducation]
+      };
+      
+      // Update CV record
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // Log activity
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'Education Added',
+        details: `Added ${degree} from ${institution}`
+      });
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Education added successfully',
+        education: newEducation
+      });
+    } catch (error) {
+      console.error('Add education error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
+  // Update education
+  router.put('/education/:educationId', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { educationId } = req.params;
+      const { degree, institution, field, year } = req.body;
+      
+      // Validate required fields
+      if (!degree || !institution) {
+        return res.status(400).json({
+          success: false,
+          message: 'Degree and institution are required'
+        });
+      }
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
+      
+      // Find and update the specific education entry
+      const existingEducation = existingParsedData.education || [];
+      const educationIndex = existingEducation.findIndex(edu => edu.id === educationId);
+      
+      if (educationIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Education not found'
+        });
+      }
+      
+      // Update the education entry
+      existingEducation[educationIndex] = {
+        ...existingEducation[educationIndex],
+        degree: degree.trim(),
+        institution: institution.trim(),
+        field: field ? field.trim() : '',
+        year: year ? year.trim() : ''
+      };
+      
+      // Update CV record
+      const updatedParsedData = {
+        ...existingParsedData,
+        education: existingEducation
+      };
+      
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // Log activity
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'Education Updated',
+        details: `Updated ${degree} from ${institution}`
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Education updated successfully',
+        education: existingEducation[educationIndex]
+      });
+    } catch (error) {
+      console.error('Update education error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
+  
+  // Delete education
+  router.delete('/education/:educationId', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { educationId } = req.params;
+      
+      // Get freelancer ID
+      const freelancerResult = await db.query(
+        'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+        [userId]
+      );
+      
+      if (freelancerResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Freelancer profile not found'
+        });
+      }
+      
+      const freelancerId = freelancerResult.rows[0].freelancer_id;
+      
+      // Get existing CV record
+      const cvResult = await db.query(
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
+        [freelancerId]
+      );
+      
+      if (cvResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No CV found. Please upload a CV first.'
+        });
+      }
+      
+      const cvId = cvResult.rows[0].cv_id;
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
+      
+      // Remove the specific education entry
+      const existingEducation = existingParsedData.education || [];
+      const filteredEducation = existingEducation.filter(edu => edu.id !== educationId);
+      
+      if (filteredEducation.length === existingEducation.length) {
+        return res.status(404).json({
+          success: false,
+          message: 'Education not found'
+        });
+      }
+      
+      // Update CV record
+      const updatedParsedData = {
+        ...existingParsedData,
+        education: filteredEducation
+      };
+      
+      await db.query(
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
+        [JSON.stringify(updatedParsedData), cvId]
+      );
+      
+      // Log activity
+      await logActivity({
+        user_id: userId,
+        role: 'freelancer',
+        activity_type: 'Education Deleted'
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Education deleted successfully'
+      });
+    } catch (error) {
+      console.error('Delete education error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1013,7 +1297,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       // Get existing CV record
       const cvResult = await db.query(
-        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        'SELECT cv_id, parsed_data FROM "CV" WHERE freelancer_id = $1 ORDER BY cv_id DESC LIMIT 1',
         [freelancerId]
       );
       
@@ -1025,7 +1309,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       }
       
       const cvId = cvResult.rows[0].cv_id;
-      const existingParsedData = cvResult.rows[0].parsed_data ? JSON.parse(cvResult.rows[0].parsed_data) : {};
+      const existingParsedData = cvResult.rows[0].parsed_data ? cvResult.rows[0].parsed_data : {};
       
       // Merge existing parsed data with new data
       const updatedParsedData = {
@@ -1035,7 +1319,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       // Update CV record with new parsed data
       await db.query(
-        'UPDATE "CV" SET parsed_data = $1, updated_at = NOW() WHERE cv_id = $2',
+        'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
         [JSON.stringify(updatedParsedData), cvId]
       );
       
