@@ -474,4 +474,92 @@ router.get('/skills', authenticateToken, requireRole(['associate', 'admin']), as
   }
 });
 
+// Search associates (for freelancers to find people to message)
+router.get('/associates', authenticateToken, requireRole(['freelancer', 'admin']), async (req, res) => {
+  try {
+    const {
+      keyword,
+      industry,
+      page = 1,
+      limit = 10
+    } = req.query;
+    
+    const offset = (page - 1) * limit;
+    
+    // Build query parts
+    let whereConditions = ['u.is_active = true'];
+    const params = [];
+    
+    // Add search conditions
+    if (keyword) {
+      whereConditions.push(`(
+        a.contact_person ILIKE $${params.length + 1} OR
+        a.company_name ILIKE $${params.length + 1} OR
+        a.industry ILIKE $${params.length + 1} OR
+        u.email ILIKE $${params.length + 1}
+      )`);
+      params.push(`%${keyword}%`);
+    }
+    
+    if (industry) {
+      whereConditions.push(`a.industry ILIKE $${params.length + 1}`);
+      params.push(`%${industry}%`);
+    }
+    
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+    
+    // Count query
+    const countQuery = `
+      SELECT COUNT(DISTINCT a.associate_id) 
+      FROM "Associate" a
+      JOIN "User" u ON a.user_id = u.user_id
+      ${whereClause}
+    `;
+    
+    const countResult = await db.query(countQuery, params);
+    const totalCount = parseInt(countResult.rows[0].count || '0');
+    
+    // Main search query
+    const searchQuery = `
+      SELECT DISTINCT a.*, u.email, u.created_at
+      FROM "Associate" a
+      JOIN "User" u ON a.user_id = u.user_id
+      ${whereClause}
+      ORDER BY a.associate_id DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+    
+    // Add pagination parameters
+    const finalParams = [...params, parseInt(limit), offset];
+    
+    const searchResult = await db.query(searchQuery, finalParams);
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+    
+    return res.status(200).json({
+      success: true,
+      associates: searchResult.rows,
+      pagination: {
+        total: totalCount,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total_pages: totalPages,
+        has_next_page: hasNextPage,
+        has_prev_page: hasPrevPage
+      }
+    });
+    
+  } catch (error) {
+    console.error('Search associates error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

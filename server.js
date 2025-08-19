@@ -24,6 +24,9 @@ const hiringRoutes = require('./routes/hiring');
 const app = express();
 const server = http.createServer(app);
 
+// Make app context available globally for activity broadcasting
+global.app = app;
+
 // Initialize socket.io
 const io = socketIo(server, {
   cors: {

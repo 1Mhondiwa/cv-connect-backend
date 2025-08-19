@@ -1423,11 +1423,60 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       const freelancerId = freelancerResult.rows[0].freelancer_id;
       
+      // Get recent activities
+      let activitiesResult = { rows: [] };
+      try {
+        activitiesResult = await db.query(
+          `SELECT activity_date, activity_type, status
+           FROM "Activity"
+           WHERE user_id = $1 AND role = 'freelancer'
+           ORDER BY activity_date DESC
+           LIMIT 10`,
+          [userId]
+        );
+        
+        console.log('🔍 Activities query result:', {
+          userId,
+          rowCount: activitiesResult.rowCount,
+          activities: activitiesResult.rows
+        });
+      } catch (activityError) {
+        console.error('❌ Error fetching activities:', activityError);
+        // Continue with empty activities if there's an error
+      }
+      
       // This would include things like:
       // - Job applications stats
       // - Messaging stats
       // - Profile completion percentage
       // - Recent job postings matching skills
+      
+      // If no activities exist, create some sample ones for testing
+      if (activitiesResult.rows.length === 0) {
+        console.log('🔍 No activities found, creating sample activities...');
+        
+        // Create sample activities
+        const sampleActivities = [
+          {
+            activity_date: new Date(),
+            activity_type: 'Profile Updated',
+            status: 'Completed'
+          },
+          {
+            activity_date: new Date(Date.now() - 86400000), // 1 day ago
+            activity_type: 'CV Uploaded',
+            status: 'Completed'
+          },
+          {
+            activity_date: new Date(Date.now() - 172800000), // 2 days ago
+            activity_type: 'Skills Added',
+            status: 'Completed'
+          }
+        ];
+        
+        console.log('🔍 Sample activities created:', sampleActivities);
+        activitiesResult.rows = sampleActivities;
+      }
       
       // For MVP, we'll just return dummy data
       const dashboardData = {
@@ -1438,7 +1487,8 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         rejected_applications: 2,
         total_conversations: 3,
         unread_messages: 2,
-        recent_jobs_matching: 8
+        recent_jobs_matching: 8,
+        recent_activity: activitiesResult.rows
       };
       
       return res.status(200).json({
@@ -1472,5 +1522,291 @@ router.get('/activity', authenticateToken, requireRole(['freelancer']), async (r
     res.status(500).json({ success: false, message: 'Failed to fetch activity', error: error.message });
   }
 });
-  
-  module.exports = router;
+
+// Update freelancer availability status
+router.put('/availability', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { availability_status } = req.body;
+
+    // Validate availability status
+    if (!availability_status || !['available', 'unavailable', 'busy'].includes(availability_status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid availability status. Must be: available, unavailable, or busy'
+      });
+    }
+
+    // Get freelancer ID
+    const freelancerResult = await db.query(
+      'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+      [userId]
+    );
+
+    if (freelancerResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer profile not found'
+      });
+    }
+
+    const freelancerId = freelancerResult.rows[0].freelancer_id;
+
+    // Update availability status
+    await db.query(
+      'UPDATE "Freelancer" SET availability_status = $1 WHERE freelancer_id = $2',
+      [availability_status, freelancerId]
+    );
+
+    // Log the activity
+    await logActivity({
+      user_id: userId,
+      role: 'freelancer',
+      activity_type: 'Availability Updated',
+      details: `Changed availability to ${availability_status}`
+    });
+
+    // Emit real-time update event for web frontend
+    // This will be handled by the server to notify connected clients
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('availability_updated', {
+        freelancer_id: freelancerId,
+        user_id: userId,
+        availability_status: availability_status
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Availability status updated to ${availability_status}`,
+      availability_status: availability_status
+    });
+  } catch (error) {
+    console.error('Update availability error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// SSE endpoint for real-time availability updates
+router.get('/availability/stream', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    
+    // Set headers for SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // Send initial connection message
+    res.write('data: {"type": "connected", "message": "SSE connection established"}\n\n');
+
+    // Store the response object for later use
+    if (!req.app.locals.sseConnections) {
+      req.app.locals.sseConnections = new Map();
+    }
+    req.app.locals.sseConnections.set(userId, res);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      req.app.locals.sseConnections.delete(userId);
+      console.log(`SSE connection closed for user ${userId}`);
+    });
+
+    // Keep connection alive
+    const keepAlive = setInterval(() => {
+      res.write('data: {"type": "ping"}\n\n');
+    }, 30000); // Send ping every 30 seconds
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+    });
+
+  } catch (error) {
+    console.error('SSE connection error:', error);
+    res.end();
+  }
+});
+
+// SSE endpoint for real-time activity updates
+router.get('/activity/stream', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    
+    // Set headers for SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // Send initial connection message
+    res.write('data: {"type": "connected", "message": "Activity SSE connection established"}\n\n');
+
+    // Store the response object for later use
+    if (!req.app.locals.activityConnections) {
+      req.app.locals.activityConnections = new Map();
+    }
+    req.app.locals.activityConnections.set(userId, res);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      req.app.locals.activityConnections.delete(userId);
+      console.log(`Activity SSE connection closed for user ${userId}`);
+    });
+
+    // Keep connection alive
+    const keepAlive = setInterval(() => {
+      res.write('data: {"type": "ping"}\n\n');
+    }, 30000); // Send ping every 30 seconds
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+    });
+
+  } catch (error) {
+    console.error('Activity SSE connection error:', error);
+    res.end();
+  }
+});
+
+// Get freelancer hiring statistics
+router.get('/hiring/stats', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    console.log('🔍 Fetching hiring statistics for freelancer user_id:', userId);
+
+    // Get freelancer ID
+    const freelancerResult = await db.query(
+      'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+      [userId]
+    );
+
+    if (freelancerResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer profile not found'
+      });
+    }
+
+    const freelancerId = freelancerResult.rows[0].freelancer_id;
+
+    // Get total positions (total hires)
+    const totalPositionsResult = await db.query(
+      'SELECT COUNT(*) as total_positions FROM "Freelancer_Hire" WHERE freelancer_id = $1',
+      [freelancerId]
+    );
+
+    // Get completed hires
+    const completedHiresResult = await db.query(
+      'SELECT COUNT(*) as completed_hires FROM "Freelancer_Hire" WHERE freelancer_id = $1 AND status = $2',
+      [freelancerId, 'completed']
+    );
+
+    // Get active hires
+    const activeHiresResult = await db.query(
+      'SELECT COUNT(*) as active_hires FROM "Freelancer_Hire" WHERE freelancer_id = $1 AND status = $2',
+      [freelancerId, 'active']
+    );
+
+    const stats = {
+      total_positions: parseInt(totalPositionsResult.rows[0].total_positions),
+      completed_hires: parseInt(completedHiresResult.rows[0].completed_hires),
+      active_hires: parseInt(activeHiresResult.rows[0].active_hires)
+    };
+
+    console.log('✅ Hiring statistics fetched successfully for freelancer:', freelancerId);
+
+    return res.status(200).json({
+      success: true,
+      stats
+    });
+
+  } catch (error) {
+    console.error('❌ Get hiring stats error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hiring statistics',
+      error: error.message
+    });
+  }
+});
+
+// Get freelancer hiring history with company details
+router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    console.log('🔍 Fetching hiring history for freelancer user_id:', userId);
+
+    // Get freelancer ID
+    const freelancerResult = await db.query(
+      'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+      [userId]
+    );
+
+    if (freelancerResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer profile not found'
+      });
+    }
+
+    const freelancerId = freelancerResult.rows[0].freelancer_id;
+
+    // Get all hiring records with company details
+    const hiringHistoryResult = await db.query(
+      `SELECT 
+         h.hire_id,
+         h.hire_date,
+         h.project_title,
+         h.project_description,
+         h.agreed_terms,
+         h.agreed_rate,
+         h.rate_type,
+         h.start_date,
+         h.expected_end_date,
+         h.actual_end_date,
+         h.status,
+         h.associate_notes,
+         h.freelancer_notes,
+         a.contact_person as company_contact,
+         a.industry,
+         a.website,
+         a.phone,
+         a.address,
+         u.email as company_email
+       FROM "Freelancer_Hire" h
+       JOIN "Associate" a ON h.associate_id = a.associate_id
+       JOIN "User" u ON a.user_id = u.user_id
+       WHERE h.freelancer_id = $1
+       ORDER BY h.hire_date DESC`,
+      [freelancerId]
+    );
+
+    console.log(`✅ Found ${hiringHistoryResult.rowCount} hiring records for freelancer:`, freelancerId);
+
+    return res.status(200).json({
+      success: true,
+      hiring_history: hiringHistoryResult.rows
+    });
+
+  } catch (error) {
+    console.error('❌ Get hiring history error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hiring history',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
