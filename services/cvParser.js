@@ -156,7 +156,7 @@ class CVParser {
   // Enhanced contact information extraction
   extractContactInfo(text) {
     if (!text || typeof text !== 'string') {
-      return { email: null, phone: null, linkedin_url: null, github_url: null };
+      return { email: null, phone: null, linkedin_url: null, github_url: null, address: null };
     }
 
     const contactInfo = {};
@@ -205,7 +205,126 @@ class CVParser {
       contactInfo.github_url = github[0].startsWith('http') ? github[0] : 'https://' + github[0];
     }
     
+    // Address extraction
+    const address = this.extractAddressFromText(text);
+    if (address) {
+      contactInfo.address = address;
+    }
+    
     return contactInfo;
+  }
+
+  // Extract address from CV text
+  extractAddressFromText(text) {
+    console.log('Extracting address from CV text...');
+    
+    if (!text || typeof text !== 'string') {
+      console.log('No text provided for address extraction');
+      return null;
+    }
+
+    const lines = text.split('\n');
+    
+    // Look for explicit address patterns
+    const addressPatterns = [
+      // "Address: [address content]"
+      /^(?:Address|Location|Residence|Home):\s*(.+)$/i,
+      // Line starting with address indicators
+      /^(?:Address|Location|Residence|Home)\s*[:\-]?\s*(.+)$/i
+    ];
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Check explicit address patterns
+      for (const pattern of addressPatterns) {
+        const match = trimmedLine.match(pattern);
+        if (match && match[1]) {
+          const address = match[1].trim();
+          if (this.looksLikeAddress(address)) {
+            console.log(`Found address with pattern: "${address}"`);
+            return address;
+          }
+        }
+      }
+    }
+
+    // Look for address-like patterns in contact sections
+    const contactSectionKeywords = ['contact', 'personal', 'information', 'details'];
+    const contactLines = [];
+    let inContactSection = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim().toLowerCase();
+      
+      // Check if we're entering a contact section
+      if (contactSectionKeywords.some(keyword => line.includes(keyword))) {
+        inContactSection = true;
+        continue;
+      }
+      
+      // Check if we're leaving the contact section
+      if (inContactSection && this.looksLikeSectionHeader(lines[i])) {
+        break;
+      }
+      
+      if (inContactSection) {
+        contactLines.push(lines[i].trim());
+      }
+    }
+
+    // Look for address-like content in contact section
+    for (const line of contactLines) {
+      if (this.looksLikeAddress(line) && !line.includes('@') && !line.includes('http')) {
+        console.log(`Found address in contact section: "${line}"`);
+        return line;
+      }
+    }
+
+    console.log('No address found in CV text');
+    return null;
+  }
+
+  // Check if a line looks like an address
+  looksLikeAddress(line) {
+    if (!line || line.length < 10 || line.length > 200) {
+      return false;
+    }
+
+    // Address indicators
+    const addressIndicators = [
+      // Common address components
+      /\b(street|avenue|road|drive|lane|boulevard|ave|st|rd|dr|ln|blvd)\b/i,
+      /\b(apartment|apt|unit|suite|ste|floor|fl)\b/i,
+      // Postal codes and zip codes
+      /\b\d{5}(-\d{4})?\b/, // US ZIP codes
+      /\b[A-Z]\d[A-Z]\s*\d[A-Z]\d\b/, // Canadian postal codes
+      /\b\d{4,6}\b/, // Generic postal codes
+      // Countries and common city patterns
+      /\b(south africa|usa|canada|uk|united states|united kingdom)\b/i,
+      /\b(johannesburg|cape town|durban|pretoria|new york|london|toronto)\b/i,
+      // Address structure patterns
+      /\d+\s+[A-Za-z]/i, // Number followed by street name
+      /,\s*[A-Za-z]+\s*,/, // City, State/Province, pattern
+      /,\s*\d{4,6}/, // Ends with postal code
+    ];
+
+    // Exclusion patterns (things that are NOT addresses)
+    const exclusionPatterns = [
+      /^(email|phone|linkedin|github|website|url):/i,
+      /@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/, // Email addresses
+      /^https?:\/\//, // URLs
+      /^[\d\s\-\+\(\)]+$/, // Only numbers and phone symbols
+      /^[A-Z\s]{3,30}$/, // All caps headers
+    ];
+
+    // Check exclusions first
+    if (exclusionPatterns.some(pattern => pattern.test(line))) {
+      return false;
+    }
+
+    // Check for address indicators
+    return addressIndicators.some(pattern => pattern.test(line));
   }
 
   // Improved name extraction with better validation
