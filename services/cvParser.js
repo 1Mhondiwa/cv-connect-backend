@@ -2216,6 +2216,7 @@ class CVParser {
         email: contactInfo.email || '',
         linkedin_url: contactInfo.linkedin_url || '',
         github_url: contactInfo.github_url || '',
+        address: contactInfo.address || '',
         skills: skills,
         education: education,
         work_experience: workExperience,
