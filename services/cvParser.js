@@ -348,26 +348,32 @@ class CVParser {
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     let skills = [];
     
+    console.log('Starting skills extraction...');
+    
     // Primary method: Find dedicated skills section
     const skillsSection = this.findSection(lines, this.getSkillsKeywords());
     
     if (skillsSection.found) {
-      const sectionSkills = this.parseSkillsFromSection(skillsSection.content);
-      if (sectionSkills.length > 0) {
-        skills = sectionSkills;
-      }
+      console.log('Found skills section, extracting from section only...');
+      skills = this.parseSkillsFromSection(skillsSection.content);
+      console.log(`Extracted ${skills.length} skills from section`);
+      
+      // If we found a skills section, ONLY use skills from that section
+      // Do not fall back to other methods to avoid contamination
+      return this.deduplicateSkills(skills).slice(0, 20);
     }
     
-    // Secondary method: Look for skills patterns throughout the document
-    if (skills.length === 0) {
-      skills = this.extractSkillsFromEntireDocument(lines);
-    }
+    console.log('No skills section found, trying document-wide extraction...');
+    // Only use broader extraction if NO skills section was found
+    skills = this.extractSkillsFromEntireDocument(lines);
     
-    // Tertiary method: Use fallback with known skills database
+    // Final fallback: Use known skills database only if still no skills found
     if (skills.length === 0) {
+      console.log('No skills found, using fallback database...');
       skills = this.extractSkillsFallback(text);
     }
     
+    console.log(`Final skills count: ${skills.length}`);
     // Limit to reasonable number and deduplicate
     return this.deduplicateSkills(skills).slice(0, 20);
   }
@@ -570,16 +576,67 @@ class CVParser {
   parseSkillsFromSection(lines) {
     const skills = [];
     
+    console.log('Parsing skills from section with', lines.length, 'lines');
+    
     for (const line of lines) {
       const trimmedLine = line.trim();
       
+      console.log(`Processing skills line: "${trimmedLine}"`);
+      
       if (this.isSkillLine(trimmedLine)) {
         const extractedSkills = this.extractSkillsFromLine(trimmedLine);
-        skills.push(...extractedSkills);
+        console.log(`Extracted skills from line: ${extractedSkills.map(s => s.name).join(', ')}`);
+        
+        // Additional validation: filter out obvious non-skills
+        const validSkills = extractedSkills.filter(skill => this.isValidSkillInSkillsSection(skill.name));
+        skills.push(...validSkills);
+      } else {
+        console.log('Line not considered a skill line');
       }
     }
     
+    console.log('Final skills from section:', skills.map(s => s.name));
     return this.deduplicateSkills(skills);
+  }
+
+  // Additional validation for skills found in skills section
+  isValidSkillInSkillsSection(skillName) {
+    if (!skillName || skillName.length < 2) {
+      return false;
+    }
+    
+    // Exclude things that are clearly not skills
+    const nonSkillPatterns = [
+      // Job titles
+      /^(Lead|Senior|Junior|Assistant|Apprentice|Manager|Director|Supervisor|Coordinator)$/i,
+      
+      // Company related
+      /^(Rainbow|Coatings|Artisan|Fresh|Coat|Decorators|Services|Company|Inc|Ltd|Corp)$/i,
+      
+      // Locations
+      /^(Johannesburg|Pretoria|Cape Town|Durban|Port Elizabeth|Bloemfontein|East London|Polokwane|Kimberley|Nelspruit)$/i,
+      
+      // Dates and time
+      /^(January|February|March|April|May|June|July|August|September|October|November|December|Present|Current|Years?|Months?|Days?)$/i,
+      
+      // Common words that aren't skills
+      /^(Experience|Expert|Advanced|Intermediate|Beginner|Proficient|Knowledge|Ability|Years)$/i,
+      
+      // Single letters or very short words
+      /^[a-zA-Z]$/,
+      
+      // Numbers only
+      /^\d+$/
+    ];
+    
+    const isNonSkill = nonSkillPatterns.some(pattern => pattern.test(skillName));
+    
+    if (isNonSkill) {
+      console.log(`Filtering out non-skill: "${skillName}"`);
+      return false;
+    }
+    
+    return true;
   }
 
   isSkillLine(line) {
@@ -589,8 +646,27 @@ class CVParser {
     }
     
     // Skip lines that look like section headers
-    if (line.length < 50 && this.getCommonSectionHeaders().some(header => 
-      line.toLowerCase().includes(header))) {
+    if (this.looksLikeSectionHeader(line)) {
+      return false;
+    }
+    
+    // Skip lines that look like job descriptions or work experience content
+    if (this.looksLikeJobDescription(line)) {
+      return false;
+    }
+    
+    // Skip lines that contain dates (likely not skills)
+    if (/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/.test(line)) {
+      return false;
+    }
+    
+    // Skip lines that contain "Present" or date ranges
+    if (/\b(Present|Current)\b|\d{4}\s*[-–]\s*(\d{4}|Present|Current)/i.test(line)) {
+      return false;
+    }
+    
+    // Skip lines that start with action verbs (likely job descriptions)
+    if (/^(Managed|Led|Developed|Implemented|Created|Designed|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized)/i.test(line)) {
       return false;
     }
     
