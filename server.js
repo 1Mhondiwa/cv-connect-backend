@@ -75,9 +75,6 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// Serve static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/freelancer', freelancerRoutes);
@@ -87,6 +84,10 @@ app.use('/api/search', searchRoutes);
 app.use('/api/message', messageRoutes);
 app.use('/api/associate-request', associateRequestRoutes);
 app.use('/api/hiring', hiringRoutes);
+
+// Serve static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/cv', express.static(path.join(__dirname, 'uploads/cvs')));
 
 // Health check endpoint 
 app.get('/api/health', (req, res) => {
