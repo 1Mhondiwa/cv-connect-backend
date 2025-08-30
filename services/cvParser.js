@@ -346,17 +346,30 @@ class CVParser {
     }
 
     const lines = text.split('\n').filter(line => line.trim().length > 0);
+    let skills = [];
+    
+    // Primary method: Find dedicated skills section
     const skillsSection = this.findSection(lines, this.getSkillsKeywords());
     
     if (skillsSection.found) {
-      const skills = this.parseSkillsFromSection(skillsSection.content);
-      if (skills.length > 0) {
-        return skills;
+      const sectionSkills = this.parseSkillsFromSection(skillsSection.content);
+      if (sectionSkills.length > 0) {
+        skills = sectionSkills;
       }
     }
     
-    // Fallback: extract skills throughout the document
-    return this.extractSkillsFallback(text);
+    // Secondary method: Look for skills patterns throughout the document
+    if (skills.length === 0) {
+      skills = this.extractSkillsFromEntireDocument(lines);
+    }
+    
+    // Tertiary method: Use fallback with known skills database
+    if (skills.length === 0) {
+      skills = this.extractSkillsFallback(text);
+    }
+    
+    // Limit to reasonable number and deduplicate
+    return this.deduplicateSkills(skills).slice(0, 20);
   }
 
   getSkillsKeywords() {
@@ -365,15 +378,64 @@ class CVParser {
       'proficiencies', 'abilities', 'qualifications', 'programming languages',
       'tools', 'software', 'frameworks', 'platforms', 'core competencies',
       'professional skills', 'key skills', 'specialized skills', 'skill set',
-      'technical expertise', 'capabilities', 'strengths', 'core skills'
+      'core skills', 'technical competencies', 'technical expertise'
     ];
+  }
+
+  // New method: Extract skills from entire document using multiple strategies
+  extractSkillsFromEntireDocument(lines) {
+    const allSkills = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Skip if line is too short or too long
+      if (line.length < 3 || line.length > 200) continue;
+      
+      // Check if line contains skill indicators
+      if (this.lineContainsSkillIndicators(line)) {
+        const skillsFromLine = this.extractSkillsFromLine(line);
+        allSkills.push(...skillsFromLine);
+      }
+      
+      // Look for bullet points or lists that might contain skills
+      if (this.looksLikeSkillsList(line)) {
+        const skillsFromLine = this.extractSkillsFromLine(line);
+        allSkills.push(...skillsFromLine);
+      }
+    }
+    
+    return this.deduplicateSkills(allSkills);
+  }
+
+  lineContainsSkillIndicators(line) {
+    const skillIndicators = [
+      'proficient in', 'experienced with', 'skilled in', 'knowledge of',
+      'familiar with', 'expertise in', 'competent in', 'specializing in',
+      'technologies:', 'tools:', 'languages:', 'frameworks:', 'software:'
+    ];
+    
+    const lowerLine = line.toLowerCase();
+    return skillIndicators.some(indicator => lowerLine.includes(indicator));
+  }
+
+  looksLikeSkillsList(line) {
+    // Check for common list patterns
+    const listPatterns = [
+      /^[•\-\*\+]\s+/, // Bullet points
+      /^\d+\.\s+/, // Numbered lists
+      /^[a-zA-Z\s\+\#\.]+[,;]\s*[a-zA-Z]/, // Comma/semicolon separated
+      /\b(HTML|CSS|JavaScript|Python|Java|C\+\+|SQL|React|Angular|Node\.js|PHP|Ruby|Go|Rust|Swift|Kotlin|TypeScript)\b/i // Common tech skills
+    ];
+    
+    return listPatterns.some(pattern => pattern.test(line));
   }
 
   findSection(lines, keywords) {
     let startIndex = -1;
     let endIndex = lines.length;
     
-    // Find section start - be more flexible with matching
+    // Find section start
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
       if (keywords.some(keyword => line.includes(keyword.toLowerCase()))) {
@@ -386,17 +448,11 @@ class CVParser {
       return { found: false, content: [] };
     }
     
-    // Find section end - be more flexible and look for next major section
+    // Find section end
     const endKeywords = this.getCommonSectionHeaders();
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      // Look for clear section headers, not just any mention
-      if (endKeywords.some(keyword => 
-        line === keyword.toLowerCase() || 
-        line.startsWith(keyword.toLowerCase() + ':') ||
-        line.startsWith(keyword.toLowerCase() + ' ') ||
-        (line.length < 50 && line.match(/^[A-Z][A-Z\s]+$/)) // All caps headers
-      )) {
+      if (endKeywords.some(keyword => line.includes(keyword) && line.length < 50)) {
         endIndex = i;
         break;
       }
@@ -414,8 +470,7 @@ class CVParser {
     return [
       'experience', 'work', 'employment', 'education', 'academic',
       'projects', 'achievements', 'awards', 'certifications', 'languages',
-      'references', 'contact', 'personal', 'interests', 'hobbies',
-      'professional experience', 'work history', 'career history'
+      'references', 'contact', 'personal', 'interests', 'hobbies'
     ];
   }
 
@@ -431,13 +486,6 @@ class CVParser {
       }
     }
     
-    // If no skills found in section, try to extract from the entire section text
-    if (skills.length === 0) {
-      const sectionText = lines.join(' ');
-      const fallbackSkills = this.extractSkillsFallback(sectionText);
-      skills.push(...fallbackSkills);
-    }
-    
     return this.deduplicateSkills(skills);
   }
 
@@ -447,23 +495,9 @@ class CVParser {
       return false;
     }
     
-    // Skip lines that look like section headers - be less restrictive
-    if (line.length < 30 && this.getCommonSectionHeaders().some(header => 
-      line.toLowerCase() === header.toLowerCase() || 
-      line.toLowerCase().startsWith(header.toLowerCase() + ':') ||
-      line.toLowerCase().startsWith(header.toLowerCase() + ' '))) {
-      return false;
-    }
-    
-    // Skip lines that are clearly not skills
-    const nonSkillPatterns = [
-      /^[A-Z][A-Z\s]+$/, // All caps headers
-      /^\d+\./, // Numbered lists
-      /^[•\-\*]\s*$/, // Bullet points with no content
-      /^[A-Z][a-z]+:\s*$/, // Section headers with colon
-    ];
-    
-    if (nonSkillPatterns.some(pattern => pattern.test(line))) {
+    // Skip lines that look like section headers
+    if (line.length < 50 && this.getCommonSectionHeaders().some(header => 
+      line.toLowerCase().includes(header))) {
       return false;
     }
     
@@ -473,29 +507,36 @@ class CVParser {
   extractSkillsFromLine(line) {
     const skills = [];
     
+    // Remove common prefixes and clean the line
+    let cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
+    cleanLine = cleanLine.replace(/^(Skills?|Technologies?|Tools?|Software|Frameworks?|Languages?):\s*/i, '').trim();
+    
     // Pattern 1: "JavaScript - Expert - 6 years"
-    const expertisePattern = /([A-Za-z\s\.#\+\-]+?)\s*-\s*(Expert|Advanced|Intermediate|Beginner|Proficient)\s*(?:-\s*(\d+)\s*years?)?/gi;
+    const expertisePattern = /([A-Za-z\s\.#\+\-]+?)\s*[-–]\s*(Expert|Advanced|Intermediate|Beginner|Proficient|Experienced?)\s*(?:[-–]\s*(\d+)\s*years?)?/gi;
     let match;
     
-    while ((match = expertisePattern.exec(line)) !== null) {
-      skills.push({
-        name: match[1].trim(),
-        proficiency: match[2] || 'Intermediate',
-        years_experience: match[3] ? parseInt(match[3]) : null
-      });
+    while ((match = expertisePattern.exec(cleanLine)) !== null) {
+      const skillName = this.cleanSkillName(match[1]);
+      if (skillName && this.looksLikeSkill(skillName)) {
+        skills.push({
+          name: skillName,
+          proficiency: match[2] || 'Intermediate',
+          years_experience: match[3] ? parseInt(match[3]) : null
+        });
+      }
     }
     
     if (skills.length > 0) {
       return skills;
     }
     
-    // Pattern 2: Comma or bullet separated skills - be more flexible
-    const separators = [',', '•', '-', '*', '|', ';', '/', '&'];
+    // Pattern 2: Multiple separators (comma, semicolon, pipe, bullet)
+    const separators = [',', ';', '|', '•', '▪', '○', '→'];
     for (const sep of separators) {
-      if (line.includes(sep)) {
-        const skillNames = line.split(sep)
-          .map(s => s.trim())
-          .filter(s => s.length > 1 && s.length < 60) // Increased length limit
+      if (cleanLine.includes(sep)) {
+        const skillNames = cleanLine.split(sep)
+          .map(s => this.cleanSkillName(s))
+          .filter(s => s && s.length > 1 && s.length < 50)
           .filter(s => this.looksLikeSkill(s));
         
         if (skillNames.length > 0) {
@@ -508,31 +549,23 @@ class CVParser {
       }
     }
     
-    // Pattern 3: Skills with proficiency indicators
-    const proficiencyPatterns = [
-      /([A-Za-z\s\.#\+\-]+?)\s*\(([A-Za-z]+)\)/gi, // "Skill (Level)"
-      /([A-Za-z\s\.#\+\-]+?)\s*:\s*([A-Za-z]+)/gi, // "Skill: Level"
-      /([A-Za-z\s\.#\+\-]+?)\s*\[([A-Za-z]+)\]/gi, // "Skill [Level]"
-    ];
-    
-    for (const pattern of proficiencyPatterns) {
-      while ((match = pattern.exec(line)) !== null) {
-        skills.push({
-          name: match[1].trim(),
-          proficiency: match[2] || 'Intermediate',
+    // Pattern 3: Space-separated skills (for lines with multiple skills)
+    if (this.looksLikeMultipleSkills(cleanLine)) {
+      const skillNames = this.extractSpaceSeparatedSkills(cleanLine);
+      if (skillNames.length > 1) {
+        return skillNames.map(name => ({
+          name: name,
+          proficiency: 'Intermediate',
           years_experience: null
-        });
+        }));
       }
     }
     
-    if (skills.length > 0) {
-      return skills;
-    }
-    
-    // Pattern 4: Single skill on a line - be more permissive
-    if (this.looksLikeSkill(line)) {
+    // Pattern 4: Single skill on a line
+    const singleSkill = this.cleanSkillName(cleanLine);
+    if (singleSkill && this.looksLikeSkill(singleSkill)) {
       return [{
-        name: line,
+        name: singleSkill,
         proficiency: 'Intermediate',
         years_experience: null
       }];
@@ -541,35 +574,116 @@ class CVParser {
     return [];
   }
 
+  cleanSkillName(skill) {
+    if (!skill) return '';
+    
+    return skill
+      .replace(/[()[\]{}]/g, '') // Remove brackets
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .replace(/^[-•\*\+\s]+|[-•\*\+\s]+$/g, '') // Remove leading/trailing symbols
+      .trim();
+  }
+
+  looksLikeMultipleSkills(line) {
+    // Check if line contains multiple potential skills separated by spaces
+    const words = line.split(/\s+/);
+    if (words.length < 2 || words.length > 10) return false;
+    
+    // Count words that look like skills
+    const skillLikeWords = words.filter(word => 
+      word.length > 2 && 
+      /^[A-Za-z\+\#\.]+$/.test(word) &&
+      !['and', 'or', 'with', 'the', 'for', 'in', 'on', 'at', 'by'].includes(word.toLowerCase())
+    );
+    
+    return skillLikeWords.length >= 2;
+  }
+
+  extractSpaceSeparatedSkills(line) {
+    const words = line.split(/\s+/);
+    const skills = [];
+    
+    for (const word of words) {
+      const cleanWord = this.cleanSkillName(word);
+      if (cleanWord && this.looksLikeSkill(cleanWord)) {
+        skills.push(cleanWord);
+      }
+    }
+    
+    return skills;
+  }
+
   looksLikeSkill(text) {
-    if (!text || text.length < 2 || text.length > 60) { // Increased length limit
+    if (!text || text.length < 2 || text.length > 50) {
       return false;
     }
     
-    // Should contain mostly letters and common skill characters
-    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
-    const skillCharCount = (text.match(/[a-zA-Z0-9\s\.#\+\-\/]/g) || []).length;
-    
-    if (letterCount / text.length < 0.4) { // Reduced requirement
+    // Should contain mostly letters (allow + # . for tech skills)
+    const validChars = (text.match(/[a-zA-Z\+\#\.]/g) || []).length;
+    if (validChars / text.length < 0.6) {
       return false;
     }
     
-    // Exclude common non-skill phrases - be more specific
+    // Exclude common non-skill phrases
     const excludePatterns = [
-      /^(and|or|the|with|for|in|on|at|by|from|to|of|a|an)$/i,
-      /^(years?|months?|experience|level|proficiency|skills?|expertise)$/i,
-      /^(certification|certified|license|licensed)$/i,
-      /^(beginner|intermediate|advanced|expert|proficient)$/i,
-      /^[0-9\s\-\.]+$/, // Only numbers and separators
-      /^[A-Z\s]+$/, // All caps with only spaces
+      /^(and|or|the|with|for|in|on|at|by|from|to|as|is|are|was|were|have|has|had)$/i,
+      /^(years?|months?|days?)$/i,
+      /^(experience|level|proficiency|knowledge|ability)$/i,
+      /^(including|such|like|also|plus|etc)$/i,
+      /^\d+$/,
+      /^[^a-zA-Z]*$/,
+      /\b(page|pages|resume|cv|curriculum|vitae)\b/i
     ];
     
     if (excludePatterns.some(pattern => pattern.test(text))) {
       return false;
     }
     
-    // Must contain at least one letter
-    return /[a-zA-Z]/.test(text);
+    // Positive indicators for skills
+    const skillIndicators = [
+      /^[A-Z][a-z]+(\.[A-Z][a-z]+)*$/, // CamelCase or dotted names (e.g., Node.js)
+      /^[A-Z]+$/, // Acronyms (HTML, CSS, SQL)
+      /^[A-Za-z]+[\+\#]$/, // C++, C#
+      /^[A-Za-z\+\#\.]+$/, // General tech pattern
+    ];
+    
+    // If it matches skill indicators, it's likely a skill
+    if (skillIndicators.some(pattern => pattern.test(text))) {
+      return true;
+    }
+    
+    // Check against common skills database for additional validation
+    const commonSkills = this.getCommonSkillsList();
+    return commonSkills.some(skill => 
+      skill.toLowerCase() === text.toLowerCase() ||
+      text.toLowerCase().includes(skill.toLowerCase()) ||
+      skill.toLowerCase().includes(text.toLowerCase())
+    );
+  }
+
+  getCommonSkillsList() {
+    return [
+      // Programming languages
+      'JavaScript', 'Python', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'TypeScript',
+      'HTML', 'CSS', 'SQL', 'R', 'MATLAB', 'Scala', 'Perl', 'Shell', 'Bash', 'PowerShell', 'VB.NET',
+      
+      // Frameworks and libraries
+      'React', 'Angular', 'Vue', 'Node.js', 'Express', 'Django', 'Flask', 'Spring', 'Laravel', 'ASP.NET',
+      'Bootstrap', 'jQuery', 'Redux', 'GraphQL', 'REST', 'API', 'MongoDB', 'MySQL', 'PostgreSQL',
+      
+      // Tools and technologies
+      'Git', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP', 'Jenkins', 'Linux', 'Windows', 'MacOS',
+      'Photoshop', 'Illustrator', 'Figma', 'Sketch', 'AutoCAD', 'SolidWorks', 'Excel', 'Word', 'PowerPoint',
+      
+      // Professional skills
+      'Leadership', 'Management', 'Communication', 'Teamwork', 'Problem', 'Solving', 'Analysis',
+      'Marketing', 'Sales', 'Accounting', 'Finance', 'HR', 'Operations', 'Strategy', 'Planning',
+      
+      // Industry specific
+      'Machine Learning', 'AI', 'Data Science', 'Cybersecurity', 'DevOps', 'Agile', 'Scrum',
+      'SEO', 'SEM', 'Social Media', 'Content', 'Writing', 'Editing', 'Translation',
+      'Teaching', 'Training', 'Consulting', 'Research', 'Healthcare', 'Nursing', 'Medicine'
+    ];
   }
 
   extractSkillsFallback(text) {
@@ -1157,4 +1271,5 @@ class CVParser {
   }
 }
 
+module.exports = new CVParser();
 module.exports = new CVParser();
