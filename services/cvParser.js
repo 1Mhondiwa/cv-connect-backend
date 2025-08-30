@@ -519,18 +519,15 @@ class CVParser {
       return { found: false, content: [] };
     }
     
-    // Find section end
-    const endKeywords = this.getCommonSectionHeaders();
+    // Find section end - look for ANY section header after the start
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i].trim();
       
+      // Any line that looks like a section header should end the current section
       if (this.looksLikeSectionHeader(line)) {
-        const lowerLine = line.toLowerCase();
-        if (endKeywords.some(keyword => this.matchesSectionKeyword(lowerLine, keyword))) {
-          endIndex = i;
-          console.log(`Found section end at line ${i}: "${line}"`);
-          break;
-        }
+        endIndex = i;
+        console.log(`Found section end at line ${i}: "${line}"`);
+        break;
       }
     }
     
@@ -567,9 +564,12 @@ class CVParser {
 
   getCommonSectionHeaders() {
     return [
-      'experience', 'work', 'employment', 'education', 'academic',
-      'projects', 'achievements', 'awards', 'certifications', 'languages',
-      'references', 'contact', 'personal', 'interests', 'hobbies'
+      'work experience', 'experience', 'work', 'employment', 'job history', 'career history',
+      'education', 'academic', 'qualifications', 'degrees',
+      'projects', 'achievements', 'awards', 'certifications', 'licenses',
+      'languages', 'language skills',
+      'references', 'contact', 'personal', 'interests', 'hobbies',
+      'summary', 'objective', 'profile', 'about'
     ];
   }
 
@@ -650,9 +650,14 @@ class CVParser {
       return false;
     }
     
-    // Skip lines that look like job descriptions or work experience content
-    if (this.looksLikeJobDescription(line)) {
-      return false;
+    // IMPORTANT: Lines starting with bullet points are likely skills in a skills section
+    if (/^[•\-\*\+]/.test(line.trim())) {
+      // But make sure they're not work experience bullet points
+      if (this.looksLikeJobDescription(line)) {
+        return false;
+      }
+      // If it's a bullet point but not a job description, it's likely a skill
+      return true;
     }
     
     // Skip lines that contain dates (likely not skills)
@@ -665,8 +670,13 @@ class CVParser {
       return false;
     }
     
-    // Skip lines that start with action verbs (likely job descriptions)
-    if (/^(Managed|Led|Developed|Implemented|Created|Designed|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized)/i.test(line)) {
+    // Skip obvious job titles
+    if (this.looksLikeJobTitle(line)) {
+      return false;
+    }
+    
+    // Skip obvious company names
+    if (this.looksLikeCompany(line)) {
       return false;
     }
     
@@ -1515,36 +1525,38 @@ class CVParser {
     // Clean the line for content analysis
     const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
     
+    // SPECIAL CASE: If line contains skill proficiency indicators, it's NOT a job description
+    // Format: "• Skill Name – Level – X years"
+    if (/^[•\-\*\+]\s*[A-Za-z\s&]+\s*[–\-]\s*(Expert|Advanced|Intermediate|Beginner|Proficient)\s*[–\-]\s*\d+\s*years?/i.test(originalLine)) {
+      return false;
+    }
+    
     // Strong indicators this is a job description
     const strongDescriptionIndicators = [
-      // Starts with bullet points
-      /^[•\-\*\+]/, 
-      
-      // Starts with action verbs (past tense or present tense)
+      // Starts with action verbs (past tense or present tense) - but not skill-related verbs
       /^(Managed|Led|Developed|Implemented|Created|Designed|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized|Specialized|Provided|Reduced|Trained|Gained|Learned|Introduced|Ensured)/i,
       
-      // Contains percentage or numbers (achievements)
-      /\d+%|\d+\s*(years?|months?|people|team|projects?|clients?)/i,
+      // Contains percentage or numbers with specific contexts (not skill years)
+      /\d+%|\d+\s*(people|team|projects?|clients?|employees|staff|budget|cost|revenue|sales)/i,
       
       // Multiple sentences (descriptions tend to be longer)
       /\.\s+[A-Z]/, // Period followed by capital letter
       
       // Contains typical job description phrases
-      /\b(responsible for|in charge of|worked with|collaborated with|ensured that|resulted in|leading to)\b/i
+      /\b(responsible for|in charge of|worked with|collaborated with|ensured that|resulted in|leading to|managing|overseeing)\b/i
     ];
     
-    // Check against original line (with bullet points)
-    if (strongDescriptionIndicators.some(pattern => pattern.test(originalLine))) {
+    // Check against clean line (without bullet points)
+    if (strongDescriptionIndicators.some(pattern => pattern.test(cleanLine))) {
       return true;
     }
     
-    // Additional check against clean line
-    const additionalPatterns = [
-      /\b(experience|expertise|proficiency|specialization)\b.*\b(in|with|for)\b/i,
-      /\b(customers|clients|team|staff|projects|systems|processes|procedures|standards|requirements|goals|objectives|quality|efficiency|satisfaction)\b/i
+    // Additional check for work-related content
+    const workRelatedPatterns = [
+      /\b(customers|clients|team|staff|projects|systems|processes|procedures|standards|requirements|goals|objectives|quality|efficiency|satisfaction|revenue|budget|sales|management)\b/i
     ];
     
-    return additionalPatterns.some(pattern => pattern.test(cleanLine));
+    return workRelatedPatterns.some(pattern => pattern.test(cleanLine));
   }
 
   validateAndCleanExperiences(experiences) {
@@ -1771,9 +1783,9 @@ class CVParser {
     
     // Known section headers
     const sectionHeaders = [
-      'work experience', 'experience', 'employment', 'career history', 'professional experience',
+      'work experience', 'experience', 'employment', 'career history', 'professional experience', 'job history',
       'education', 'academic background', 'qualifications', 'academic qualifications',
-      'skills', 'technical skills', 'core competencies', 'professional skills', 'key skills',
+      'skills', 'technical skills', 'core competencies', 'professional skills', 'key skills', 'expertise', 'abilities',
       'references', 'contact information', 'personal information', 'contact details', 'contact',
       'objective', 'summary', 'profile', 'about me', 'professional summary', 'career objective',
       'certifications', 'licenses', 'awards', 'achievements', 'honors',
