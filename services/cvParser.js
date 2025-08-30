@@ -1860,9 +1860,47 @@ class CVParser {
     return isKnownSection || isAllCapsHeader;
   }
 
-  // Calculate years of experience
+  // Extract years of experience from CV text
+  extractYearsOfExperienceFromText(text) {
+    console.log('Extracting years of experience from CV text...');
+    
+    if (!text || typeof text !== 'string') {
+      console.log('No text provided for years extraction');
+      return null;
+    }
+
+    // Look for patterns like "X years of experience", "X+ years", etc.
+    const experiencePatterns = [
+      /(\d+)\+?\s*years?\s+of\s+experience/i,
+      /(\d+)\+?\s*years?\s+experience/i,
+      /experience\s+of\s+(\d+)\+?\s*years?/i,
+      /with\s+(\d+)\+?\s*years?\s+of\s+experience/i,
+      /(\d+)\+?\s*years?\s+in\s+/i,
+      /over\s+(\d+)\+?\s*years?\s+/i,
+      /more\s+than\s+(\d+)\+?\s*years?\s+/i
+    ];
+
+    for (const pattern of experiencePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const years = parseInt(match[1]);
+        if (years > 0 && years <= 50) { // Reasonable range
+          console.log(`Found years of experience in text: ${years} years (pattern: "${match[0]}")`);
+          return years;
+        }
+      }
+    }
+
+    console.log('No years of experience pattern found in text');
+    return null;
+  }
+
+  // Calculate years of experience (fallback method)
   calculateTotalExperience(workExperience) {
+    console.log('Calculating total experience from work history...');
+    
     if (!Array.isArray(workExperience) || workExperience.length === 0) {
+      console.log('No work experience provided for calculation');
       return 0;
     }
     
@@ -1879,12 +1917,32 @@ class CVParser {
         }
         
         if (startYear && endYear && endYear >= startYear) {
-          totalYears += (endYear - startYear);
+          const yearsDiff = endYear - startYear;
+          console.log(`Work experience: ${exp.title} (${startYear}-${endYear}) = ${yearsDiff} years`);
+          totalYears += yearsDiff;
         }
       }
     }
     
+    console.log(`Total calculated experience: ${totalYears} years`);
     return Math.max(0, totalYears);
+  }
+
+  // Determine years of experience (prioritize CV text over calculation)
+  determineYearsOfExperience(text, workExperience) {
+    console.log('Determining years of experience...');
+    
+    // FIRST: Try to extract from CV text (professional summary, etc.)
+    const extractedYears = this.extractYearsOfExperienceFromText(text);
+    if (extractedYears !== null) {
+      console.log(`Using extracted years from CV text: ${extractedYears}`);
+      return extractedYears;
+    }
+    
+    // FALLBACK: Calculate from work experience dates
+    const calculatedYears = this.calculateTotalExperience(workExperience);
+    console.log(`Using calculated years from work history: ${calculatedYears}`);
+    return calculatedYears;
   }
 
   extractYearFromDate(dateStr) {
@@ -2011,7 +2069,7 @@ class CVParser {
       const skills = this.extractSkills(text);
       const education = this.extractEducation(text);
       const workExperience = this.extractWorkExperience(text);
-      const totalExperience = this.calculateTotalExperience(workExperience);
+      const totalExperience = this.determineYearsOfExperience(text, workExperience);
       
       const extractedData = {
         skills,
