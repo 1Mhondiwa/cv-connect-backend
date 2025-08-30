@@ -904,19 +904,20 @@ class CVParser {
     const experienceSection = this.findSection(lines, this.getExperienceKeywords());
     
     if (experienceSection.found) {
+      console.log('Found work experience section, parsing...');
       experiences = this.parseExperienceFromSection(experienceSection.content);
+      console.log(`Extracted ${experiences.length} experiences from section`);
     }
     
-    // Secondary method: If no experiences found or very few, try broader extraction
-    if (experiences.length <= 1) {
-      const fallbackExperiences = this.extractWorkExperienceFallback(text);
-      if (fallbackExperiences.length > experiences.length) {
-        experiences = fallbackExperiences;
-      }
+    // Only use fallback if we found no experiences at all AND there's a clear work experience section missing
+    if (experiences.length === 0 && !experienceSection.found) {
+      console.log('No experience section found, trying fallback...');
+      experiences = this.extractWorkExperienceFromEntireDocument(lines);
+      console.log(`Extracted ${experiences.length} experiences from fallback`);
     }
     
     // Limit to reasonable number and validate
-    return experiences.slice(0, 10);
+    return experiences.slice(0, 6);
   }
 
   getExperienceKeywords() {
@@ -933,6 +934,8 @@ class CVParser {
     let descriptionLines = [];
     let i = 0;
     
+    console.log('Parsing experience section with', lines.length, 'lines');
+    
     while (i < lines.length) {
       const trimmedLine = lines[i].trim();
       
@@ -941,10 +944,20 @@ class CVParser {
         continue;
       }
       
-      // Try multiple methods to detect a new work experience entry
-      const detectedEntry = this.detectWorkExperienceEntry(lines, i);
+      console.log(`Processing line ${i}: "${trimmedLine}"`);
+      
+      // Check if we've hit a new section header (this means we should stop)
+      if (this.looksLikeSectionHeader(trimmedLine) && i > 0) {
+        console.log('Hit section header, stopping:', trimmedLine);
+        break;
+      }
+      
+      // Try to detect a new work experience entry (but be more conservative)
+      const detectedEntry = this.detectWorkExperienceEntryStrict(lines, i);
       
       if (detectedEntry.isNewEntry) {
+        console.log('Detected new experience entry:', detectedEntry.title);
+        
         // Save previous experience if exists
         if (currentExp) {
           currentExp.description = descriptionLines.join(' ').trim();
@@ -965,13 +978,11 @@ class CVParser {
         i += detectedEntry.linesProcessed;
       } else if (currentExp) {
         // Try to extract additional information for current experience
-        if (!currentExp.company) {
-          const company = this.extractCompanyFromLine(trimmedLine);
-          if (company) {
-            currentExp.company = company;
-            i++;
-            continue;
-          }
+        if (!currentExp.company && this.looksLikeCompany(trimmedLine)) {
+          currentExp.company = trimmedLine;
+          console.log('Added company:', trimmedLine);
+          i++;
+          continue;
         }
         
         if (!currentExp.start_date) {
@@ -979,6 +990,7 @@ class CVParser {
           if (dates) {
             currentExp.start_date = dates.start;
             currentExp.end_date = dates.end;
+            console.log('Added dates:', dates);
             i++;
             continue;
           }
@@ -987,10 +999,26 @@ class CVParser {
         // Add to description if it looks like description content
         if (this.looksLikeJobDescription(trimmedLine)) {
           descriptionLines.push(trimmedLine);
+          console.log('Added to description:', trimmedLine.substring(0, 50) + '...');
         }
         
         i++;
       } else {
+        // No current experience, check if this could start a new one
+        if (this.looksLikeJobTitle(trimmedLine)) {
+          console.log('Found potential job title without experience context:', trimmedLine);
+          // Only accept if it's a very clear job title
+          if (this.isVeryLikelyJobTitle(trimmedLine)) {
+            currentExp = {
+              title: trimmedLine,
+              company: null,
+              start_date: null,
+              end_date: null,
+              description: ''
+            };
+            descriptionLines = [];
+          }
+        }
         i++;
       }
     }
@@ -1001,7 +1029,103 @@ class CVParser {
       experiences.push(currentExp);
     }
     
+    console.log('Final experiences extracted:', experiences.length);
     return this.validateAndCleanExperiences(experiences);
+  }
+
+  // More conservative detection for within sections
+  detectWorkExperienceEntryStrict(lines, startIndex) {
+    const line = lines[startIndex].trim();
+    let result = {
+      isNewEntry: false,
+      title: null,
+      company: null,
+      start_date: null,
+      end_date: null,
+      linesProcessed: 1
+    };
+    
+    // Only detect job titles that are very likely to be work experience
+    if (this.isVeryLikelyJobTitle(line)) {
+      result.isNewEntry = true;
+      result.title = line;
+      
+      // Look ahead for company and dates in next few lines
+      for (let i = 1; i <= 3 && (startIndex + i) < lines.length; i++) {
+        const nextLine = lines[startIndex + i].trim();
+        
+        // Stop if we hit another section
+        if (this.looksLikeSectionHeader(nextLine)) {
+          break;
+        }
+        
+        if (!result.company && this.looksLikeCompany(nextLine)) {
+          result.company = nextLine;
+          result.linesProcessed = Math.max(result.linesProcessed, i + 1);
+        }
+        
+        if (!result.start_date) {
+          const dates = this.extractDatesFromLine(nextLine);
+          if (dates) {
+            result.start_date = dates.start;
+            result.end_date = dates.end;
+            result.linesProcessed = Math.max(result.linesProcessed, i + 1);
+          }
+        }
+      }
+      
+      return result;
+    }
+    
+    return result;
+  }
+
+  // Very strict job title detection for work experience sections
+  isVeryLikelyJobTitle(line) {
+    if (!line || line.length < 3 || line.length > 100) {
+      return false;
+    }
+    
+    // Clean the line
+    const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
+    
+    // Exclude patterns that are definitely not job titles
+    const excludePatterns = [
+      /@/, // Email
+      /http/, // URL
+      /^\d+$/, // Only numbers
+      /\d{4}[-\/]\d{1,2}/, // Date patterns
+      /^(January|February|March|April|May|June|July|August|September|October|November|December)/i,
+      /^(Education|Skills|References|Contact|Personal|Objective|Summary|About|Profile|Certifications|Languages|Awards|Interests|Hobbies)/i,
+      /\b(years|months|present|current|to|from|until|since|experience|at|in|on|the|and|or|with|for|by)\b/i,
+      /^(CONTACT|PROFESSIONAL|EDUCATION|SKILLS|REFERENCES|CERTIFICATIONS|LANGUAGES|AWARDS)/i,
+      /Email:|Phone:|Address:|LinkedIn:/i,
+      /•/, // Bullet points are usually descriptions, not titles
+      /\b(Managed|Developed|Implemented|Created|Designed|Led|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized|Responsible)\b/i
+    ];
+    
+    if (excludePatterns.some(pattern => pattern.test(cleanLine))) {
+      return false;
+    }
+    
+    // Very specific job title patterns that we're confident about
+    const veryLikelyJobTitlePatterns = [
+      // Specific painter job titles
+      /^(Lead|Senior|Master|Chief|Head|Principal)\s+(Painter)$/i,
+      /^(Painter)$/i,
+      /^(Apprentice|Junior|Assistant)\s+(Painter)$/i,
+      /^(Professional|Commercial|Residential|Industrial)\s+(Painter)$/i,
+      
+      // Other clear job patterns
+      /^(Senior|Lead|Principal|Junior|Assistant|Deputy|Chief|Head|Vice|Executive)\s+[A-Z][a-z]+$/i,
+      /^[A-Z][a-z]+\s+(Manager|Director|Supervisor|Coordinator|Specialist|Analyst|Engineer|Developer|Designer|Consultant|Administrator|Representative|Officer|Technician|Lead|Leader)$/i,
+      /^(Project|Team|Operations|Sales|Account|Business|Technical)\s+(Manager|Lead|Leader|Coordinator)$/i,
+      
+      // Simple professional titles
+      /^[A-Z][a-z]{2,15}(\s+[A-Z][a-z]{2,15}){0,2}$/  // 1-3 capitalized words, reasonable length
+    ];
+    
+    return veryLikelyJobTitlePatterns.some(pattern => pattern.test(cleanLine));
   }
 
   detectWorkExperienceEntry(lines, startIndex) {
@@ -1312,77 +1436,90 @@ class CVParser {
     return null;
   }
 
-  extractWorkExperienceFallback(text) {
+  // Conservative fallback that only looks for very clear work experience patterns
+  extractWorkExperienceFromEntireDocument(lines) {
     const experiences = [];
-    const lines = text.split('\n').filter(line => line.trim().length > 0);
     
-    // Look for work experience patterns throughout the document
+    console.log('Using fallback extraction (no clear work experience section found)');
+    
+    // Only look for very obvious work experience patterns when no section is found
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      // Skip if in obvious non-work sections
-      if (this.isInNonWorkSection(line)) {
+      // Skip if we're clearly in another section
+      if (this.isDefinitelyNotWorkExperienceSection(line, lines, i)) {
         continue;
       }
       
-      // Try to detect work experience entry
-      const detectedEntry = this.detectWorkExperienceEntry(lines, i);
-      
-      if (detectedEntry.isNewEntry) {
+      // Only accept very obvious job titles
+      if (this.isVeryLikelyJobTitle(line)) {
+        console.log('Found potential job title in fallback:', line);
+        
         const experience = {
-          title: detectedEntry.title || '',
-          company: detectedEntry.company || null,
-          start_date: detectedEntry.start_date || null,
-          end_date: detectedEntry.end_date || null,
+          title: line,
+          company: null,
+          start_date: null,
+          end_date: null,
           description: ''
         };
         
-        // Look for additional information in nearby lines
-        const descriptionLines = [];
-        for (let j = i + detectedEntry.linesProcessed; j < Math.min(lines.length, i + 8); j++) {
-          const nearbyLine = lines[j].trim();
+        // Look for company and dates in next few lines only
+        for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
+          const nextLine = lines[j].trim();
           
-          // Stop if we hit another potential job title
-          if (this.looksLikeJobTitle(nearbyLine) && j > i + detectedEntry.linesProcessed + 1) {
-            break;
+          if (!experience.company && this.looksLikeCompany(nextLine)) {
+            experience.company = nextLine;
           }
           
-          // Stop if we hit a section header
-          if (this.looksLikeSectionHeader(nearbyLine)) {
-            break;
-          }
-          
-          // Add missing company info
-          if (!experience.company && this.looksLikeCompany(nearbyLine)) {
-            experience.company = nearbyLine;
-            continue;
-          }
-          
-          // Add missing date info
           if (!experience.start_date) {
-            const dates = this.extractDatesFromLine(nearbyLine);
+            const dates = this.extractDatesFromLine(nextLine);
             if (dates) {
               experience.start_date = dates.start;
               experience.end_date = dates.end;
-              continue;
             }
-          }
-          
-          // Add to description if it looks like job description
-          if (this.looksLikeJobDescription(nearbyLine)) {
-            descriptionLines.push(nearbyLine);
           }
         }
         
-        experience.description = descriptionLines.join(' ').trim();
-        experiences.push(experience);
-        
-        // Skip the lines we've processed
-        i += Math.max(detectedEntry.linesProcessed - 1, 0);
+        // Only add if we found at least a company or dates (to validate it's real work experience)
+        if (experience.company || experience.start_date) {
+          experiences.push(experience);
+          console.log('Added fallback experience:', experience.title);
+        }
       }
     }
     
     return this.validateAndCleanExperiences(experiences);
+  }
+
+  isDefinitelyNotWorkExperienceSection(line, lines, index) {
+    const lowerLine = line.toLowerCase().trim();
+    
+    // Check if we're in a clearly defined non-work section
+    const nonWorkSections = [
+      'education', 'academic background', 'qualifications', 'degrees',
+      'skills', 'technical skills', 'core competencies', 'abilities',
+      'contact information', 'personal information', 'contact details',
+      'references', 'professional references',
+      'certifications', 'licenses', 'awards', 'achievements',
+      'languages', 'language skills',
+      'interests', 'hobbies', 'personal interests',
+      'objective', 'career objective', 'professional summary', 'summary', 'profile', 'about me',
+      'volunteer work', 'volunteer experience', 'community service'
+    ];
+    
+    // Check if current line or recent previous lines indicate we're in a non-work section
+    for (let i = Math.max(0, index - 3); i <= index; i++) {
+      const checkLine = lines[i] ? lines[i].toLowerCase().trim() : '';
+      if (nonWorkSections.some(section => 
+        checkLine === section || 
+        checkLine === section + ':' ||
+        checkLine.startsWith(section + ':')
+      )) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   isInNonWorkSection(line) {
