@@ -368,83 +368,8 @@ class CVParser {
       skills = this.extractSkillsFallback(text);
     }
     
-    // Final validation and filtering
-    skills = this.deduplicateSkills(skills);
-    skills = this.validateSkillsAgainstContext(skills, text);
-    
-    // Limit to reasonable number
-    return skills.slice(0, 20);
-  }
-
-  validateSkillsAgainstContext(skills, text) {
-    if (!skills || skills.length === 0) return skills;
-    
-    const lowerText = text.toLowerCase();
-    
-    // Detect the industry/domain based on CV content
-    const isPaintingCV = this.isPaintingRelatedCV(lowerText);
-    const isTechCV = this.isTechRelatedCV(lowerText);
-    
-    return skills.filter(skill => {
-      const skillName = skill.name.toLowerCase();
-      
-      // Always keep skills that are explicitly mentioned in the CV text
-      if (lowerText.includes(skillName)) {
-        return true;
-      }
-      
-      // Filter skills based on CV context
-      if (isPaintingCV) {
-        return this.isPaintingRelatedSkill(skillName) || this.isGeneralProfessionalSkill(skillName);
-      } else if (isTechCV) {
-        return this.isTechRelatedSkill(skillName) || this.isGeneralProfessionalSkill(skillName);
-      }
-      
-      // Default: only keep skills explicitly mentioned or very general professional skills
-      return this.isGeneralProfessionalSkill(skillName);
-    });
-  }
-
-  isPaintingRelatedCV(text) {
-    const paintingKeywords = [
-      'painter', 'painting', 'paint', 'brush', 'roller', 'exterior', 'interior',
-      'surface preparation', 'decorative', 'finish', 'color matching', 'repair'
-    ];
-    return paintingKeywords.some(keyword => text.includes(keyword));
-  }
-
-  isTechRelatedCV(text) {
-    const techKeywords = [
-      'developer', 'programmer', 'software', 'web', 'app', 'code', 'programming',
-      'javascript', 'python', 'java', 'react', 'angular', 'database', 'api'
-    ];
-    return techKeywords.some(keyword => text.includes(keyword));
-  }
-
-  isPaintingRelatedSkill(skillName) {
-    const paintingSkills = [
-      'exterior painting', 'interior painting', 'brush techniques', 'roller techniques',
-      'spray painting', 'surface preparation', 'priming', 'color matching', 'paint mixing',
-      'decorative finishes', 'repair', 'maintenance', 'budgeting', 'team supervision',
-      'project planning', 'safety', 'quality control', 'time management'
-    ];
-    return paintingSkills.some(skill => skill.includes(skillName) || skillName.includes(skill));
-  }
-
-  isTechRelatedSkill(skillName) {
-    const techSkills = [
-      'javascript', 'python', 'java', 'react', 'angular', 'html', 'css', 'sql',
-      'git', 'docker', 'aws', 'api', 'database', 'programming', 'development'
-    ];
-    return techSkills.some(skill => skill.includes(skillName) || skillName.includes(skill));
-  }
-
-  isGeneralProfessionalSkill(skillName) {
-    const generalSkills = [
-      'communication', 'teamwork', 'leadership', 'management', 'problem solving',
-      'critical thinking', 'time management', 'project planning', 'budgeting'
-    ];
-    return generalSkills.some(skill => skill.includes(skillName) || skillName.includes(skill));
+    // Limit to reasonable number and deduplicate
+    return this.deduplicateSkills(skills).slice(0, 20);
   }
 
   getSkillsKeywords() {
@@ -461,17 +386,11 @@ class CVParser {
   extractSkillsFromEntireDocument(lines) {
     const allSkills = [];
     
-    // First, try to identify sections to avoid (work experience, education, etc.)
-    const sectionsToAvoid = this.identifySectionsToAvoid(lines);
-    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
       // Skip if line is too short or too long
       if (line.length < 3 || line.length > 200) continue;
-      
-      // Skip if this line is in a section we should avoid for skills
-      if (this.isInAvoidedSection(i, sectionsToAvoid)) continue;
       
       // Check if line contains skill indicators
       if (this.lineContainsSkillIndicators(line)) {
@@ -487,50 +406,6 @@ class CVParser {
     }
     
     return this.deduplicateSkills(allSkills);
-  }
-
-  identifySectionsToAvoid(lines) {
-    const sections = [];
-    const avoidSectionKeywords = [
-      'work experience', 'experience', 'employment', 'job history', 'career history',
-      'education', 'academic', 'qualifications', 'degree', 'university', 'college',
-      'professional summary', 'summary', 'objective', 'profile', 'about',
-      'references', 'contact', 'personal information', 'contact information'
-    ];
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase().trim();
-      
-      for (const keyword of avoidSectionKeywords) {
-        if (line.includes(keyword) && line.length < 50) {
-          // Find the end of this section
-          let endIndex = lines.length;
-          for (let j = i + 1; j < lines.length; j++) {
-            const nextLine = lines[j].toLowerCase().trim();
-            if (this.getCommonSectionHeaders().some(header => 
-              nextLine.includes(header) && nextLine.length < 50)) {
-              endIndex = j;
-              break;
-            }
-          }
-          
-          sections.push({
-            keyword: keyword,
-            start: i,
-            end: endIndex
-          });
-          break;
-        }
-      }
-    }
-    
-    return sections;
-  }
-
-  isInAvoidedSection(lineIndex, sectionsToAvoid) {
-    return sectionsToAvoid.some(section => 
-      lineIndex > section.start && lineIndex < section.end
-    );
   }
 
   lineContainsSkillIndicators(line) {
@@ -749,61 +624,41 @@ class CVParser {
       return false;
     }
     
-    // Exclude common non-skill phrases (expanded list)
+    // Exclude common non-skill phrases
     const excludePatterns = [
-      // Common words
       /^(and|or|the|with|for|in|on|at|by|from|to|as|is|are|was|were|have|has|had)$/i,
-      /^(years?|months?|days?|time|work|job|role|position|responsibilities)$/i,
-      /^(experience|level|proficiency|knowledge|ability|background|history)$/i,
-      /^(including|such|like|also|plus|etc|more|other|various|different)$/i,
-      
-      // CV/Job related terms
-      /^(customer|service|compliance|expert|advanced|intermediate|beginner)$/i,
-      /^(company|organization|team|staff|employees|clients|projects)$/i,
-      /^(management|supervision|leadership|training|development)$/i,
-      /^(quality|standards|procedures|processes|systems|methods)$/i,
-      /^(health|safety|regulations|policies|requirements|standards)$/i,
-      
-      // Common job description words
-      /^(responsible|ensuring|maintaining|developing|implementing|managing)$/i,
-      /^(working|performing|providing|supporting|assisting|helping)$/i,
-      /^(excellent|strong|good|effective|efficient|successful)$/i,
-      
-      // Numbers and symbols only
+      /^(years?|months?|days?)$/i,
+      /^(experience|level|proficiency|knowledge|ability)$/i,
+      /^(including|such|like|also|plus|etc)$/i,
       /^\d+$/,
       /^[^a-zA-Z]*$/,
-      /\b(page|pages|resume|cv|curriculum|vitae)\b/i,
-      
-      // Single letters or very short words that aren't skills
-      /^[a-z]$/i,
-      /^(a|an|of|up|we|me|my|our|you|your|his|her|its|they|them)$/i
+      /\b(page|pages|resume|cv|curriculum|vitae)\b/i
     ];
     
     if (excludePatterns.some(pattern => pattern.test(text))) {
       return false;
     }
     
-    // More strict validation: must be an actual skill
-    // First check against known skills database
-    const commonSkills = this.getCommonSkillsList();
-    const isKnownSkill = commonSkills.some(skill => 
-      skill.toLowerCase() === text.toLowerCase()
-    );
+    // Positive indicators for skills
+    const skillIndicators = [
+      /^[A-Z][a-z]+(\.[A-Z][a-z]+)*$/, // CamelCase or dotted names (e.g., Node.js)
+      /^[A-Z]+$/, // Acronyms (HTML, CSS, SQL)
+      /^[A-Za-z]+[\+\#]$/, // C++, C#
+      /^[A-Za-z\+\#\.]+$/, // General tech pattern
+    ];
     
-    if (isKnownSkill) {
+    // If it matches skill indicators, it's likely a skill
+    if (skillIndicators.some(pattern => pattern.test(text))) {
       return true;
     }
     
-    // Check for technical skill patterns (more strict)
-    const techSkillPatterns = [
-      /^[A-Z][a-z]+(\.[A-Z][a-z]+)+$/, // Node.js, React.js style
-      /^[A-Z]{2,}$/, // HTML, CSS, SQL, API
-      /^[A-Za-z]+[\+\#]$/, // C++, C#
-      /^[A-Z][a-z]*[A-Z][a-z]*$/, // CamelCase like JavaScript, TypeScript
-    ];
-    
-    // Only accept if it matches strict technical patterns
-    return techSkillPatterns.some(pattern => pattern.test(text));
+    // Check against common skills database for additional validation
+    const commonSkills = this.getCommonSkillsList();
+    return commonSkills.some(skill => 
+      skill.toLowerCase() === text.toLowerCase() ||
+      text.toLowerCase().includes(skill.toLowerCase()) ||
+      skill.toLowerCase().includes(text.toLowerCase())
+    );
   }
 
   getCommonSkillsList() {
@@ -820,25 +675,14 @@ class CVParser {
       'Git', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP', 'Jenkins', 'Linux', 'Windows', 'MacOS',
       'Photoshop', 'Illustrator', 'Figma', 'Sketch', 'AutoCAD', 'SolidWorks', 'Excel', 'Word', 'PowerPoint',
       
-      // Painting and Construction Skills
-      'Exterior Painting', 'Interior Painting', 'Brush Techniques', 'Roller Techniques', 'Spray Painting',
-      'Surface Preparation', 'Priming', 'Color Matching', 'Paint Mixing', 'Texture Application',
-      'Decorative Finishes', 'Wallpaper Hanging', 'Drywall Repair', 'Caulking', 'Masking',
-      'Safety Protocols', 'Equipment Maintenance', 'Quality Control', 'Time Management', 'Project Planning',
-      'Budgeting', 'Cost Estimation', 'Client Relations', 'Team Supervision', 'Repair Work',
-      
       // Professional skills
-      'Leadership', 'Management', 'Communication', 'Teamwork', 'Problem Solving', 'Critical Thinking',
+      'Leadership', 'Management', 'Communication', 'Teamwork', 'Problem', 'Solving', 'Analysis',
       'Marketing', 'Sales', 'Accounting', 'Finance', 'HR', 'Operations', 'Strategy', 'Planning',
       
       // Industry specific
       'Machine Learning', 'AI', 'Data Science', 'Cybersecurity', 'DevOps', 'Agile', 'Scrum',
-      'SEO', 'SEM', 'Social Media', 'Content Writing', 'Editing', 'Translation',
-      'Teaching', 'Training', 'Consulting', 'Research', 'Healthcare', 'Nursing', 'Medicine',
-      
-      // Trade and Manual Skills
-      'Carpentry', 'Plumbing', 'Electrical Work', 'Welding', 'HVAC', 'Roofing', 'Flooring',
-      'Landscaping', 'Masonry', 'Tile Work', 'Construction', 'Renovation', 'Maintenance'
+      'SEO', 'SEM', 'Social Media', 'Content', 'Writing', 'Editing', 'Translation',
+      'Teaching', 'Training', 'Consulting', 'Research', 'Healthcare', 'Nursing', 'Medicine'
     ];
   }
 
@@ -1054,16 +898,25 @@ class CVParser {
     }
 
     const lines = text.split('\n').filter(line => line.trim().length > 0);
+    let experiences = [];
+    
+    // Primary method: Find dedicated experience section
     const experienceSection = this.findSection(lines, this.getExperienceKeywords());
     
     if (experienceSection.found) {
-      const experience = this.parseExperienceFromSection(experienceSection.content);
-      if (experience.length > 0) {
-        return experience;
+      experiences = this.parseExperienceFromSection(experienceSection.content);
+    }
+    
+    // Secondary method: If no experiences found or very few, try broader extraction
+    if (experiences.length <= 1) {
+      const fallbackExperiences = this.extractWorkExperienceFallback(text);
+      if (fallbackExperiences.length > experiences.length) {
+        experiences = fallbackExperiences;
       }
     }
     
-    return this.extractWorkExperienceFallback(text);
+    // Limit to reasonable number and validate
+    return experiences.slice(0, 10);
   }
 
   getExperienceKeywords() {
@@ -1078,83 +931,307 @@ class CVParser {
     const experiences = [];
     let currentExp = null;
     let descriptionLines = [];
+    let i = 0;
     
-    for (const line of lines) {
-      const trimmedLine = line.trim();
+    while (i < lines.length) {
+      const trimmedLine = lines[i].trim();
       
-      if (trimmedLine.length === 0 || trimmedLine.includes('---')) {
+      if (trimmedLine.length === 0 || trimmedLine.includes('---') || trimmedLine.includes('===')) {
+        i++;
         continue;
       }
       
-      const jobTitle = this.extractJobTitleFromLine(trimmedLine);
-      if (jobTitle) {
+      // Try multiple methods to detect a new work experience entry
+      const detectedEntry = this.detectWorkExperienceEntry(lines, i);
+      
+      if (detectedEntry.isNewEntry) {
+        // Save previous experience if exists
         if (currentExp) {
           currentExp.description = descriptionLines.join(' ').trim();
           experiences.push(currentExp);
         }
         
+        // Start new experience
         currentExp = {
-          title: jobTitle,
-          company: null,
-          start_date: null,
-          end_date: null,
+          title: detectedEntry.title || '',
+          company: detectedEntry.company || null,
+          start_date: detectedEntry.start_date || null,
+          end_date: detectedEntry.end_date || null,
           description: ''
         };
         descriptionLines = [];
+        
+        // Skip the lines we've processed
+        i += detectedEntry.linesProcessed;
       } else if (currentExp) {
-        // Try to extract company, dates, or description
+        // Try to extract additional information for current experience
         if (!currentExp.company) {
           const company = this.extractCompanyFromLine(trimmedLine);
           if (company) {
             currentExp.company = company;
+            i++;
             continue;
           }
         }
         
-        const dates = this.extractDatesFromLine(trimmedLine);
-        if (dates && !currentExp.start_date) {
-          currentExp.start_date = dates.start;
-          currentExp.end_date = dates.end;
-          continue;
+        if (!currentExp.start_date) {
+          const dates = this.extractDatesFromLine(trimmedLine);
+          if (dates) {
+            currentExp.start_date = dates.start;
+            currentExp.end_date = dates.end;
+            i++;
+            continue;
+          }
         }
         
-        // Treat as description
-        if (trimmedLine.length > 10) {
+        // Add to description if it looks like description content
+        if (this.looksLikeJobDescription(trimmedLine)) {
           descriptionLines.push(trimmedLine);
         }
+        
+        i++;
+      } else {
+        i++;
       }
     }
     
+    // Add the last experience
     if (currentExp) {
       currentExp.description = descriptionLines.join(' ').trim();
       experiences.push(currentExp);
     }
     
-    return experiences;
+    return this.validateAndCleanExperiences(experiences);
   }
 
-  extractJobTitleFromLine(line) {
-    // More focused job title patterns - avoid overly broad matching
-    const jobTitleIndicators = [
-      // Common job title prefixes
-      /^(Senior|Lead|Principal|Junior|Associate|Staff|Chief|Head|Vice|Assistant|Deputy)\s+(.+)$/i,
-      // Common job title suffixes
-      /^(.+)\s+(Manager|Director|Supervisor|Coordinator|Specialist|Analyst|Engineer|Developer|Designer|Consultant|Administrator|Assistant|Representative|Officer|Technician)$/i,
-      // Specific professional titles
-      /^(Software|Web|Data|Product|Project|Marketing|Sales|HR|Finance|Operations|Business|Technical|System|Network|Database|Security|Quality|Customer|Account)\s+(Engineer|Developer|Manager|Analyst|Specialist|Coordinator|Director|Consultant|Administrator)$/i
+  detectWorkExperienceEntry(lines, startIndex) {
+    const line = lines[startIndex].trim();
+    let result = {
+      isNewEntry: false,
+      title: null,
+      company: null,
+      start_date: null,
+      end_date: null,
+      linesProcessed: 1
+    };
+    
+    // Method 1: Check if line looks like a job title
+    if (this.looksLikeJobTitle(line)) {
+      result.isNewEntry = true;
+      result.title = line;
+      
+      // Look ahead for company and dates in next few lines
+      for (let i = 1; i <= 3 && (startIndex + i) < lines.length; i++) {
+        const nextLine = lines[startIndex + i].trim();
+        
+        if (!result.company && this.looksLikeCompany(nextLine)) {
+          result.company = nextLine;
+          result.linesProcessed = Math.max(result.linesProcessed, i + 1);
+        }
+        
+        if (!result.start_date) {
+          const dates = this.extractDatesFromLine(nextLine);
+          if (dates) {
+            result.start_date = dates.start;
+            result.end_date = dates.end;
+            result.linesProcessed = Math.max(result.linesProcessed, i + 1);
+          }
+        }
+      }
+      
+      return result;
+    }
+    
+    // Method 2: Check for combined title and company in one line
+    const titleCompanyMatch = this.extractTitleAndCompanyFromLine(line);
+    if (titleCompanyMatch) {
+      result.isNewEntry = true;
+      result.title = titleCompanyMatch.title;
+      result.company = titleCompanyMatch.company;
+      
+      // Look for dates in next lines
+      for (let i = 1; i <= 2 && (startIndex + i) < lines.length; i++) {
+        const nextLine = lines[startIndex + i].trim();
+        const dates = this.extractDatesFromLine(nextLine);
+        if (dates) {
+          result.start_date = dates.start;
+          result.end_date = dates.end;
+          result.linesProcessed = i + 1;
+          break;
+        }
+      }
+      
+      return result;
+    }
+    
+    // Method 3: Check for patterns like "Job Title at Company"
+    const atPattern = /^(.+?)\s+at\s+(.+)$/i;
+    const atMatch = line.match(atPattern);
+    if (atMatch && this.looksLikeJobTitle(atMatch[1]) && this.looksLikeCompany(atMatch[2])) {
+      result.isNewEntry = true;
+      result.title = atMatch[1].trim();
+      result.company = atMatch[2].trim();
+      return result;
+    }
+    
+    return result;
+  }
+
+  // New flexible method to detect job titles
+  looksLikeJobTitle(line) {
+    if (!line || line.length < 3 || line.length > 100) {
+      return false;
+    }
+    
+    // Clean the line
+    const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
+    
+    // Check for obvious non-job title patterns
+    const excludePatterns = [
+      /@/, // Email
+      /http/, // URL
+      /^\d+$/, // Only numbers
+      /\d{4}[-\/]\d{1,2}/, // Date patterns
+      /^(January|February|March|April|May|June|July|August|September|October|November|December)/i,
+      /^(Education|Skills|References|Contact|Personal|Objective|Summary)/i,
+      /\b(years|months|present|current|to|from|until|since)\b/i
     ];
     
-    // Check if line looks like a job title
-    for (const pattern of jobTitleIndicators) {
-      if (pattern.test(line)) {
-        // Additional validation
-        if (this.isValidJobTitle(line)) {
-          return line;
+    if (excludePatterns.some(pattern => pattern.test(cleanLine))) {
+      return false;
+    }
+    
+    // Positive indicators for job titles
+    const jobTitlePatterns = [
+      // Standard job title patterns
+      /^(Senior|Lead|Principal|Junior|Assistant|Deputy|Chief|Head|Vice|Executive)\s+/i,
+      /\s+(Manager|Director|Supervisor|Coordinator|Specialist|Analyst|Engineer|Developer|Designer|Consultant|Administrator|Representative|Officer|Technician|Lead|Leader)$/i,
+      /^(Software|Web|Data|Product|Project|Marketing|Sales|HR|Finance|Operations|Business|Technical|System|Network|Database|Security|Quality|Customer|Account)\s+/i,
+      
+      // Trade and service job patterns
+      /^(Lead|Senior|Master|Journeyman|Apprentice)?\s*(Painter|Carpenter|Plumber|Electrician|Mechanic|Technician|Operator|Driver|Worker|Helper|Laborer)/i,
+      /\s+(Painter|Carpenter|Plumber|Electrician|Mechanic|Technician|Operator|Driver|Worker|Helper|Laborer)$/i,
+      
+      // Professional titles
+      /^(Professional|Certified|Licensed|Registered)\s+/i,
+      /^(Project|Team|Operations|Sales|Account|Business|Technical)\s+(Manager|Lead|Leader|Coordinator)/i,
+      
+      // Generic patterns
+      /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/, // Capitalized words
+      /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*\s+(I{1,3}|1|2|3)$/ // With level indicators
+    ];
+    
+    // Check if it matches any job title pattern
+    return jobTitlePatterns.some(pattern => pattern.test(cleanLine));
+  }
+
+  looksLikeCompany(line) {
+    if (!line || line.length < 2 || line.length > 150) {
+      return false;
+    }
+    
+    // Clean the line
+    const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
+    
+    // Exclude obvious non-company patterns
+    const excludePatterns = [
+      /@/, // Email
+      /http/, // URL
+      /^\d+$/, // Only numbers
+      /\d{4}[-\/]\d{1,2}/, // Date patterns
+      /^(January|February|March|April|May|June|July|August|September|October|November|December)/i,
+      /\b(years|months|present|current|to|from|until|since)\b/i,
+      /^(•|-)/, // Bullet points (likely job descriptions)
+      /^(Responsibilities|Duties|Achievements|Tasks)/i
+    ];
+    
+    if (excludePatterns.some(pattern => pattern.test(cleanLine))) {
+      return false;
+    }
+    
+    // Positive indicators for companies
+    const companyPatterns = [
+      // Company suffixes
+      /\b(Inc|LLC|Corp|Ltd|Company|Group|Solutions|Technologies|Systems|Services|Studios|Consulting|Partners|Associates|Enterprises|Industries|Foundation|Organization|Institute|Agency|Firm|Office)\b\.?$/i,
+      
+      // Generic capitalized text (potential company name)
+      /^[A-Z][A-Za-z\s&,.-]+$/,
+      /^[A-Z]+\s+[A-Z][A-Za-z\s&,.-]+$/, // Acronym + name
+      
+      // Construction/service companies
+      /\b(Painting|Construction|Contracting|Maintenance|Services|Solutions|Home|Residential|Commercial)\b/i
+    ];
+    
+    return companyPatterns.some(pattern => pattern.test(cleanLine));
+  }
+
+  extractTitleAndCompanyFromLine(line) {
+    // Patterns for combined title and company
+    const patterns = [
+      // "Job Title | Company Name"
+      /^(.+?)\s*[\|\-–]\s*(.+)$/,
+      // "Job Title, Company Name"
+      /^(.+?),\s*(.+)$/,
+      // "Job Title - Company Name"
+      /^(.+?)\s*[-–]\s*(.+)$/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const potentialTitle = match[1].trim();
+        const potentialCompany = match[2].trim();
+        
+        if (this.looksLikeJobTitle(potentialTitle) && this.looksLikeCompany(potentialCompany)) {
+          return {
+            title: potentialTitle,
+            company: potentialCompany
+          };
         }
       }
     }
     
     return null;
+  }
+
+  looksLikeJobDescription(line) {
+    if (!line || line.length < 10) {
+      return false;
+    }
+    
+    // Clean the line
+    const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
+    
+    // Check for description indicators
+    const descriptionPatterns = [
+      /^(Responsible|Managed|Developed|Implemented|Created|Designed|Led|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized)/i,
+      /^[•\-\*\+]/, // Bullet points
+      /\b(experience|skills|knowledge|ability|expertise|proficiency)\b/i,
+      /\.(.*\.)/, // Multiple sentences
+      /\b(and|or|including|such as|with|using|through|for|to|in order to)\b.*\b(customers|clients|team|staff|projects|systems|processes|procedures|standards|requirements|goals|objectives)\b/i
+    ];
+    
+    return descriptionPatterns.some(pattern => pattern.test(cleanLine));
+  }
+
+  validateAndCleanExperiences(experiences) {
+    return experiences.filter(exp => {
+      // Must have at least a title
+      if (!exp.title || exp.title.trim().length < 2) {
+        return false;
+      }
+      
+      // Clean up the experience
+      exp.title = exp.title.trim();
+      if (exp.company) {
+        exp.company = exp.company.trim();
+      }
+      if (exp.description) {
+        exp.description = exp.description.trim();
+      }
+      
+      return true;
+    });
   }
 
   isValidJobTitle(title) {
@@ -1237,44 +1314,111 @@ class CVParser {
 
   extractWorkExperienceFallback(text) {
     const experiences = [];
-    const lines = text.split('\n');
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
     
-    // Look for job titles throughout the document
+    // Look for work experience patterns throughout the document
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      const jobTitle = this.extractJobTitleFromLine(line);
       
-      if (jobTitle) {
+      // Skip if in obvious non-work sections
+      if (this.isInNonWorkSection(line)) {
+        continue;
+      }
+      
+      // Try to detect work experience entry
+      const detectedEntry = this.detectWorkExperienceEntry(lines, i);
+      
+      if (detectedEntry.isNewEntry) {
         const experience = {
-          title: jobTitle,
-          company: null,
-          start_date: null,
-          end_date: null,
+          title: detectedEntry.title || '',
+          company: detectedEntry.company || null,
+          start_date: detectedEntry.start_date || null,
+          end_date: detectedEntry.end_date || null,
           description: ''
         };
         
-        // Look for company and dates in nearby lines
-        for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+        // Look for additional information in nearby lines
+        const descriptionLines = [];
+        for (let j = i + detectedEntry.linesProcessed; j < Math.min(lines.length, i + 8); j++) {
           const nearbyLine = lines[j].trim();
           
-          if (!experience.company) {
-            experience.company = this.extractCompanyFromLine(nearbyLine);
+          // Stop if we hit another potential job title
+          if (this.looksLikeJobTitle(nearbyLine) && j > i + detectedEntry.linesProcessed + 1) {
+            break;
           }
           
+          // Stop if we hit a section header
+          if (this.looksLikeSectionHeader(nearbyLine)) {
+            break;
+          }
+          
+          // Add missing company info
+          if (!experience.company && this.looksLikeCompany(nearbyLine)) {
+            experience.company = nearbyLine;
+            continue;
+          }
+          
+          // Add missing date info
           if (!experience.start_date) {
             const dates = this.extractDatesFromLine(nearbyLine);
             if (dates) {
               experience.start_date = dates.start;
               experience.end_date = dates.end;
+              continue;
             }
+          }
+          
+          // Add to description if it looks like job description
+          if (this.looksLikeJobDescription(nearbyLine)) {
+            descriptionLines.push(nearbyLine);
           }
         }
         
+        experience.description = descriptionLines.join(' ').trim();
         experiences.push(experience);
+        
+        // Skip the lines we've processed
+        i += Math.max(detectedEntry.linesProcessed - 1, 0);
       }
     }
     
-    return experiences;
+    return this.validateAndCleanExperiences(experiences);
+  }
+
+  isInNonWorkSection(line) {
+    const nonWorkSectionHeaders = [
+      'education', 'skills', 'references', 'contact', 'personal', 'objective', 
+      'summary', 'profile', 'languages', 'certifications', 'awards', 'hobbies',
+      'interests', 'publications', 'volunteer'
+    ];
+    
+    const lowerLine = line.toLowerCase().trim();
+    return nonWorkSectionHeaders.some(header => 
+      lowerLine === header || lowerLine.startsWith(header + ':')
+    );
+  }
+
+  looksLikeSectionHeader(line) {
+    if (!line || line.length < 3 || line.length > 50) {
+      return false;
+    }
+    
+    const sectionHeaders = [
+      'work experience', 'experience', 'employment', 'career history',
+      'education', 'academic background', 'qualifications',
+      'skills', 'technical skills', 'core competencies',
+      'references', 'contact information', 'personal information',
+      'objective', 'summary', 'profile', 'about me',
+      'certifications', 'licenses', 'awards', 'achievements',
+      'languages', 'interests', 'hobbies', 'volunteer work'
+    ];
+    
+    const lowerLine = line.toLowerCase().trim();
+    return sectionHeaders.some(header => 
+      lowerLine === header || 
+      lowerLine === header + ':' ||
+      lowerLine.startsWith(header + ':')
+    );
   }
 
   // Calculate years of experience
