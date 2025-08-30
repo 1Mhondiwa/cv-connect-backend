@@ -1894,20 +1894,66 @@ class CVParser {
     return yearMatch ? parseInt(yearMatch[0]) : null;
   }
 
-  // Generate summary from extracted information
-  generateSummary(text, extractedData) {
-    // Try to find existing summary first
+  // Extract summary from CV text
+  extractSummary(text) {
+    console.log('Starting summary extraction...');
+    
+    if (!text || typeof text !== 'string') {
+      console.log('No text provided for summary extraction');
+      return null;
+    }
+
     const lines = text.split('\n').filter(line => line.trim().length > 0);
-    const summarySection = this.findSection(lines, ['summary', 'profile', 'objective', 'about', 'overview']);
+    const summaryKeywords = [
+      'professional summary', 'summary', 'profile', 'objective', 'about', 'overview',
+      'career objective', 'professional profile', 'professional overview'
+    ];
+    
+    console.log('Looking for summary section with keywords:', summaryKeywords);
+    const summarySection = this.findSection(lines, summaryKeywords);
     
     if (summarySection.found && summarySection.content.length > 0) {
-      const summaryText = summarySection.content.join(' ').trim();
-      if (summaryText.length > 20 && summaryText.length < 500) {
+      console.log(`Found summary section with ${summarySection.content.length} lines`);
+      console.log('Summary content lines:', summarySection.content);
+      
+      // Join the content and clean it up
+      let summaryText = summarySection.content
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join(' ')
+        .trim();
+      
+      // Clean up any extra whitespace
+      summaryText = summaryText.replace(/\s+/g, ' ');
+      
+      console.log(`Extracted summary text (${summaryText.length} chars): "${summaryText}"`);
+      
+      // Validate summary length and content
+      if (summaryText.length > 20 && summaryText.length < 1000) {
+        console.log('Summary validation passed');
         return summaryText;
+      } else {
+        console.log(`Summary validation failed - length: ${summaryText.length}`);
       }
+    } else {
+      console.log('No summary section found');
     }
     
-    // Generate summary from extracted data
+    return null;
+  }
+
+  // Generate summary from extracted information (fallback only)
+  generateSummary(text, extractedData) {
+    // FIRST: Try to extract actual summary from CV
+    const extractedSummary = this.extractSummary(text);
+    if (extractedSummary) {
+      console.log('Using extracted summary from CV');
+      return extractedSummary;
+    }
+    
+    console.log('No summary found in CV, generating fallback summary');
+    
+    // FALLBACK: Generate summary from extracted data
     const { skills, work_experience, years_experience } = extractedData;
     
     let summary = 'Professional';
