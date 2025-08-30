@@ -364,7 +364,8 @@ class CVParser {
       'skills', 'technical skills', 'technologies', 'expertise', 'competencies',
       'proficiencies', 'abilities', 'qualifications', 'programming languages',
       'tools', 'software', 'frameworks', 'platforms', 'core competencies',
-      'professional skills', 'key skills', 'specialized skills', 'skill set'
+      'professional skills', 'key skills', 'specialized skills', 'skill set',
+      'technical expertise', 'capabilities', 'strengths', 'core skills'
     ];
   }
 
@@ -372,7 +373,7 @@ class CVParser {
     let startIndex = -1;
     let endIndex = lines.length;
     
-    // Find section start
+    // Find section start - be more flexible with matching
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
       if (keywords.some(keyword => line.includes(keyword.toLowerCase()))) {
@@ -385,11 +386,17 @@ class CVParser {
       return { found: false, content: [] };
     }
     
-    // Find section end
+    // Find section end - be more flexible and look for next major section
     const endKeywords = this.getCommonSectionHeaders();
     for (let i = startIndex + 1; i < lines.length; i++) {
       const line = lines[i].toLowerCase().trim();
-      if (endKeywords.some(keyword => line.includes(keyword) && line.length < 50)) {
+      // Look for clear section headers, not just any mention
+      if (endKeywords.some(keyword => 
+        line === keyword.toLowerCase() || 
+        line.startsWith(keyword.toLowerCase() + ':') ||
+        line.startsWith(keyword.toLowerCase() + ' ') ||
+        (line.length < 50 && line.match(/^[A-Z][A-Z\s]+$/)) // All caps headers
+      )) {
         endIndex = i;
         break;
       }
@@ -407,7 +414,8 @@ class CVParser {
     return [
       'experience', 'work', 'employment', 'education', 'academic',
       'projects', 'achievements', 'awards', 'certifications', 'languages',
-      'references', 'contact', 'personal', 'interests', 'hobbies'
+      'references', 'contact', 'personal', 'interests', 'hobbies',
+      'professional experience', 'work history', 'career history'
     ];
   }
 
@@ -423,6 +431,13 @@ class CVParser {
       }
     }
     
+    // If no skills found in section, try to extract from the entire section text
+    if (skills.length === 0) {
+      const sectionText = lines.join(' ');
+      const fallbackSkills = this.extractSkillsFallback(sectionText);
+      skills.push(...fallbackSkills);
+    }
+    
     return this.deduplicateSkills(skills);
   }
 
@@ -432,9 +447,23 @@ class CVParser {
       return false;
     }
     
-    // Skip lines that look like section headers
-    if (line.length < 50 && this.getCommonSectionHeaders().some(header => 
-      line.toLowerCase().includes(header))) {
+    // Skip lines that look like section headers - be less restrictive
+    if (line.length < 30 && this.getCommonSectionHeaders().some(header => 
+      line.toLowerCase() === header.toLowerCase() || 
+      line.toLowerCase().startsWith(header.toLowerCase() + ':') ||
+      line.toLowerCase().startsWith(header.toLowerCase() + ' '))) {
+      return false;
+    }
+    
+    // Skip lines that are clearly not skills
+    const nonSkillPatterns = [
+      /^[A-Z][A-Z\s]+$/, // All caps headers
+      /^\d+\./, // Numbered lists
+      /^[•\-\*]\s*$/, // Bullet points with no content
+      /^[A-Z][a-z]+:\s*$/, // Section headers with colon
+    ];
+    
+    if (nonSkillPatterns.some(pattern => pattern.test(line))) {
       return false;
     }
     
@@ -460,24 +489,47 @@ class CVParser {
       return skills;
     }
     
-    // Pattern 2: Comma or bullet separated skills
-    const separators = [',', '•', '-', '*', '|'];
+    // Pattern 2: Comma or bullet separated skills - be more flexible
+    const separators = [',', '•', '-', '*', '|', ';', '/', '&'];
     for (const sep of separators) {
       if (line.includes(sep)) {
         const skillNames = line.split(sep)
           .map(s => s.trim())
-          .filter(s => s.length > 1 && s.length < 50)
+          .filter(s => s.length > 1 && s.length < 60) // Increased length limit
           .filter(s => this.looksLikeSkill(s));
         
-        return skillNames.map(name => ({
-          name: name,
-          proficiency: 'Intermediate',
-          years_experience: null
-        }));
+        if (skillNames.length > 0) {
+          return skillNames.map(name => ({
+            name: name,
+            proficiency: 'Intermediate',
+            years_experience: null
+          }));
+        }
       }
     }
     
-    // Pattern 3: Single skill on a line
+    // Pattern 3: Skills with proficiency indicators
+    const proficiencyPatterns = [
+      /([A-Za-z\s\.#\+\-]+?)\s*\(([A-Za-z]+)\)/gi, // "Skill (Level)"
+      /([A-Za-z\s\.#\+\-]+?)\s*:\s*([A-Za-z]+)/gi, // "Skill: Level"
+      /([A-Za-z\s\.#\+\-]+?)\s*\[([A-Za-z]+)\]/gi, // "Skill [Level]"
+    ];
+    
+    for (const pattern of proficiencyPatterns) {
+      while ((match = pattern.exec(line)) !== null) {
+        skills.push({
+          name: match[1].trim(),
+          proficiency: match[2] || 'Intermediate',
+          years_experience: null
+        });
+      }
+    }
+    
+    if (skills.length > 0) {
+      return skills;
+    }
+    
+    // Pattern 4: Single skill on a line - be more permissive
     if (this.looksLikeSkill(line)) {
       return [{
         name: line,
@@ -490,26 +542,34 @@ class CVParser {
   }
 
   looksLikeSkill(text) {
-    if (!text || text.length < 2 || text.length > 50) {
+    if (!text || text.length < 2 || text.length > 60) { // Increased length limit
       return false;
     }
     
-    // Should contain mostly letters
+    // Should contain mostly letters and common skill characters
     const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
-    if (letterCount / text.length < 0.6) {
+    const skillCharCount = (text.match(/[a-zA-Z0-9\s\.#\+\-\/]/g) || []).length;
+    
+    if (letterCount / text.length < 0.4) { // Reduced requirement
       return false;
     }
     
-    // Exclude common non-skill phrases
+    // Exclude common non-skill phrases - be more specific
     const excludePatterns = [
-      /^(and|or|the|with|for|in|on|at|by|from)$/i,
-      /years?/i,
-      /experience/i,
-      /level/i,
-      /proficiency/i
+      /^(and|or|the|with|for|in|on|at|by|from|to|of|a|an)$/i,
+      /^(years?|months?|experience|level|proficiency|skills?|expertise)$/i,
+      /^(certification|certified|license|licensed)$/i,
+      /^(beginner|intermediate|advanced|expert|proficient)$/i,
+      /^[0-9\s\-\.]+$/, // Only numbers and separators
+      /^[A-Z\s]+$/, // All caps with only spaces
     ];
     
-    return !excludePatterns.some(pattern => pattern.test(text));
+    if (excludePatterns.some(pattern => pattern.test(text))) {
+      return false;
+    }
+    
+    // Must contain at least one letter
+    return /[a-zA-Z]/.test(text);
   }
 
   extractSkillsFallback(text) {
