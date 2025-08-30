@@ -368,8 +368,83 @@ class CVParser {
       skills = this.extractSkillsFallback(text);
     }
     
-    // Limit to reasonable number and deduplicate
-    return this.deduplicateSkills(skills).slice(0, 20);
+    // Final validation and filtering
+    skills = this.deduplicateSkills(skills);
+    skills = this.validateSkillsAgainstContext(skills, text);
+    
+    // Limit to reasonable number
+    return skills.slice(0, 20);
+  }
+
+  validateSkillsAgainstContext(skills, text) {
+    if (!skills || skills.length === 0) return skills;
+    
+    const lowerText = text.toLowerCase();
+    
+    // Detect the industry/domain based on CV content
+    const isPaintingCV = this.isPaintingRelatedCV(lowerText);
+    const isTechCV = this.isTechRelatedCV(lowerText);
+    
+    return skills.filter(skill => {
+      const skillName = skill.name.toLowerCase();
+      
+      // Always keep skills that are explicitly mentioned in the CV text
+      if (lowerText.includes(skillName)) {
+        return true;
+      }
+      
+      // Filter skills based on CV context
+      if (isPaintingCV) {
+        return this.isPaintingRelatedSkill(skillName) || this.isGeneralProfessionalSkill(skillName);
+      } else if (isTechCV) {
+        return this.isTechRelatedSkill(skillName) || this.isGeneralProfessionalSkill(skillName);
+      }
+      
+      // Default: only keep skills explicitly mentioned or very general professional skills
+      return this.isGeneralProfessionalSkill(skillName);
+    });
+  }
+
+  isPaintingRelatedCV(text) {
+    const paintingKeywords = [
+      'painter', 'painting', 'paint', 'brush', 'roller', 'exterior', 'interior',
+      'surface preparation', 'decorative', 'finish', 'color matching', 'repair'
+    ];
+    return paintingKeywords.some(keyword => text.includes(keyword));
+  }
+
+  isTechRelatedCV(text) {
+    const techKeywords = [
+      'developer', 'programmer', 'software', 'web', 'app', 'code', 'programming',
+      'javascript', 'python', 'java', 'react', 'angular', 'database', 'api'
+    ];
+    return techKeywords.some(keyword => text.includes(keyword));
+  }
+
+  isPaintingRelatedSkill(skillName) {
+    const paintingSkills = [
+      'exterior painting', 'interior painting', 'brush techniques', 'roller techniques',
+      'spray painting', 'surface preparation', 'priming', 'color matching', 'paint mixing',
+      'decorative finishes', 'repair', 'maintenance', 'budgeting', 'team supervision',
+      'project planning', 'safety', 'quality control', 'time management'
+    ];
+    return paintingSkills.some(skill => skill.includes(skillName) || skillName.includes(skill));
+  }
+
+  isTechRelatedSkill(skillName) {
+    const techSkills = [
+      'javascript', 'python', 'java', 'react', 'angular', 'html', 'css', 'sql',
+      'git', 'docker', 'aws', 'api', 'database', 'programming', 'development'
+    ];
+    return techSkills.some(skill => skill.includes(skillName) || skillName.includes(skill));
+  }
+
+  isGeneralProfessionalSkill(skillName) {
+    const generalSkills = [
+      'communication', 'teamwork', 'leadership', 'management', 'problem solving',
+      'critical thinking', 'time management', 'project planning', 'budgeting'
+    ];
+    return generalSkills.some(skill => skill.includes(skillName) || skillName.includes(skill));
   }
 
   getSkillsKeywords() {
@@ -386,11 +461,17 @@ class CVParser {
   extractSkillsFromEntireDocument(lines) {
     const allSkills = [];
     
+    // First, try to identify sections to avoid (work experience, education, etc.)
+    const sectionsToAvoid = this.identifySectionsToAvoid(lines);
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
       // Skip if line is too short or too long
       if (line.length < 3 || line.length > 200) continue;
+      
+      // Skip if this line is in a section we should avoid for skills
+      if (this.isInAvoidedSection(i, sectionsToAvoid)) continue;
       
       // Check if line contains skill indicators
       if (this.lineContainsSkillIndicators(line)) {
@@ -406,6 +487,50 @@ class CVParser {
     }
     
     return this.deduplicateSkills(allSkills);
+  }
+
+  identifySectionsToAvoid(lines) {
+    const sections = [];
+    const avoidSectionKeywords = [
+      'work experience', 'experience', 'employment', 'job history', 'career history',
+      'education', 'academic', 'qualifications', 'degree', 'university', 'college',
+      'professional summary', 'summary', 'objective', 'profile', 'about',
+      'references', 'contact', 'personal information', 'contact information'
+    ];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase().trim();
+      
+      for (const keyword of avoidSectionKeywords) {
+        if (line.includes(keyword) && line.length < 50) {
+          // Find the end of this section
+          let endIndex = lines.length;
+          for (let j = i + 1; j < lines.length; j++) {
+            const nextLine = lines[j].toLowerCase().trim();
+            if (this.getCommonSectionHeaders().some(header => 
+              nextLine.includes(header) && nextLine.length < 50)) {
+              endIndex = j;
+              break;
+            }
+          }
+          
+          sections.push({
+            keyword: keyword,
+            start: i,
+            end: endIndex
+          });
+          break;
+        }
+      }
+    }
+    
+    return sections;
+  }
+
+  isInAvoidedSection(lineIndex, sectionsToAvoid) {
+    return sectionsToAvoid.some(section => 
+      lineIndex > section.start && lineIndex < section.end
+    );
   }
 
   lineContainsSkillIndicators(line) {
@@ -624,41 +749,61 @@ class CVParser {
       return false;
     }
     
-    // Exclude common non-skill phrases
+    // Exclude common non-skill phrases (expanded list)
     const excludePatterns = [
+      // Common words
       /^(and|or|the|with|for|in|on|at|by|from|to|as|is|are|was|were|have|has|had)$/i,
-      /^(years?|months?|days?)$/i,
-      /^(experience|level|proficiency|knowledge|ability)$/i,
-      /^(including|such|like|also|plus|etc)$/i,
+      /^(years?|months?|days?|time|work|job|role|position|responsibilities)$/i,
+      /^(experience|level|proficiency|knowledge|ability|background|history)$/i,
+      /^(including|such|like|also|plus|etc|more|other|various|different)$/i,
+      
+      // CV/Job related terms
+      /^(customer|service|compliance|expert|advanced|intermediate|beginner)$/i,
+      /^(company|organization|team|staff|employees|clients|projects)$/i,
+      /^(management|supervision|leadership|training|development)$/i,
+      /^(quality|standards|procedures|processes|systems|methods)$/i,
+      /^(health|safety|regulations|policies|requirements|standards)$/i,
+      
+      // Common job description words
+      /^(responsible|ensuring|maintaining|developing|implementing|managing)$/i,
+      /^(working|performing|providing|supporting|assisting|helping)$/i,
+      /^(excellent|strong|good|effective|efficient|successful)$/i,
+      
+      // Numbers and symbols only
       /^\d+$/,
       /^[^a-zA-Z]*$/,
-      /\b(page|pages|resume|cv|curriculum|vitae)\b/i
+      /\b(page|pages|resume|cv|curriculum|vitae)\b/i,
+      
+      // Single letters or very short words that aren't skills
+      /^[a-z]$/i,
+      /^(a|an|of|up|we|me|my|our|you|your|his|her|its|they|them)$/i
     ];
     
     if (excludePatterns.some(pattern => pattern.test(text))) {
       return false;
     }
     
-    // Positive indicators for skills
-    const skillIndicators = [
-      /^[A-Z][a-z]+(\.[A-Z][a-z]+)*$/, // CamelCase or dotted names (e.g., Node.js)
-      /^[A-Z]+$/, // Acronyms (HTML, CSS, SQL)
-      /^[A-Za-z]+[\+\#]$/, // C++, C#
-      /^[A-Za-z\+\#\.]+$/, // General tech pattern
-    ];
+    // More strict validation: must be an actual skill
+    // First check against known skills database
+    const commonSkills = this.getCommonSkillsList();
+    const isKnownSkill = commonSkills.some(skill => 
+      skill.toLowerCase() === text.toLowerCase()
+    );
     
-    // If it matches skill indicators, it's likely a skill
-    if (skillIndicators.some(pattern => pattern.test(text))) {
+    if (isKnownSkill) {
       return true;
     }
     
-    // Check against common skills database for additional validation
-    const commonSkills = this.getCommonSkillsList();
-    return commonSkills.some(skill => 
-      skill.toLowerCase() === text.toLowerCase() ||
-      text.toLowerCase().includes(skill.toLowerCase()) ||
-      skill.toLowerCase().includes(text.toLowerCase())
-    );
+    // Check for technical skill patterns (more strict)
+    const techSkillPatterns = [
+      /^[A-Z][a-z]+(\.[A-Z][a-z]+)+$/, // Node.js, React.js style
+      /^[A-Z]{2,}$/, // HTML, CSS, SQL, API
+      /^[A-Za-z]+[\+\#]$/, // C++, C#
+      /^[A-Z][a-z]*[A-Z][a-z]*$/, // CamelCase like JavaScript, TypeScript
+    ];
+    
+    // Only accept if it matches strict technical patterns
+    return techSkillPatterns.some(pattern => pattern.test(text));
   }
 
   getCommonSkillsList() {
@@ -675,14 +820,25 @@ class CVParser {
       'Git', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP', 'Jenkins', 'Linux', 'Windows', 'MacOS',
       'Photoshop', 'Illustrator', 'Figma', 'Sketch', 'AutoCAD', 'SolidWorks', 'Excel', 'Word', 'PowerPoint',
       
+      // Painting and Construction Skills
+      'Exterior Painting', 'Interior Painting', 'Brush Techniques', 'Roller Techniques', 'Spray Painting',
+      'Surface Preparation', 'Priming', 'Color Matching', 'Paint Mixing', 'Texture Application',
+      'Decorative Finishes', 'Wallpaper Hanging', 'Drywall Repair', 'Caulking', 'Masking',
+      'Safety Protocols', 'Equipment Maintenance', 'Quality Control', 'Time Management', 'Project Planning',
+      'Budgeting', 'Cost Estimation', 'Client Relations', 'Team Supervision', 'Repair Work',
+      
       // Professional skills
-      'Leadership', 'Management', 'Communication', 'Teamwork', 'Problem', 'Solving', 'Analysis',
+      'Leadership', 'Management', 'Communication', 'Teamwork', 'Problem Solving', 'Critical Thinking',
       'Marketing', 'Sales', 'Accounting', 'Finance', 'HR', 'Operations', 'Strategy', 'Planning',
       
       // Industry specific
       'Machine Learning', 'AI', 'Data Science', 'Cybersecurity', 'DevOps', 'Agile', 'Scrum',
-      'SEO', 'SEM', 'Social Media', 'Content', 'Writing', 'Editing', 'Translation',
-      'Teaching', 'Training', 'Consulting', 'Research', 'Healthcare', 'Nursing', 'Medicine'
+      'SEO', 'SEM', 'Social Media', 'Content Writing', 'Editing', 'Translation',
+      'Teaching', 'Training', 'Consulting', 'Research', 'Healthcare', 'Nursing', 'Medicine',
+      
+      // Trade and Manual Skills
+      'Carpentry', 'Plumbing', 'Electrical Work', 'Welding', 'HVAC', 'Roofing', 'Flooring',
+      'Landscaping', 'Masonry', 'Tile Work', 'Construction', 'Renovation', 'Maintenance'
     ];
   }
 
