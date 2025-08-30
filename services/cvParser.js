@@ -961,16 +961,29 @@ class CVParser {
     const education = [];
     let currentEntry = null;
     
+    console.log('Parsing education from section with', lines.length, 'lines');
+    
     for (const line of lines) {
       const trimmedLine = line.trim();
       
+      console.log(`Processing education line: "${trimmedLine}"`);
+      
       if (trimmedLine.length === 0 || trimmedLine.includes('---')) {
+        console.log('Skipping empty or separator line');
+        continue;
+      }
+      
+      // Skip bullet points that look like achievements or activities
+      if (trimmedLine.startsWith('•') && this.looksLikeAchievement(trimmedLine)) {
+        console.log('Skipping achievement/activity line');
         continue;
       }
       
       const degreeMatch = this.extractDegreeFromLine(trimmedLine);
       if (degreeMatch) {
+        console.log(`Found degree: ${degreeMatch.degree}`);
         if (currentEntry) {
+          console.log(`Completing previous entry: ${currentEntry.degree}`);
           education.push(currentEntry);
         }
         currentEntry = degreeMatch;
@@ -980,19 +993,43 @@ class CVParser {
         const year = this.extractYearFromLine(trimmedLine);
         
         if (institution && !currentEntry.institution) {
+          console.log(`Adding institution: ${institution}`);
           currentEntry.institution = institution;
         }
         if (year && !currentEntry.year) {
+          console.log(`Adding year: ${year}`);
           currentEntry.year = year;
         }
+      } else {
+        console.log('No current entry, skipping line');
       }
     }
     
     if (currentEntry) {
+      console.log(`Completing final entry: ${currentEntry.degree}`);
       education.push(currentEntry);
     }
     
+    console.log(`Final education entries: ${education.length}`);
     return education;
+  }
+
+  looksLikeAchievement(line) {
+    // Check if this line looks like an achievement, activity, or distinction rather than education
+    const achievementIndicators = [
+      // Academic achievements
+      /\b(distinction|honor|honours|award|prize|merit|excellence|achievement)\b/i,
+      // Activities and roles
+      /\b(member|president|captain|treasurer|secretary|leader|representative|participant)\b/i,
+      // Sports and clubs
+      /\b(team|club|society|association|sport|soccer|football|basketball|rugby|cricket|tennis)\b/i,
+      // Specific achievement patterns
+      /\b(first\s+team|dean'?s\s+list|magna\s+cum\s+laude|summa\s+cum\s+laude|cum\s+laude)\b/i,
+      // GPA or grade indicators
+      /\b(gpa|grade|score|percentage|%)\b/i
+    ];
+    
+    return achievementIndicators.some(pattern => pattern.test(line));
   }
 
   extractDegreeFromLine(line) {
@@ -1002,23 +1039,32 @@ class CVParser {
       /(Master|M\.?A\.?|M\.?S\.?|M\.?Sc\.?|M\.?Tech\.?|M\.?E\.?|M\.?Eng\.?)\s*(?:of\s+|in\s+)?(.+)/i,
       /(MBA|M\.?B\.?A\.?|Master\s+of\s+Business\s+Administration)\s*(?:in\s+)?(.+)?/i,
       /(Ph\.?D\.?|PhD|Doctorate|Doctor)\s*(?:in\s+)?(.+)?/i,
-      /(Associate|A\.?A\.?|A\.?S\.?)\s*(?:of\s+|in\s+)?(.+)/i,
-      /(Diploma|Certificate)\s*(?:in\s+)?(.+)/i,
-      /(High\s+School|Secondary\s+School|GED)/i
+      // More specific Associate pattern - must be at start of line or after whitespace
+      /^(Associate\s+Degree|Associate|A\.?A\.?|A\.?S\.?)\s*(?:of\s+|in\s+)?(.+)/i,
+      // Diploma and Certificate - be more specific about structure
+      /^(Diploma|Certificate)\s+(?:in\s+|of\s+)?(.+)/i,
+      // High school - very specific
+      /^(High\s+School\s+Diploma|Secondary\s+School|GED|Matriculation|Matric)/i
     ];
     
-    for (const pattern of degreePatterns) {
+    console.log(`Checking line for degree patterns: "${line}"`);
+    
+    for (let i = 0; i < degreePatterns.length; i++) {
+      const pattern = degreePatterns[i];
       const match = line.match(pattern);
       if (match) {
-        return {
+        const result = {
           degree: match[0].trim(),
           field: match[2] ? match[2].trim() : '',
           institution: null,
           year: null
         };
+        console.log(`Pattern ${i} matched: degree="${result.degree}", field="${result.field}"`);
+        return result;
       }
     }
     
+    console.log('No degree pattern matched');
     return null;
   }
 
