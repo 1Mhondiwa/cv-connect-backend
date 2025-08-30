@@ -386,11 +386,19 @@ class CVParser {
   extractSkillsFromEntireDocument(lines) {
     const allSkills = [];
     
+    // Identify sections to avoid extracting skills from
+    const sectionsToAvoid = this.identifyNonSkillsSections(lines);
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
       // Skip if line is too short or too long
       if (line.length < 3 || line.length > 200) continue;
+      
+      // Skip if we're in a section where skills shouldn't be extracted
+      if (this.isInAvoidedSection(i, sectionsToAvoid)) {
+        continue;
+      }
       
       // Check if line contains skill indicators
       if (this.lineContainsSkillIndicators(line)) {
@@ -406,6 +414,51 @@ class CVParser {
     }
     
     return this.deduplicateSkills(allSkills);
+  }
+
+  identifyNonSkillsSections(lines) {
+    const sections = [];
+    const avoidSectionKeywords = [
+      'work experience', 'experience', 'employment', 'job history', 'career history',
+      'education', 'academic', 'qualifications', 'degree', 'university', 'college',
+      'professional summary', 'summary', 'objective', 'profile', 'about',
+      'references', 'contact', 'personal information', 'contact information'
+    ];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase().trim();
+      
+      // Check if this line is a section header we should avoid
+      if (this.looksLikeSectionHeader(lines[i])) {
+        for (const keyword of avoidSectionKeywords) {
+          if (this.matchesSectionKeyword(line, keyword)) {
+            // Find the end of this section
+            let endIndex = lines.length;
+            for (let j = i + 1; j < lines.length; j++) {
+              if (this.looksLikeSectionHeader(lines[j])) {
+                endIndex = j;
+                break;
+              }
+            }
+            
+            sections.push({
+              keyword: keyword,
+              start: i,
+              end: endIndex
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+    return sections;
+  }
+
+  isInAvoidedSection(lineIndex, sectionsToAvoid) {
+    return sectionsToAvoid.some(section => 
+      lineIndex > section.start && lineIndex < section.end
+    );
   }
 
   lineContainsSkillIndicators(line) {
@@ -1017,14 +1070,17 @@ class CVParser {
         // Skip the lines we've processed
         i += detectedEntry.linesProcessed;
       } else if (currentExp) {
-        // Try to extract additional information for current experience
-        if (!currentExp.company && this.looksLikeCompany(trimmedLine)) {
+        // Priority order: company first, then dates, then description
+        
+        // First priority: extract company if we don't have one
+        if (!currentExp.company && this.looksLikeCompany(trimmedLine) && !this.looksLikeJobDescription(trimmedLine)) {
           currentExp.company = trimmedLine;
           console.log('Added company:', trimmedLine);
           i++;
           continue;
         }
         
+        // Second priority: extract dates if we don't have them
         if (!currentExp.start_date) {
           const dates = this.extractDatesFromLine(trimmedLine);
           if (dates) {
@@ -1036,8 +1092,8 @@ class CVParser {
           }
         }
         
-        // Add to description if it looks like description content
-        if (this.looksLikeJobDescription(trimmedLine)) {
+        // Third priority: add to description only if it clearly looks like description content
+        if (this.looksLikeJobDescription(trimmedLine) && !this.looksLikeCompany(trimmedLine)) {
           descriptionLines.push(trimmedLine);
           console.log('Added to description:', trimmedLine.substring(0, 50) + '...');
         }
@@ -1302,11 +1358,11 @@ class CVParser {
       /@/, // Email
       /http/, // URL
       /^\d+$/, // Only numbers
-      /\d{4}[-\/]\d{1,2}/, // Date patterns
+      /\d{4}[-\/]\d{1,2}/, // Date patterns but allow company names with locations
       /^(January|February|March|April|May|June|July|August|September|October|November|December)/i,
       /\b(years|months|present|current|to|from|until|since)\b/i,
-      /^(•|-)/, // Bullet points (likely job descriptions)
-      /^(Responsibilities|Duties|Achievements|Tasks)/i
+      /^[•\-\*\+]/, // Bullet points (likely job descriptions)
+      /^(Responsibilities|Duties|Achievements|Tasks|Managed|Led|Developed|Implemented|Created|Designed|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized)/i
     ];
     
     if (excludePatterns.some(pattern => pattern.test(cleanLine))) {
@@ -1318,15 +1374,29 @@ class CVParser {
       // Company suffixes
       /\b(Inc|LLC|Corp|Ltd|Company|Group|Solutions|Technologies|Systems|Services|Studios|Consulting|Partners|Associates|Enterprises|Industries|Foundation|Organization|Institute|Agency|Firm|Office)\b\.?$/i,
       
-      // Generic capitalized text (potential company name)
-      /^[A-Z][A-Za-z\s&,.-]+$/,
-      /^[A-Z]+\s+[A-Z][A-Za-z\s&,.-]+$/, // Acronym + name
+      // Company names with locations in parentheses (very common format)
+      /^[A-Z][A-Za-z\s&,.-]+\s*\([A-Za-z\s,.-]+\)$/,
       
-      // Construction/service companies
-      /\b(Painting|Construction|Contracting|Maintenance|Services|Solutions|Home|Residential|Commercial)\b/i
+      // Specific business types
+      /\b(Painting|Construction|Contracting|Maintenance|Services|Solutions|Coatings|Decorators|Contractors|Builders|Designs|Works|Trading|Engineering|Consulting)\b/i,
+      
+      // Generic capitalized text (potential company name) - but be more selective
+      /^[A-Z][A-Za-z]+(\s+[A-Z][A-Za-z]+)*(\s+\([A-Za-z\s,.-]+\))?$/,
+      
+      // Two or more capitalized words (typical company format)
+      /^[A-Z][a-z]+\s+[A-Z][a-z]+/
     ];
     
-    return companyPatterns.some(pattern => pattern.test(cleanLine));
+    const isCompanyPattern = companyPatterns.some(pattern => pattern.test(cleanLine));
+    
+    // Additional validation: if it contains typical job action words, it's probably not a company
+    const jobActionWords = /\b(managed|led|developed|implemented|created|designed|supervised|coordinated|executed|performed|achieved|completed|handled|maintained|operated|assisted|supported|improved|optimized|specialized|provided|reduced|trained|gained|learned|introduced|ensured)\b/i;
+    
+    if (jobActionWords.test(cleanLine)) {
+      return false;
+    }
+    
+    return isCompanyPattern;
   }
 
   extractTitleAndCompanyFromLine(line) {
@@ -1363,19 +1433,42 @@ class CVParser {
       return false;
     }
     
-    // Clean the line
+    // Original line for bullet point detection
+    const originalLine = line.trim();
+    
+    // Clean the line for content analysis
     const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
     
-    // Check for description indicators
-    const descriptionPatterns = [
-      /^(Responsible|Managed|Developed|Implemented|Created|Designed|Led|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized)/i,
-      /^[•\-\*\+]/, // Bullet points
-      /\b(experience|skills|knowledge|ability|expertise|proficiency)\b/i,
-      /\.(.*\.)/, // Multiple sentences
-      /\b(and|or|including|such as|with|using|through|for|to|in order to)\b.*\b(customers|clients|team|staff|projects|systems|processes|procedures|standards|requirements|goals|objectives)\b/i
+    // Strong indicators this is a job description
+    const strongDescriptionIndicators = [
+      // Starts with bullet points
+      /^[•\-\*\+]/, 
+      
+      // Starts with action verbs (past tense or present tense)
+      /^(Managed|Led|Developed|Implemented|Created|Designed|Supervised|Coordinated|Executed|Performed|Achieved|Completed|Handled|Maintained|Operated|Assisted|Supported|Improved|Optimized|Specialized|Provided|Reduced|Trained|Gained|Learned|Introduced|Ensured)/i,
+      
+      // Contains percentage or numbers (achievements)
+      /\d+%|\d+\s*(years?|months?|people|team|projects?|clients?)/i,
+      
+      // Multiple sentences (descriptions tend to be longer)
+      /\.\s+[A-Z]/, // Period followed by capital letter
+      
+      // Contains typical job description phrases
+      /\b(responsible for|in charge of|worked with|collaborated with|ensured that|resulted in|leading to)\b/i
     ];
     
-    return descriptionPatterns.some(pattern => pattern.test(cleanLine));
+    // Check against original line (with bullet points)
+    if (strongDescriptionIndicators.some(pattern => pattern.test(originalLine))) {
+      return true;
+    }
+    
+    // Additional check against clean line
+    const additionalPatterns = [
+      /\b(experience|expertise|proficiency|specialization)\b.*\b(in|with|for)\b/i,
+      /\b(customers|clients|team|staff|projects|systems|processes|procedures|standards|requirements|goals|objectives|quality|efficiency|satisfaction)\b/i
+    ];
+    
+    return additionalPatterns.some(pattern => pattern.test(cleanLine));
   }
 
   validateAndCleanExperiences(experiences) {
