@@ -435,35 +435,75 @@ class CVParser {
     let startIndex = -1;
     let endIndex = lines.length;
     
-    // Find section start
+    console.log('Looking for section with keywords:', keywords);
+    
+    // Find section start - be more precise about section headers
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase().trim();
-      if (keywords.some(keyword => line.includes(keyword.toLowerCase()))) {
-        startIndex = i;
-        break;
+      const line = lines[i].trim();
+      const lowerLine = line.toLowerCase();
+      
+      console.log(`Checking line ${i}: "${line}"`);
+      
+      // Check if this line is a section header (short line, likely all caps or title case)
+      if (this.looksLikeSectionHeader(line)) {
+        // Check if it matches our keywords
+        if (keywords.some(keyword => this.matchesSectionKeyword(lowerLine, keyword.toLowerCase()))) {
+          startIndex = i;
+          console.log(`Found section header at line ${i}: "${line}"`);
+          break;
+        }
       }
     }
     
     if (startIndex === -1) {
+      console.log('Section not found');
       return { found: false, content: [] };
     }
     
     // Find section end
     const endKeywords = this.getCommonSectionHeaders();
     for (let i = startIndex + 1; i < lines.length; i++) {
-      const line = lines[i].toLowerCase().trim();
-      if (endKeywords.some(keyword => line.includes(keyword) && line.length < 50)) {
-        endIndex = i;
-        break;
+      const line = lines[i].trim();
+      
+      if (this.looksLikeSectionHeader(line)) {
+        const lowerLine = line.toLowerCase();
+        if (endKeywords.some(keyword => this.matchesSectionKeyword(lowerLine, keyword))) {
+          endIndex = i;
+          console.log(`Found section end at line ${i}: "${line}"`);
+          break;
+        }
       }
     }
     
+    const content = lines.slice(startIndex + 1, endIndex);
+    console.log(`Section content has ${content.length} lines`);
+    
     return {
       found: true,
-      content: lines.slice(startIndex + 1, endIndex),
+      content: content,
       startIndex,
       endIndex
     };
+  }
+
+  // More precise section keyword matching
+  matchesSectionKeyword(lineLower, keyword) {
+    // Exact match
+    if (lineLower === keyword) return true;
+    
+    // Match with colon
+    if (lineLower === keyword + ':') return true;
+    
+    // Match at start with colon
+    if (lineLower.startsWith(keyword + ':')) return true;
+    
+    // For multi-word keywords, check if the line contains the exact phrase
+    if (keyword.includes(' ')) {
+      return lineLower.includes(keyword);
+    }
+    
+    // For single words, be more strict
+    return lineLower === keyword || lineLower === keyword + ':';
   }
 
   getCommonSectionHeaders() {
@@ -922,9 +962,9 @@ class CVParser {
 
   getExperienceKeywords() {
     return [
-      'work experience', 'experience', 'employment', 'job history',
-      'professional experience', 'career history', 'employment history',
-      'work history', 'professional background', 'career background'
+      'work experience', 'professional experience', 'career history', 'employment history',
+      'work history', 'employment', 'job history', 'professional background', 'career background',
+      'experience' // Keep this last as it's most general
     ];
   }
 
@@ -1536,26 +1576,56 @@ class CVParser {
   }
 
   looksLikeSectionHeader(line) {
-    if (!line || line.length < 3 || line.length > 50) {
+    if (!line || line.length < 3 || line.length > 80) {
       return false;
     }
     
-    const sectionHeaders = [
-      'work experience', 'experience', 'employment', 'career history',
-      'education', 'academic background', 'qualifications',
-      'skills', 'technical skills', 'core competencies',
-      'references', 'contact information', 'personal information',
-      'objective', 'summary', 'profile', 'about me',
-      'certifications', 'licenses', 'awards', 'achievements',
-      'languages', 'interests', 'hobbies', 'volunteer work'
+    const trimmedLine = line.trim();
+    
+    // Check if it looks like a section header by structure
+    const structuralIndicators = [
+      // All uppercase (common for section headers)
+      /^[A-Z\s]+$/,
+      // Title Case with common section words
+      /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/,
+      // Contains colon (common for headers)
+      /:$/,
+      // Starts with capital and ends with colon
+      /^[A-Z][A-Za-z\s]+:$/
     ];
     
-    const lowerLine = line.toLowerCase().trim();
-    return sectionHeaders.some(header => 
+    const hasStructuralIndicator = structuralIndicators.some(pattern => pattern.test(trimmedLine));
+    
+    if (!hasStructuralIndicator) {
+      return false;
+    }
+    
+    // Known section headers
+    const sectionHeaders = [
+      'work experience', 'experience', 'employment', 'career history', 'professional experience',
+      'education', 'academic background', 'qualifications', 'academic qualifications',
+      'skills', 'technical skills', 'core competencies', 'professional skills', 'key skills',
+      'references', 'contact information', 'personal information', 'contact details', 'contact',
+      'objective', 'summary', 'profile', 'about me', 'professional summary', 'career objective',
+      'certifications', 'licenses', 'awards', 'achievements', 'honors',
+      'languages', 'language skills', 'interests', 'hobbies', 'volunteer work', 'volunteer experience',
+      'projects', 'personal projects', 'side projects'
+    ];
+    
+    const lowerLine = trimmedLine.toLowerCase().replace(/:$/, '');
+    
+    // Check if it matches known section headers
+    const isKnownSection = sectionHeaders.some(header => 
       lowerLine === header || 
       lowerLine === header + ':' ||
-      lowerLine.startsWith(header + ':')
+      lowerLine.startsWith(header + ':') ||
+      lowerLine.endsWith(header)
     );
+    
+    // Additional check: if it's all caps and reasonable length, it's likely a header
+    const isAllCapsHeader = /^[A-Z\s]{3,40}$/.test(trimmedLine) && !trimmedLine.includes('@') && !trimmedLine.includes('http');
+    
+    return isKnownSection || isAllCapsHeader;
   }
 
   // Calculate years of experience
