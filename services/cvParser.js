@@ -690,8 +690,8 @@ class CVParser {
     let cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
     cleanLine = cleanLine.replace(/^(Skills?|Technologies?|Tools?|Software|Frameworks?|Languages?):\s*/i, '').trim();
     
-    // Pattern 1: "JavaScript - Expert - 6 years"
-    const expertisePattern = /([A-Za-z\s\.#\+\-]+?)\s*[-–]\s*(Expert|Advanced|Intermediate|Beginner|Proficient|Experienced?)\s*(?:[-–]\s*(\d+)\s*years?)?/gi;
+    // Pattern 1: "Interior & Exterior Painting - Expert - 10 years"
+    const expertisePattern = /([A-Za-z\s\.#\+\-&]+)\s*[-–]\s*(Expert|Advanced|Intermediate|Beginner|Proficient|Experienced?)\s*(?:[-–]\s*(\d+)\s*years?)?/gi;
     let match;
     
     while ((match = expertisePattern.exec(cleanLine)) !== null) {
@@ -764,6 +764,11 @@ class CVParser {
   }
 
   looksLikeMultipleSkills(line) {
+    // Don't split compound skills connected with &
+    if (line.includes('&')) {
+      return false;
+    }
+    
     // Check if line contains multiple potential skills separated by spaces
     const words = line.split(/\s+/);
     if (words.length < 2 || words.length > 10) return false;
