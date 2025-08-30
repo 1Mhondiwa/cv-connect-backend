@@ -364,6 +364,13 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
       
       // Add extracted skills if available
       if (parsedData.skills && Array.isArray(parsedData.skills) && parsedData.skills.length > 0) {
+        // FIRST: Remove ALL existing skills for this freelancer (to replace, not append)
+        await db.query(
+          'DELETE FROM "Freelancer_Skill" WHERE freelancer_id = $1',
+          [freelancerId]
+        );
+        
+        // THEN: Add all new skills from the CV
         for (const skill of parsedData.skills) {
           // Check if skill exists in database
           let skillId;
@@ -383,24 +390,16 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
             skillId = skillResult.rows[0].skill_id;
           }
           
-          // Check if freelancer already has this skill
-          const existingSkillResult = await db.query(
-            'SELECT freelancer_skill_id FROM "Freelancer_Skill" WHERE freelancer_id = $1 AND skill_id = $2',
-            [freelancerId, skillId]
+          // Add skill to freelancer (no need to check for existence since we cleared all)
+          await db.query(
+            'INSERT INTO "Freelancer_Skill" (freelancer_id, skill_id, proficiency_level, years_experience) VALUES ($1, $2, $3, $4)',
+            [
+              freelancerId,
+              skillId,
+              skill.proficiency || 'Intermediate',
+              skill.years_experience || 1
+            ]
           );
-          
-          if (existingSkillResult.rowCount === 0) {
-            // Add skill to freelancer
-            await db.query(
-              'INSERT INTO "Freelancer_Skill" (freelancer_id, skill_id, proficiency_level, years_experience) VALUES ($1, $2, $3, $4)',
-              [
-                freelancerId,
-                skillId,
-                skill.proficiency || 'Intermediate',
-                skill.years_experience || 1
-              ]
-            );
-          }
         }
       }
     }

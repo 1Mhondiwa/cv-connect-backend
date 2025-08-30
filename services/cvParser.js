@@ -691,7 +691,7 @@ class CVParser {
     cleanLine = cleanLine.replace(/^(Skills?|Technologies?|Tools?|Software|Frameworks?|Languages?):\s*/i, '').trim();
     
     // Pattern 1: "Interior & Exterior Painting - Expert - 10 years"
-    const expertisePattern = /([A-Za-z\s\.#\+\-&]+)\s*[-–]\s*(Expert|Advanced|Intermediate|Beginner|Proficient|Experienced?)\s*(?:[-–]\s*(\d+)\s*years?)?/gi;
+    const expertisePattern = /^([A-Za-z\s\.#\+\-&]+?)\s*[-–]\s*(Expert|Advanced|Intermediate|Beginner|Proficient|Experienced?)\s*(?:[-–]\s*(\d+)\s*years?)?/gi;
     let match;
     
     while ((match = expertisePattern.exec(cleanLine)) !== null) {
