@@ -2159,6 +2159,205 @@ class CVParser {
     return summary;
   }
 
+  // Extract professional headline/title from CV
+  extractHeadline(text, workExperience) {
+    console.log('Starting headline extraction...');
+    
+    if (!text || typeof text !== 'string') {
+      console.log('No text provided for headline extraction');
+      return null;
+    }
+
+    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    
+    // Strategy 1: Look for professional titles near the top of CV (after name)
+    const topSectionHeadline = this.extractHeadlineFromTop(lines);
+    if (topSectionHeadline) {
+      console.log('Found headline from top section:', topSectionHeadline);
+      return topSectionHeadline;
+    }
+    
+    // Strategy 2: Extract from professional summary/objective sections  
+    const summaryHeadline = this.extractHeadlineFromSummary(lines);
+    if (summaryHeadline) {
+      console.log('Found headline from summary section:', summaryHeadline);
+      return summaryHeadline;
+    }
+    
+    // Strategy 3: Use most recent job title from work experience
+    if (workExperience && workExperience.length > 0) {
+      const recentTitle = workExperience[0].title;
+      if (recentTitle && this.isValidHeadline(recentTitle)) {
+        console.log('Using most recent job title as headline:', recentTitle);
+        return recentTitle;
+      }
+    }
+    
+    console.log('No suitable headline found');
+    return null;
+  }
+
+  // Extract headline from top section of CV (near name)
+  extractHeadlineFromTop(lines) {
+    // Look in first 15 lines for potential headlines
+    const searchLines = lines.slice(0, Math.min(15, lines.length));
+    
+    for (let i = 0; i < searchLines.length; i++) {
+      const line = searchLines[i].trim();
+      
+      // Skip obviously non-headline content
+      if (this.isObviouslyNotHeadline(line)) {
+        continue;
+      }
+      
+      // Check if this line looks like a professional title
+      if (this.looksLikeProfessionalHeadline(line)) {
+        return this.cleanHeadline(line);
+      }
+    }
+    
+    return null;
+  }
+
+  // Extract headline from summary/objective sections
+  extractHeadlineFromSummary(lines) {
+    const summaryKeywords = [
+      'professional summary', 'summary', 'profile', 'objective', 'about', 'overview',
+      'career objective', 'professional profile', 'professional overview'
+    ];
+    
+    const summarySection = this.findSection(lines, summaryKeywords);
+    
+    if (summarySection.found && summarySection.content.length > 0) {
+      // Look for job titles mentioned in the summary
+      for (const line of summarySection.content) {
+        const headlineMatch = this.extractHeadlineFromSummaryLine(line);
+        if (headlineMatch) {
+          return headlineMatch;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  // Extract headline from a summary line
+  extractHeadlineFromSummaryLine(line) {
+    // Patterns to find titles in summary text
+    const patterns = [
+      // "I am a Software Developer with..."
+      /(?:I am|I'm)\s+(?:a|an)\s+([^,\.]+?)(?:\s+with|\s+who|\s+that|,|\.)/i,
+      // "Experienced Software Developer with..."
+      /^((?:Experienced|Senior|Lead|Junior|Professional|Certified|Skilled)\s+[^,\.]+?)(?:\s+with|\s+who|\s+that|,|\.)/i,
+      // "Software Developer with 5 years..."
+      /^([^,\.]+?)\s+with\s+\d+\s+years?/i,
+      // "As a Software Developer, I..."
+      /(?:As|Being)\s+(?:a|an)\s+([^,\.]+?)(?:,|\.|I)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (match && match[1]) {
+        const potentialTitle = match[1].trim();
+        if (this.isValidHeadline(potentialTitle)) {
+          return this.cleanHeadline(potentialTitle);
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  // Check if line looks like a professional headline
+  looksLikeProfessionalHeadline(line) {
+    const cleanLine = line.replace(/^[•\-\*\+\d\.]\s*/, '').trim();
+    
+    // Should be reasonable length for a title
+    if (cleanLine.length < 3 || cleanLine.length > 80) {
+      return false;
+    }
+    
+    // Professional title patterns
+    const titlePatterns = [
+      // Standard professional titles
+      /^(Senior|Lead|Principal|Junior|Assistant|Chief|Head|Vice|Executive)\s+/i,
+      /\s+(Developer|Engineer|Designer|Manager|Director|Analyst|Specialist|Consultant|Administrator|Coordinator|Supervisor|Technician)$/i,
+      
+      // Field-specific titles
+      /^(Software|Web|Data|Product|Project|Marketing|Sales|HR|Finance|Operations|Business|Technical|System|Network|Database|Security|Quality|Customer|Account)\s+/i,
+      
+      // Trade/skilled worker titles
+      /^(Lead|Senior|Master|Journeyman|Apprentice)?\s*(Painter|Carpenter|Plumber|Electrician|Mechanic|Technician|Operator|Driver|Worker)$/i,
+      
+      // Professional designations
+      /^(Professional|Certified|Licensed|Registered)\s+/i,
+      
+      // Common standalone titles
+      /^(Developer|Engineer|Designer|Manager|Director|Analyst|Consultant|Specialist|Coordinator|Supervisor|Administrator|Technician|Architect|Programmer|Writer|Editor|Artist|Photographer|Nurse|Teacher|Lawyer|Accountant|Scientist|Researcher)$/i
+    ];
+    
+    return titlePatterns.some(pattern => pattern.test(cleanLine));
+  }
+
+  // Check if content is obviously not a headline
+  isObviouslyNotHeadline(line) {
+    const obviousNonHeadlines = [
+      // Contact information
+      /@/, /phone/i, /email/i, /address/i, /linkedin/i, /github/i,
+      // Dates
+      /\d{4}/, /january|february|march|april|may|june|july|august|september|october|november|december/i,
+      // Section headers
+      /^(education|skills|experience|work|references|contact|personal|summary|objective|profile|about)/i,
+      // Too short or too long
+      /^.{1,2}$/, /^.{100,}$/,
+      // Numbers only
+      /^\d+$/,
+      // URLs
+      /http/i, /www\./i,
+      // Common CV elements
+      /curriculum|vitae|resume|cv/i
+    ];
+    
+    return obviousNonHeadlines.some(pattern => pattern.test(line));
+  }
+
+  // Validate if extracted text is a good headline
+  isValidHeadline(headline) {
+    if (!headline || typeof headline !== 'string') {
+      return false;
+    }
+    
+    const clean = headline.trim();
+    
+    // Length check
+    if (clean.length < 3 || clean.length > 80) {
+      return false;
+    }
+    
+    // Should not contain obvious non-title content
+    const invalidPatterns = [
+      /@/, /http/, /www\./, /\.com/, /\.org/, /\.net/,
+      /\d{4}/, // Years
+      /phone/i, /email/i, /address/i,
+      /years?(?:\s+of)?\s+experience/i, // "5 years experience" is not a title
+      /\b(with|and|the|in|at|for|by|from|to)\b.*\b(with|and|the|in|at|for|by|from|to)\b/i // Too many prepositions
+    ];
+    
+    return !invalidPatterns.some(pattern => pattern.test(clean));
+  }
+
+  // Clean and format headline
+  cleanHeadline(headline) {
+    if (!headline) return null;
+    
+    return headline
+      .trim()
+      .replace(/^[•\-\*\+\d\.]\s*/, '') // Remove bullets/numbers
+      .replace(/[:\-–—]\s*$/, '') // Remove trailing colons/dashes
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  }
+
   // Main parsing method
   async parseCV(filePath) {
     if (!filePath || typeof filePath !== 'string') {
@@ -2197,12 +2396,14 @@ class CVParser {
       };
       
       const summary = this.generateSummary(text, extractedData);
+      const headline = this.extractHeadline(text, workExperience);
       
       console.log('Parsing completed successfully');
       console.log('Extracted data summary:', {
         name: `${firstName} ${lastName}`,
         email: contactInfo.email,
         phone: contactInfo.phone,
+        headline: headline,
         skillsCount: skills.length,
         educationCount: education.length,
         workExperienceCount: workExperience.length,
@@ -2217,6 +2418,7 @@ class CVParser {
         linkedin_url: contactInfo.linkedin_url || '',
         github_url: contactInfo.github_url || '',
         address: contactInfo.address || '',
+        headline: headline || '',
         skills: skills,
         education: education,
         work_experience: workExperience,

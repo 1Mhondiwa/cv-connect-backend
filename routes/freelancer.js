@@ -357,6 +357,11 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
         values.push(parsedData.address);
       }
       
+      if (parsedData.headline && parsedData.headline.trim()) {
+        fieldsToUpdate.push(`headline = $${paramIndex++}`);
+        values.push(parsedData.headline);
+      }
+      
       if (fieldsToUpdate.length > 0) {
         // Add the last parameter for freelancer_id
         values.push(freelancerId);
