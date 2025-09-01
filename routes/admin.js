@@ -93,12 +93,14 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     let whereConditions = ['u.is_active = true'];
     const params = [];
 
-    // Filter by availability status (new field)
+    // Filter by availability status (real-time field)
     if (availability_status && availability_status !== 'all') {
       if (availability_status === 'available') {
-        whereConditions.push(`f.is_available = true`);
+        whereConditions.push(`f.availability_status = 'available'`);
       } else if (availability_status === 'unavailable') {
-        whereConditions.push(`f.is_available = false`);
+        whereConditions.push(`f.availability_status = 'unavailable'`);
+      } else if (availability_status === 'busy') {
+        whereConditions.push(`f.availability_status = 'busy'`);
       }
     }
     // If availability_status is 'all' or not provided, don't filter by availability
