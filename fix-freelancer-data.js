@@ -4,31 +4,22 @@ async function fixFreelancerData() {
   try {
     console.log('🔧 Fixing freelancer data...');
     
-    // Update freelancers with sample data
+    // Update freelancers with basic data (removed default headline/current_status assumptions)
     const result = await db.query(`
       UPDATE "Freelancer" 
       SET 
-        headline = CASE 
-          WHEN headline IS NULL THEN 'Software Developer'
-          ELSE headline
-        END,
-        current_status = CASE 
-          WHEN current_status IS NULL THEN 'Full Stack Developer'
-          ELSE current_status
-        END,
         years_experience = CASE 
-          WHEN years_experience IS NULL THEN 3
+          WHEN years_experience IS NULL THEN 0
           ELSE years_experience
         END,
         address = CASE 
-          WHEN address IS NULL THEN 'Remote'
+          WHEN address IS NULL THEN 'Not specified'
           ELSE address
         END,
         is_approved = true,
         admin_rating = 3
-      WHERE headline IS NULL 
-         OR current_status IS NULL 
-         OR years_experience IS NULL
+      WHERE years_experience IS NULL 
+         OR address IS NULL
     `);
     
     console.log('✅ Updated freelancers:', result.rowCount);
@@ -42,14 +33,14 @@ async function fixFreelancerData() {
         f.headline,
         f.years_experience,
         f.current_status,
-        ARRAY[f.headline, f.current_status] as skills
+        f.address
       FROM "Freelancer" f
       LIMIT 3
     `);
     
     console.log('🔍 Verification - Sample data:');
     verify.rows.forEach(row => {
-      console.log(`${row.first_name}: ${row.headline}, ${row.years_experience} years, Skills: [${row.skills}]`);
+      console.log(`${row.first_name}: ${row.headline || 'No headline'}, ${row.years_experience} years, Status: ${row.current_status || 'Not set'}`);
     });
     
   } catch (error) {
