@@ -166,7 +166,7 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
        FROM "Freelancer" f
        JOIN "User" u ON f.user_id = u.user_id
        ${whereClause}
-       ORDER BY f.is_approved DESC, f.admin_rating DESC, f.freelancer_id DESC
+       ORDER BY f.availability_status ASC, f.freelancer_id DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     
     console.log('🔍 Admin freelancers query - Main query:', mainQuery);
