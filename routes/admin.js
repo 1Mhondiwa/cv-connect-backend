@@ -759,6 +759,70 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
   }
 });
 
+// Get detailed freelancer profile for ECS Employee recommendations
+router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
+  try {
+    const { freelancerId } = req.params;
+    
+    console.log(`🔍 ECS Employee fetching detailed profile for freelancer ${freelancerId}`);
+    
+    // Get freelancer details with user info
+    const freelancerResult = await db.query(
+      `SELECT f.*, u.email, u.created_at, u.last_login, u.is_active, u.is_verified
+       FROM "Freelancer" f
+       JOIN "User" u ON f.user_id = u.user_id
+       WHERE f.freelancer_id = $1`,
+      [freelancerId]
+    );
+    
+    if (freelancerResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer not found'
+      });
+    }
+    
+    const freelancer = freelancerResult.rows[0];
+    
+    // Get skills with proficiency levels
+    const skillsResult = await db.query(
+      `SELECT fs.*, s.skill_name
+       FROM "Freelancer_Skill" fs
+       JOIN "Skill" s ON fs.skill_id = s.skill_id
+       WHERE fs.freelancer_id = $1
+       ORDER BY fs.proficiency_level DESC, s.skill_name ASC`,
+      [freelancerId]
+    );
+    
+    // Get CV information
+    const cvResult = await db.query(
+      'SELECT * FROM "CV" WHERE freelancer_id = $1',
+      [freelancerId]
+    );
+    
+    // Combine all data
+    const freelancerProfile = {
+      ...freelancer,
+      skills: skillsResult.rows,
+      cv: cvResult.rows[0] || null
+    };
+    
+    console.log(`✅ Detailed profile fetched for freelancer ${freelancerId}`);
+    
+    return res.status(200).json({
+      success: true,
+      freelancer: freelancerProfile
+    });
+  } catch (error) {
+    console.error('❌ Get freelancer profile error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 // Get specific associate request with details (ESC Admin and ECS Employee)
 router.get('/associate-requests/:requestId', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
   try {
