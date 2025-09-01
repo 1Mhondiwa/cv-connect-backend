@@ -2286,11 +2286,18 @@ class CVParser {
       // Field-specific titles
       /^(Software|Web|Data|Product|Project|Marketing|Sales|HR|Finance|Operations|Business|Technical|System|Network|Database|Security|Quality|Customer|Account)\s+/i,
       
-      // Trade/skilled worker titles
+      // Trade/skilled worker titles - flexible patterns
       /^(Lead|Senior|Master|Journeyman|Apprentice)?\s*(Painter|Carpenter|Plumber|Electrician|Mechanic|Technician|Operator|Driver|Worker)$/i,
+      /(Painter|Carpenter|Plumber|Electrician|Mechanic|Technician|Operator|Driver|Worker)\s+(&|and)\s+/i,
       
-      // Professional designations
-      /^(Professional|Certified|Licensed|Registered)\s+/i,
+      // Professional designations - more flexible
+      /^(Professional|Certified|Licensed|Registered)\s+(Electrician|Engineer|Developer|Designer|Manager|Specialist|Consultant|Technician|Architect|Accountant|Lawyer|Teacher|Nurse)/i,
+      
+      // Compound titles with & or "and"
+      /(Developer|Engineer|Designer|Manager|Director|Analyst|Specialist|Consultant|Technician|Electrician|Carpenter|Plumber|Mechanic)\s+(&|and)\s+(Developer|Engineer|Designer|Manager|Director|Analyst|Specialist|Consultant|Technician|Electrician|Construction|Building)/i,
+      
+      // Construction and trade specific compounds
+      /^(Licensed|Certified|Professional|Senior|Lead)?\s*(Electrician|Carpenter|Plumber|Mechanic|Contractor|Builder)\s+(&|and|\/)\s*(Construction|Building|Specialist|Technician|Engineer)/i,
       
       // Common standalone titles
       /^(Developer|Engineer|Designer|Manager|Director|Analyst|Consultant|Specialist|Coordinator|Supervisor|Administrator|Technician|Architect|Programmer|Writer|Editor|Artist|Photographer|Nurse|Teacher|Lawyer|Accountant|Scientist|Researcher)$/i
