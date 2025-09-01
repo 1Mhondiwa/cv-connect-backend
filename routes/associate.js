@@ -714,14 +714,14 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
          f.last_name,
          f.headline,
          f.phone,
-         f.admin_rating,
+         f.availability_status,
          u.email,
          u.is_verified
        FROM "Freelancer_Recommendation" fr
        JOIN "Freelancer" f ON fr.freelancer_id = f.freelancer_id
        JOIN "User" u ON f.user_id = u.user_id
        WHERE fr.request_id = $1
-       ORDER BY fr.is_highlighted DESC, fr.admin_rating DESC`,
+       ORDER BY fr.is_highlighted DESC, fr.created_at DESC`,
       [requestId]
     );
 
