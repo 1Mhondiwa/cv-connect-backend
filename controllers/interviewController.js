@@ -111,8 +111,10 @@ const scheduleInterview = async (req, res) => {
     // Generate meeting link for video interviews
     let meetingLink = null;
     if (interview_type === 'video') {
-      // Use a simpler meeting name to avoid authentication issues
-      meetingLink = `cvconnect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Use a very simple room name that definitely won't trigger authentication
+      // Generate a random 8-character string
+      const randomString = Math.random().toString(36).substring(2, 10);
+      meetingLink = `room${randomString}`;
     }
 
     // Create the interview record
