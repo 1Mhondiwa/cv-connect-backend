@@ -111,7 +111,8 @@ const scheduleInterview = async (req, res) => {
     // Generate meeting link for video interviews
     let meetingLink = null;
     if (interview_type === 'video') {
-      meetingLink = `interview-${uuidv4()}`;
+      // Use a simpler meeting name to avoid authentication issues
+      meetingLink = `cvconnect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
 
     // Create the interview record
