@@ -19,6 +19,7 @@ const searchRoutes = require('./routes/search');
 const messageRoutes = require('./routes/message');
 const associateRequestRoutes = require('./routes/associateRequest');
 const hiringRoutes = require('./routes/hiring');
+const interviewRoutes = require('./routes/interview');
 
 // Initialize express app
 const app = express();
@@ -84,6 +85,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/message', messageRoutes);
 app.use('/api/associate-request', associateRequestRoutes);
 app.use('/api/hiring', hiringRoutes);
+app.use('/api/interview', interviewRoutes);
 
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
