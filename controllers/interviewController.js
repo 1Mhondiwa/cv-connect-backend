@@ -243,7 +243,7 @@ const getInterviews = async (req, res) => {
       query = `
         SELECT 
           i.*,
-          a.company_name as associate_company,
+          a.industry as associate_company,
           a.contact_person as associate_contact,
           r.title as request_title,
           r.description as request_description,
