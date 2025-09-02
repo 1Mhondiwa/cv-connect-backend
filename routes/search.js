@@ -456,7 +456,7 @@ router.get('/skills', authenticateToken, requireRole(['associate', 'admin']), as
       `SELECT s.*, COUNT(fs.freelancer_id) as freelancer_count
        FROM "Skill" s
        LEFT JOIN "Freelancer_Skill" fs ON s.skill_id = fs.skill_id
-       GROUP BY s.skill_id, s.skill_name, s.category, s.created_at
+       GROUP BY s.skill_id, s.skill_name, s.created_at
        ORDER BY freelancer_count DESC, s.skill_name ASC`
     );
     

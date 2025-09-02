@@ -28,7 +28,8 @@
         "test:registration": "node test-registration-trends.js",
         "test:endpoint": "node test-registration-endpoint.js",
         "test:top-skills": "node test-top-skills.js",
-        "test:work-experience": "node test-work-experience-system.js"
+        "test:work-experience": "node test-work-experience-system.js",
+        "migrate:interview": "node run-interview-migration.js"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
