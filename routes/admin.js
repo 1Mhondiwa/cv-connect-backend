@@ -3135,4 +3135,253 @@ router.get('/performance/user-experience', authenticateToken, requireRole(['admi
   }
 });
 
+// ===================================================================
+// INTERVIEW FEEDBACK ANALYTICS ENDPOINTS
+// ===================================================================
+
+// Get interview feedback analytics overview
+router.get('/analytics/interview-feedback', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
+  try {
+    const { timeRange = '30' } = req.query; // Default to last 30 days
+    const days = parseInt(timeRange);
+    
+    console.log(`🔍 ECS Admin fetching interview feedback analytics for last ${days} days`);
+
+    // Calculate date range
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // 1. Overall interview stats
+    const overallStatsQuery = `
+      SELECT 
+        COUNT(DISTINCT i.interview_id) as total_interviews,
+        COUNT(DISTINCT CASE WHEN i.status = 'completed' THEN i.interview_id END) as completed_interviews,
+        COUNT(DISTINCT if.feedback_id) as total_feedback_submissions,
+        ROUND(AVG(if.overall_rating), 2) as avg_overall_rating,
+        COUNT(DISTINCT CASE WHEN if.recommendation = 'hire' THEN if.feedback_id END) as hire_recommendations,
+        COUNT(DISTINCT CASE WHEN if.recommendation = 'no_hire' THEN if.feedback_id END) as no_hire_recommendations,
+        COUNT(DISTINCT CASE WHEN if.recommendation = 'maybe' THEN if.feedback_id END) as maybe_recommendations
+      FROM "Interview" i
+      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      WHERE i.created_at >= $1
+    `;
+
+    const overallStats = await db.query(overallStatsQuery, [startDate]);
+
+    // 2. Rating breakdown by category
+    const ratingBreakdownQuery = `
+      SELECT 
+        ROUND(AVG(technical_skills_rating), 2) as avg_technical_skills,
+        ROUND(AVG(communication_rating), 2) as avg_communication,
+        ROUND(AVG(cultural_fit_rating), 2) as avg_cultural_fit,
+        ROUND(AVG(overall_rating), 2) as avg_overall,
+        COUNT(*) as total_ratings
+      FROM "Interview_Feedback" if
+      JOIN "Interview" i ON if.interview_id = i.interview_id
+      WHERE i.created_at >= $1 
+        AND if.overall_rating IS NOT NULL
+    `;
+
+    const ratingBreakdown = await db.query(ratingBreakdownQuery, [startDate]);
+
+    // 3. Recommendation distribution
+    const recommendationDistQuery = `
+      SELECT 
+        recommendation,
+        COUNT(*) as count,
+        ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER()), 1) as percentage
+      FROM "Interview_Feedback" if
+      JOIN "Interview" i ON if.interview_id = i.interview_id
+      WHERE i.created_at >= $1 
+        AND recommendation IS NOT NULL
+      GROUP BY recommendation
+      ORDER BY count DESC
+    `;
+
+    const recommendationDist = await db.query(recommendationDistQuery, [startDate]);
+
+    // 4. Interview trends over time (weekly)
+    const trendsQuery = `
+      SELECT 
+        DATE_TRUNC('week', i.created_at) as week,
+        COUNT(DISTINCT i.interview_id) as interviews_count,
+        COUNT(DISTINCT CASE WHEN i.status = 'completed' THEN i.interview_id END) as completed_count,
+        ROUND(AVG(if.overall_rating), 2) as avg_rating,
+        COUNT(DISTINCT CASE WHEN if.recommendation = 'hire' THEN if.feedback_id END) as hire_count
+      FROM "Interview" i
+      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      WHERE i.created_at >= $1
+      GROUP BY DATE_TRUNC('week', i.created_at)
+      ORDER BY week ASC
+    `;
+
+    const trends = await db.query(trendsQuery, [startDate]);
+
+    // 5. Top performing industries (by average rating)
+    const industryPerformanceQuery = `
+      SELECT 
+        a.industry,
+        COUNT(DISTINCT i.interview_id) as interview_count,
+        ROUND(AVG(if.overall_rating), 2) as avg_rating,
+        COUNT(DISTINCT CASE WHEN if.recommendation = 'hire' THEN if.feedback_id END) as hire_count
+      FROM "Interview" i
+      JOIN "Associate" a ON i.associate_id = a.associate_id
+      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      WHERE i.created_at >= $1 
+        AND a.industry IS NOT NULL
+        AND if.overall_rating IS NOT NULL
+      GROUP BY a.industry
+      HAVING COUNT(DISTINCT i.interview_id) >= 2  -- Only include industries with 2+ interviews
+      ORDER BY avg_rating DESC, interview_count DESC
+      LIMIT 10
+    `;
+
+    const industryPerformance = await db.query(industryPerformanceQuery, [startDate]);
+
+    // 6. Evaluator type breakdown (Associate vs Freelancer feedback)
+    const evaluatorBreakdownQuery = `
+      SELECT 
+        evaluator_type,
+        COUNT(*) as feedback_count,
+        ROUND(AVG(overall_rating), 2) as avg_rating,
+        COUNT(CASE WHEN recommendation = 'hire' THEN 1 END) as hire_count
+      FROM "Interview_Feedback" if
+      JOIN "Interview" i ON if.interview_id = i.interview_id
+      WHERE i.created_at >= $1
+      GROUP BY evaluator_type
+    `;
+
+    const evaluatorBreakdown = await db.query(evaluatorBreakdownQuery, [startDate]);
+
+    // 7. Success rate calculation
+    const stats = overallStats.rows[0];
+    const completionRate = stats.total_interviews > 0 ? 
+      ((stats.completed_interviews / stats.total_interviews) * 100).toFixed(1) : 0;
+    
+    const hireRate = stats.total_feedback_submissions > 0 ? 
+      ((stats.hire_recommendations / stats.total_feedback_submissions) * 100).toFixed(1) : 0;
+
+    const response = {
+      success: true,
+      data: {
+        timeRange: days,
+        overview: {
+          ...stats,
+          completion_rate: parseFloat(completionRate),
+          hire_rate: parseFloat(hireRate)
+        },
+        ratingBreakdown: ratingBreakdown.rows[0] || {},
+        recommendationDistribution: recommendationDist.rows,
+        trends: trends.rows,
+        industryPerformance: industryPerformance.rows,
+        evaluatorBreakdown: evaluatorBreakdown.rows
+      }
+    };
+
+    console.log(`✅ Interview analytics fetched: ${stats.total_interviews} interviews, ${stats.total_feedback_submissions} feedback submissions`);
+
+    return res.status(200).json(response);
+
+  } catch (error) {
+    console.error('Interview feedback analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch interview feedback analytics',
+      error: error.message
+    });
+  }
+});
+
+// Get detailed interview feedback data for export/detailed analysis
+router.get('/analytics/interview-feedback/detailed', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
+  try {
+    const { limit = 100, offset = 0, timeRange = '30' } = req.query;
+    const days = parseInt(timeRange);
+    
+    console.log(`🔍 ECS Admin fetching detailed interview feedback data`);
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const detailedQuery = `
+      SELECT 
+        i.interview_id,
+        i.interview_type,
+        i.status,
+        i.scheduled_date,
+        i.created_at as interview_created,
+        
+        -- Associate info
+        a.industry as associate_industry,
+        au.email as associate_email,
+        
+        -- Freelancer info  
+        f.first_name as freelancer_name,
+        f.last_name as freelancer_lastname,
+        f.headline as freelancer_headline,
+        fu.email as freelancer_email,
+        
+        -- Request info
+        r.title as request_title,
+        r.required_skills,
+        
+        -- Feedback info
+        if.feedback_id,
+        if.evaluator_type,
+        if.technical_skills_rating,
+        if.communication_rating,
+        if.cultural_fit_rating,
+        if.overall_rating,
+        if.recommendation,
+        if.strengths,
+        if.areas_for_improvement,
+        if.detailed_feedback,
+        if.submitted_at as feedback_submitted
+        
+      FROM "Interview" i
+      JOIN "Associate" a ON i.associate_id = a.associate_id
+      JOIN "User" au ON a.user_id = au.user_id
+      JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
+      JOIN "User" fu ON f.user_id = fu.user_id
+      JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
+      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      
+      WHERE i.created_at >= $1
+      ORDER BY i.created_at DESC, if.submitted_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const detailedData = await db.query(detailedQuery, [startDate, limit, offset]);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(DISTINCT i.interview_id) as total_interviews
+      FROM "Interview" i
+      WHERE i.created_at >= $1
+    `;
+    
+    const countResult = await db.query(countQuery, [startDate]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        interviews: detailedData.rows,
+        pagination: {
+          total: parseInt(countResult.rows[0].total_interviews),
+          limit: parseInt(limit),
+          offset: parseInt(offset)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Detailed interview feedback error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch detailed interview feedback data',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
