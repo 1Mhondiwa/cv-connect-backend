@@ -8,6 +8,8 @@ const path = require('path');
 const fs = require('fs-extra');
 const rateLimit = require('express-rate-limit');
 const { pool, testConnection } = require('./config/database');
+const SignalingServer = require('./signalingServer');
+const WebRTCSignalingServer = require('./webrtcSignalingServer');
 require('dotenv').config();
 
 // Import routes
@@ -152,6 +154,12 @@ io.on('connection', (socket) => {
   });
 });
 
+// Initialize signaling server for WebRTC
+const signalingServer = new SignalingServer(server);
+
+// Initialize WebRTC signaling server for real-time video calls
+const webrtcSignalingServer = new WebRTCSignalingServer(server);
+
 // Start the server
 const PORT = process.env.PORT || 5000;
 
@@ -163,6 +171,7 @@ const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📡 Signaling server ready for WebRTC connections`);
     });
   } else {
     console.error('Unable to connect to the database. Server not started.');
