@@ -1269,17 +1269,17 @@ router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin
 // Get top skills
 router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    // Get skills from CV parsed_data and count occurrences across all CVs
+    // Get skills from normalized Skill and Freelancer_Skill tables for accurate counts
     const result = await db.query(`
       SELECT 
-        skill->>'name' as skill,
-        COUNT(*) as count
-      FROM "CV", 
-           jsonb_array_elements(parsed_data->'skills') as skill
-      WHERE parsed_data->'skills' IS NOT NULL 
-        AND skill->>'name' IS NOT NULL
-        AND skill->>'name' != ''
-      GROUP BY skill->>'name'
+        s.skill_name as skill,
+        COUNT(fs.freelancer_id) as count
+      FROM "Skill" s
+      LEFT JOIN "Freelancer_Skill" fs ON s.skill_id = fs.skill_id
+      WHERE s.skill_name IS NOT NULL 
+        AND s.skill_name != ''
+      GROUP BY s.skill_id, s.skill_name
+      HAVING COUNT(fs.freelancer_id) > 0
       ORDER BY count DESC
       LIMIT 10
     `);
@@ -1289,6 +1289,8 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
       count: parseInt(row.count),
       fill: getSkillColor(row.skill)
     }));
+
+    console.log('📊 Top Skills Data:', skillsData);
 
     return res.status(200).json({
       success: true,

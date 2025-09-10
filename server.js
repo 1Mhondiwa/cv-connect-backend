@@ -9,7 +9,6 @@ const fs = require('fs-extra');
 const rateLimit = require('express-rate-limit');
 const { pool, testConnection } = require('./config/database');
 const SignalingServer = require('./signalingServer');
-const WebRTCSignalingServer = require('./webrtcSignalingServer');
 require('dotenv').config();
 
 // Import routes
@@ -156,9 +155,6 @@ io.on('connection', (socket) => {
 
 // Initialize signaling server for WebRTC
 const signalingServer = new SignalingServer(server);
-
-// Initialize WebRTC signaling server for real-time video calls
-const webrtcSignalingServer = new WebRTCSignalingServer(server);
 
 // Start the server
 const PORT = process.env.PORT || 5000;
