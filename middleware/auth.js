@@ -15,7 +15,14 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'cv-connect-secret-key-2024';
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('JWT_SECRET environment variable is not set');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Server configuration error' 
+      });
+    }
     const decoded = jwt.verify(token, jwtSecret);
     
     const userResult = await db.query(
@@ -72,7 +79,12 @@ const optionalAuth = async (req, res, next) => {
       return next();
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'cv-connect-secret-key-2024';
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('JWT_SECRET environment variable is not set');
+      req.user = null;
+      return next();
+    }
     const decoded = jwt.verify(token, jwtSecret);
     
     const userResult = await db.query(

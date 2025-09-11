@@ -5,6 +5,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validateFreelancerProfile } = require('../middleware/validation');
 const { uploadCV, uploadProfileImage } = require('../middleware/upload');
 const cvParser = require('../services/cvParser');
+const { syncCVDataWithProfile } = require('../utils/profileSync');
 const fs = require('fs-extra');
 const path = require('path');
 const db = require('../config/database');
@@ -312,64 +313,12 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
     
     // Update freelancer profile with parsed data if available
     if (!parsedData.parsing_error && Object.keys(parsedData).length > 0) {
-      // Update freelancer record with any extracted information
-      const fieldsToUpdate = [];
-      const values = [];
-      let paramIndex = 1;
+      // Use the robust sync function to update freelancer profile
+      const syncResult = await syncCVDataWithProfile(freelancerId, parsedData, false);
       
-      if (parsedData.first_name && parsedData.first_name.trim()) {
-        fieldsToUpdate.push(`first_name = $${paramIndex++}`);
-        values.push(parsedData.first_name);
-      }
-      
-      if (parsedData.last_name && parsedData.last_name.trim()) {
-        fieldsToUpdate.push(`last_name = $${paramIndex++}`);
-        values.push(parsedData.last_name);
-      }
-      
-      if (parsedData.phone && parsedData.phone.trim()) {
-        fieldsToUpdate.push(`phone = $${paramIndex++}`);
-        values.push(parsedData.phone);
-      }
-      
-      if (parsedData.years_experience) {
-        fieldsToUpdate.push(`years_experience = $${paramIndex++}`);
-        values.push(parsedData.years_experience);
-      }
-      
-      if (parsedData.summary && parsedData.summary.trim()) {
-        fieldsToUpdate.push(`summary = $${paramIndex++}`);
-        values.push(parsedData.summary);
-      }
-      
-      if (parsedData.linkedin_url && parsedData.linkedin_url.trim()) {
-        fieldsToUpdate.push(`linkedin_url = $${paramIndex++}`);
-        values.push(parsedData.linkedin_url);
-      }
-      
-      if (parsedData.github_url && parsedData.github_url.trim()) {
-        fieldsToUpdate.push(`github_url = $${paramIndex++}`);
-        values.push(parsedData.github_url);
-      }
-      
-      if (parsedData.address && parsedData.address.trim()) {
-        fieldsToUpdate.push(`address = $${paramIndex++}`);
-        values.push(parsedData.address);
-      }
-      
-      if (parsedData.headline && parsedData.headline.trim()) {
-        fieldsToUpdate.push(`headline = $${paramIndex++}`);
-        values.push(parsedData.headline);
-      }
-      
-      if (fieldsToUpdate.length > 0) {
-        // Add the last parameter for freelancer_id
-        values.push(freelancerId);
-        
-        await db.query(
-          `UPDATE "Freelancer" SET ${fieldsToUpdate.join(', ')} WHERE freelancer_id = $${paramIndex}`,
-          values
-        );
+      if (!syncResult.success) {
+        console.error('Failed to sync CV data with profile:', syncResult.error);
+        // Continue with the upload even if sync fails
       }
       
       // Add extracted skills if available

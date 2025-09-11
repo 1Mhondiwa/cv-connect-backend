@@ -4,6 +4,7 @@ const path = require('path');
 const pdfParse = require('pdf-parse');
 const nlp = require('compromise');
 const mammoth = require('mammoth');
+const logger = require('../utils/logger');
 
 class CVParser {
   
@@ -53,7 +54,7 @@ class CVParser {
      
       return text;
     } catch (error) {
-      console.error('Error extracting text:', error);
+      logger.error('Error extracting text:', error);
       throw error;
     }
   }
@@ -69,19 +70,24 @@ class CVParser {
       let text = pdfData.text || '';
       text = this.cleanExtractedText(text, 'pdf');
       
-      console.log(`PDF text extracted: ${text.length} characters`);
+      logger.cv(`PDF text extracted: ${text.length} characters`);
       return text;
     } catch (error) {
-      console.error('PDF parsing error:', error);
+      logger.error('PDF parsing error:', error);
       throw new Error("PDF parsing failed. Please check the file format.");
     }
   }
 
   async extractTxtText(filePath) {
-    const text = fs.readFileSync(filePath, 'utf8');
-    const cleanedText = this.cleanExtractedText(text, 'txt');
-    console.log(`TXT text extracted: ${cleanedText.length} characters`);
-    return cleanedText;
+    try {
+      const text = fs.readFileSync(filePath, 'utf8');
+      const cleanedText = this.cleanExtractedText(text, 'txt');
+      logger.cv(`TXT text extracted: ${cleanedText.length} characters`);
+      return cleanedText;
+    } catch (error) {
+      logger.error('TXT parsing error:', error);
+      throw new Error("TXT parsing failed. Please check the file format.");
+    }
   }
 
   async extractDocxText(filePath) {
@@ -96,10 +102,10 @@ class CVParser {
       let text = result.value || '';
       text = this.cleanExtractedText(text, 'docx');
       
-      console.log(`DOCX text extracted: ${text.length} characters`);
+      logger.cv(`DOCX text extracted: ${text.length} characters`);
       return text;
     } catch (error) {
-      console.error('DOCX parsing error:', error);
+      logger.error('DOCX parsing error:', error);
       throw new Error("DOCX parsing failed. Please check the file format.");
     }
   }

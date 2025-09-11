@@ -9,6 +9,7 @@ const fs = require('fs-extra');
 const rateLimit = require('express-rate-limit');
 const { pool, testConnection } = require('./config/database');
 const SignalingServer = require('./signalingServer');
+const logger = require('./utils/logger');
 require('dotenv').config();
 
 // Import routes
@@ -32,7 +33,7 @@ global.app = app;
 // Initialize socket.io
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "*",
+    origin: process.env.CLIENT_URL || process.env.MOBILE_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -46,9 +47,23 @@ fs.ensureDirSync('./uploads/profile_images');
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+// CORS configuration
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.MOBILE_URL,
+  'http://localhost:3000', // Development fallback
+  'http://localhost:3001'  // Alternative development port
+].filter(Boolean); // Remove undefined values
+
+if (allowedOrigins.length === 0) {
+  logger.error('No CORS origins configured. Please set CLIENT_URL and/or MOBILE_URL environment variables.');
+  process.exit(1);
+}
+
 app.use(cors({
-  origin: [process.env.CLIENT_URL, process.env.MOBILE_URL],
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -105,18 +120,18 @@ app.get('/api/health', (req, res) => {
 
 // Socket.io event handlers
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  logger.debug('User connected:', socket.id);
 
   // Join a conversation room
   socket.on('join_conversation', (conversationId) => {
     socket.join(`conversation-${conversationId}`);
-    console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
+    logger.debug(`Socket ${socket.id} joined conversation ${conversationId}`);
   });
 
   // Leave a conversation room
   socket.on('leave_conversation', (conversationId) => {
     socket.leave(`conversation-${conversationId}`);
-    console.log(`Socket ${socket.id} left conversation ${conversationId}`);
+    logger.debug(`Socket ${socket.id} left conversation ${conversationId}`);
   });
 
   // Send a message
@@ -136,7 +151,7 @@ io.on('connection', (socket) => {
       io.to(`conversation-${conversation_id}`).emit('receive_message', newMessage);
       
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       socket.emit('message_error', { message: 'Failed to send message' });
     }
   });
@@ -149,7 +164,7 @@ io.on('connection', (socket) => {
 
   // Handle disconnect
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    logger.debug('User disconnected:', socket.id);
   });
 });
 
@@ -165,25 +180,25 @@ const PORT = process.env.PORT || 5000;
   
   if (dbConnected) {
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📡 Signaling server ready for WebRTC connections`);
+      logger.production(`Server running on port ${PORT}`);
+      logger.production(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.production(`📡 Signaling server ready for WebRTC connections`);
     });
   } else {
-    console.error('Unable to connect to the database. Server not started.');
+    logger.error('Unable to connect to the database. Server not started.');
     process.exit(1);
   }
 })();
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('Gracefully shutting down...');
+  logger.production('Gracefully shutting down...');
   // Close the database pool
   await pool.end();
-  console.log('Database pool closed.');
+  logger.production('Database pool closed.');
   // Close the server
   server.close(() => {
-    console.log('Server closed.');
+    logger.production('Server closed.');
     process.exit(0);
   });
 });
