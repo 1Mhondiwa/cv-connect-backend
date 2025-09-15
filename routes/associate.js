@@ -715,6 +715,7 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
          f.headline,
          f.phone,
          f.availability_status,
+         f.hourly_rate,
          u.email,
          u.is_verified
        FROM "Freelancer_Recommendation" fr
