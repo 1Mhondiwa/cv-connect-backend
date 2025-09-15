@@ -1204,13 +1204,29 @@ router.get('/analytics/user-activity-status', authenticateToken, requireRole(['a
 // Get CV upload trends from system start
 router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { days = 90 } = req.query;
+    const { days = 90, start_date, end_date } = req.query;
     
-    // Always start from June 19, 2025 (your system start date)
-    const startDate = new Date('2025-06-19');
-    // Ensure we include today by setting end time to end of day
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999); // Set to end of today
+    let startDate, endDate;
+    
+    // Handle custom date range filtering
+    if (start_date && end_date) {
+      startDate = new Date(start_date);
+      endDate = new Date(end_date);
+      endDate.setHours(23, 59, 59, 999); // Set to end of day
+    } else {
+      // Default behavior: use days parameter or default to 90 days
+      const daysBack = parseInt(days) || 90;
+      endDate = new Date();
+      endDate.setHours(23, 59, 59, 999); // Set to end of today
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+    }
+    
+    // Ensure start date is not before system start date
+    const systemStartDate = new Date('2025-06-19');
+    if (startDate < systemStartDate) {
+      startDate = systemStartDate;
+    }
     
     const result = await db.query(`
       SELECT 
