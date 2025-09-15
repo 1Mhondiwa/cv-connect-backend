@@ -134,7 +134,8 @@ router.put('/profile', authenticateToken, requireRole(['freelancer']), validateF
       headline,
       current_status,
       linkedin_url,
-      github_url
+      github_url,
+      hourly_rate
     } = req.body;
     
     // Check if freelancer exists
@@ -164,8 +165,9 @@ router.put('/profile', authenticateToken, requireRole(['freelancer']), validateF
            headline = $7, 
            current_status = $8, 
            linkedin_url = $9, 
-           github_url = $10 
-       WHERE freelancer_id = $11`,
+           github_url = $10,
+           hourly_rate = $11
+       WHERE freelancer_id = $12`,
       [
         first_name,
         last_name,
@@ -177,6 +179,7 @@ router.put('/profile', authenticateToken, requireRole(['freelancer']), validateF
         current_status,
         linkedin_url,
         github_url,
+        hourly_rate,
         freelancerId
       ]
     );
