@@ -1739,6 +1739,7 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
          h.status,
          h.associate_notes,
          h.freelancer_notes,
+         h.contract_pdf_path,
          a.contact_person as company_contact,
          a.industry,
          a.website,
