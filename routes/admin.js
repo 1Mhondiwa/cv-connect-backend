@@ -1325,19 +1325,24 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
 // Get skills demand data from job postings and associate requests
 router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    // Get skills from job postings
+    console.log('🔍 Fetching skills demand data...');
+    
+    // Get skills from job postings (TEXT field - comma separated)
     const jobPostingsResult = await db.query(`
       SELECT 
-        UNNEST(required_skills) as skill,
+        TRIM(UNNEST(string_to_array(required_skills, ','))) as skill,
         COUNT(*) as count
       FROM "Job_Posting"
       WHERE is_active = true
         AND required_skills IS NOT NULL
-        AND array_length(required_skills, 1) > 0
-      GROUP BY UNNEST(required_skills)
+        AND required_skills != ''
+        AND LENGTH(TRIM(required_skills)) > 0
+      GROUP BY TRIM(UNNEST(string_to_array(required_skills, ',')))
     `);
 
-    // Get skills from associate freelancer requests
+    console.log('📊 Job Postings Skills:', jobPostingsResult.rows);
+
+    // Get skills from associate freelancer requests (TEXT[] field - proper array)
     const associateRequestsResult = await db.query(`
       SELECT 
         UNNEST(required_skills) as skill,
@@ -1349,13 +1354,15 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       GROUP BY UNNEST(required_skills)
     `);
 
+    console.log('📊 Associate Requests Skills:', associateRequestsResult.rows);
+
     // Combine and aggregate the data
     const demandMap = new Map();
     
     // Process job postings
     jobPostingsResult.rows.forEach(row => {
       const skill = row.skill?.trim().toLowerCase();
-      if (skill) {
+      if (skill && skill !== '') {
         demandMap.set(skill, (demandMap.get(skill) || 0) + parseInt(row.count));
       }
     });
@@ -1363,10 +1370,12 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
     // Process associate requests
     associateRequestsResult.rows.forEach(row => {
       const skill = row.skill?.trim().toLowerCase();
-      if (skill) {
+      if (skill && skill !== '') {
         demandMap.set(skill, (demandMap.get(skill) || 0) + parseInt(row.count));
       }
     });
+
+    console.log('📊 Combined Demand Map:', Array.from(demandMap.entries()));
 
     // Convert to array and sort by count
     const demandData = Array.from(demandMap.entries())
@@ -1378,17 +1387,81 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       .sort((a, b) => b.count - a.count)
       .slice(0, 10); // Top 10
 
-    console.log('📊 Skills Demand Data:', demandData);
+    console.log('📊 Final Skills Demand Data:', demandData);
 
     return res.status(200).json({
       success: true,
       data: demandData
     });
   } catch (error) {
-    console.error('Analytics skills demand error:', error);
+    console.error('❌ Analytics skills demand error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
     return res.status(200).json({
       success: true,
       data: []
+    });
+  }
+});
+
+// Test endpoint to check skills demand data structure
+router.get('/analytics/skills-demand-test', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    console.log('🔍 Testing skills demand data structure...');
+    
+    // Check Job_Posting table structure
+    const jobPostingsStructure = await db.query(`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'Job_Posting' AND column_name = 'required_skills'
+    `);
+    
+    // Check Associate_Freelancer_Request table structure
+    const associateRequestsStructure = await db.query(`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'Associate_Freelancer_Request' AND column_name = 'required_skills'
+    `);
+    
+    // Get sample data from Job_Posting
+    const jobPostingsSample = await db.query(`
+      SELECT required_skills, title 
+      FROM "Job_Posting" 
+      WHERE required_skills IS NOT NULL 
+      LIMIT 5
+    `);
+    
+    // Get sample data from Associate_Freelancer_Request
+    const associateRequestsSample = await db.query(`
+      SELECT required_skills, title 
+      FROM "Associate_Freelancer_Request" 
+      WHERE required_skills IS NOT NULL 
+      LIMIT 5
+    `);
+    
+    // Count total records
+    const jobPostingsCount = await db.query('SELECT COUNT(*) FROM "Job_Posting" WHERE required_skills IS NOT NULL');
+    const associateRequestsCount = await db.query('SELECT COUNT(*) FROM "Associate_Freelancer_Request" WHERE required_skills IS NOT NULL');
+    
+    return res.status(200).json({
+      success: true,
+      data: {
+        jobPostingsStructure: jobPostingsStructure.rows,
+        associateRequestsStructure: associateRequestsStructure.rows,
+        jobPostingsSample: jobPostingsSample.rows,
+        associateRequestsSample: associateRequestsSample.rows,
+        jobPostingsCount: parseInt(jobPostingsCount.rows[0].count),
+        associateRequestsCount: parseInt(associateRequestsCount.rows[0].count)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Skills demand test error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
