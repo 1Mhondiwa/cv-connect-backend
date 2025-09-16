@@ -6,6 +6,7 @@ const fs = require('fs-extra');
 // Ensure directories exist
 fs.ensureDirSync('./uploads/cvs');
 fs.ensureDirSync('./uploads/profile_images');
+fs.ensureDirSync('./uploads/signed_contracts');
 
 // Configure storage for CV uploads
 const cvStorage = multer.diskStorage({
@@ -28,6 +29,18 @@ const profileImageStorage = multer.diskStorage({
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const extension = path.extname(file.originalname);
     cb(null, 'profile-' + uniqueSuffix + extension);
+  }
+});
+
+// Configure storage for signed contract uploads
+const signedContractStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, './uploads/signed_contracts');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    cb(null, 'signed-contract-' + uniqueSuffix + extension);
   }
 });
 
@@ -55,6 +68,18 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
+// Filter for signed contract file types (PDF only for contracts)
+const signedContractFileFilter = (req, file, cb) => {
+  const allowedTypes = ['.pdf'];
+  const extension = path.extname(file.originalname).toLowerCase();
+  
+  if (allowedTypes.includes(extension)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only PDF files are allowed for signed contracts.'), false);
+  }
+};
+
 // Create multer instances
 const uploadCV = multer({
   storage: cvStorage,
@@ -72,7 +97,16 @@ const uploadProfileImage = multer({
   }
 });
 
+const uploadSignedContract = multer({
+  storage: signedContractStorage,
+  fileFilter: signedContractFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB for contracts
+  }
+});
+
 module.exports = {
   uploadCV,
-  uploadProfileImage
+  uploadProfileImage,
+  uploadSignedContract
 };

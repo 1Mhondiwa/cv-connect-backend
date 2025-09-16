@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { validateFreelancerProfile } = require('../middleware/validation');
-const { uploadCV, uploadProfileImage } = require('../middleware/upload');
+const { uploadCV, uploadProfileImage, uploadSignedContract } = require('../middleware/upload');
 const cvParser = require('../services/cvParser');
 const { syncCVDataWithProfile } = require('../utils/profileSync');
 const fs = require('fs-extra');
@@ -1740,6 +1740,8 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
          h.associate_notes,
          h.freelancer_notes,
          h.contract_pdf_path,
+         h.signed_contract_pdf_path,
+         h.signed_contract_uploaded_at,
          a.contact_person as company_contact,
          a.industry,
          a.website,
@@ -1766,6 +1768,98 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch hiring history',
+      error: error.message
+    });
+  }
+});
+
+// Upload signed contract
+router.post('/contract/:hireId/upload-signed', authenticateToken, requireRole(['freelancer']), uploadSignedContract.single('signed_contract'), async (req, res) => {
+  try {
+    const { hireId } = req.params;
+    const userId = req.user.user_id;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No signed contract file uploaded'
+      });
+    }
+    
+    // Get freelancer ID
+    const freelancerResult = await db.query(
+      'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (freelancerResult.rowCount === 0) {
+      // Delete the uploaded file since we can't use it
+      fs.unlinkSync(req.file.path);
+      
+      return res.status(404).json({
+        success: false,
+        message: 'Freelancer profile not found'
+      });
+    }
+    
+    const freelancerId = freelancerResult.rows[0].freelancer_id;
+    
+    // Verify the hire record belongs to this freelancer
+    const hireResult = await db.query(
+      'SELECT hire_id, signed_contract_pdf_path FROM "Freelancer_Hire" WHERE hire_id = $1 AND freelancer_id = $2',
+      [hireId, freelancerId]
+    );
+    
+    if (hireResult.rowCount === 0) {
+      // Delete the uploaded file
+      fs.unlinkSync(req.file.path);
+      
+      return res.status(404).json({
+        success: false,
+        message: 'Hire record not found or does not belong to this freelancer'
+      });
+    }
+    
+    const hireRecord = hireResult.rows[0];
+    
+    // Delete old signed contract if it exists
+    if (hireRecord.signed_contract_pdf_path) {
+      const oldFilePath = path.join('./uploads/signed_contracts', path.basename(hireRecord.signed_contract_pdf_path));
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+    }
+    
+    // Update the hire record with new signed contract
+    const signedContractPath = `/uploads/signed_contracts/${req.file.filename}`;
+    await db.query(
+      'UPDATE "Freelancer_Hire" SET signed_contract_pdf_path = $1, signed_contract_uploaded_at = CURRENT_TIMESTAMP WHERE hire_id = $2',
+      [signedContractPath, hireId]
+    );
+    
+    console.log(`✅ Signed contract uploaded for hire ID: ${hireId}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Signed contract uploaded successfully',
+      data: {
+        hire_id: hireId,
+        signed_contract_path: signedContractPath,
+        uploaded_at: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Upload signed contract error:', error);
+    
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
       error: error.message
     });
   }
