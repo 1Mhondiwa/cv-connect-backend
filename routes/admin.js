@@ -1322,6 +1322,77 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
   }
 });
 
+// Get skills demand data from job postings and associate requests
+router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    // Get skills from job postings
+    const jobPostingsResult = await db.query(`
+      SELECT 
+        UNNEST(required_skills) as skill,
+        COUNT(*) as count
+      FROM "Job_Posting"
+      WHERE is_active = true
+        AND required_skills IS NOT NULL
+        AND array_length(required_skills, 1) > 0
+      GROUP BY UNNEST(required_skills)
+    `);
+
+    // Get skills from associate freelancer requests
+    const associateRequestsResult = await db.query(`
+      SELECT 
+        UNNEST(required_skills) as skill,
+        COUNT(*) as count
+      FROM "Associate_Freelancer_Request"
+      WHERE status IN ('pending', 'reviewed', 'provided')
+        AND required_skills IS NOT NULL
+        AND array_length(required_skills, 1) > 0
+      GROUP BY UNNEST(required_skills)
+    `);
+
+    // Combine and aggregate the data
+    const demandMap = new Map();
+    
+    // Process job postings
+    jobPostingsResult.rows.forEach(row => {
+      const skill = row.skill?.trim().toLowerCase();
+      if (skill) {
+        demandMap.set(skill, (demandMap.get(skill) || 0) + parseInt(row.count));
+      }
+    });
+
+    // Process associate requests
+    associateRequestsResult.rows.forEach(row => {
+      const skill = row.skill?.trim().toLowerCase();
+      if (skill) {
+        demandMap.set(skill, (demandMap.get(skill) || 0) + parseInt(row.count));
+      }
+    });
+
+    // Convert to array and sort by count
+    const demandData = Array.from(demandMap.entries())
+      .map(([skill, count]) => ({
+        skill: skill.charAt(0).toUpperCase() + skill.slice(1), // Capitalize first letter
+        count: parseInt(count),
+        fill: getSkillColor(skill)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10
+
+    console.log('📊 Skills Demand Data:', demandData);
+
+    return res.status(200).json({
+      success: true,
+      data: demandData
+    });
+  } catch (error) {
+    console.error('Analytics skills demand error:', error);
+    return res.status(200).json({
+      success: true,
+      data: []
+    });
+  }
+});
+
 // Helper function to get skill colors
 function getSkillColor(skillName) {
   const skill = skillName?.toLowerCase();
