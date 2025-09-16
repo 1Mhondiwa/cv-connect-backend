@@ -1370,7 +1370,6 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
         AND LENGTH(TRIM(project_description)) > 0
         AND status IN ('active', 'completed')
       GROUP BY TRIM(UNNEST(string_to_array(project_description, ' ')))
-      HAVING LENGTH(TRIM(UNNEST(string_to_array(project_description, ' ')))) > 2
     `);
 
     console.log('📊 Project Descriptions Skills:', projectDescriptionsResult.rows);
@@ -1387,7 +1386,6 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
         AND LENGTH(TRIM(description)) > 0
         AND is_active = true
       GROUP BY TRIM(UNNEST(string_to_array(description, ' ')))
-      HAVING LENGTH(TRIM(UNNEST(string_to_array(description, ' ')))) > 2
     `);
 
     console.log('📊 Job Descriptions Skills:', jobDescriptionsResult.rows);
@@ -1413,21 +1411,21 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       }
     });
 
-    // Process project descriptions (secondary source - filter for known skills)
-    const knownSkills = ['javascript', 'react', 'node', 'python', 'java', 'html', 'css', 'sql', 'mongodb', 'postgresql', 'aws', 'docker', 'git', 'agile', 'scrum', 'typescript', 'vue', 'angular', 'php', 'c++', 'c#', 'ruby', 'go', 'swift', 'kotlin', 'flutter', 'django', 'spring', 'express', 'laravel', 'rails', 'next', 'nuxt', 'svelte', 'jquery', 'bootstrap', 'tailwind', 'sass', 'less', 'webpack', 'babel', 'eslint', 'prettier', 'jest', 'mocha', 'cypress', 'selenium', 'jira', 'confluence', 'slack', 'trello', 'figma', 'sketch', 'photoshop', 'illustrator', 'xd', 'invision', 'zeplin', 'framer', 'principle', 'after', 'effects', 'premiere', 'final', 'cut', 'pro', 'logic', 'pro', 'ableton', 'live', 'pro', 'tools', 'cubase', 'nuendo', 'reaper', 'audacity', 'garageband', 'fl', 'studio', 'reason', 'bitwig', 'studio', 'tracktion', 'waveform', 'reaper', 'audacity', 'garageband', 'fl', 'studio', 'reason', 'bitwig', 'studio', 'tracktion', 'waveform'];
+    // Process project descriptions (secondary source - filter for known skills and length)
+    const knownSkills = ['javascript', 'react', 'node', 'python', 'java', 'html', 'css', 'sql', 'mongodb', 'postgresql', 'aws', 'docker', 'git', 'agile', 'scrum', 'typescript', 'vue', 'angular', 'php', 'c++', 'c#', 'ruby', 'go', 'swift', 'kotlin', 'flutter', 'django', 'spring', 'express', 'laravel', 'rails', 'next', 'nuxt', 'svelte', 'jquery', 'bootstrap', 'tailwind', 'sass', 'less', 'webpack', 'babel', 'eslint', 'prettier', 'jest', 'mocha', 'cypress', 'selenium', 'jira', 'confluence', 'slack', 'trello', 'figma', 'sketch', 'photoshop', 'illustrator', 'xd', 'invision', 'zeplin', 'framer', 'principle', 'after', 'effects', 'premiere', 'final', 'cut', 'pro', 'logic', 'pro', 'ableton', 'live', 'pro', 'tools', 'cubase', 'nuendo', 'reaper', 'audacity', 'garageband', 'fl', 'studio', 'reason', 'bitwig', 'studio', 'tracktion', 'waveform'];
     
     projectDescriptionsResult.rows.forEach(row => {
       const skill = row.skill?.trim().toLowerCase();
-      if (skill && skill !== '' && knownSkills.some(knownSkill => skill.includes(knownSkill))) {
+      if (skill && skill !== '' && skill.length > 2 && knownSkills.some(knownSkill => skill.includes(knownSkill))) {
         const currentCount = demandMap.get(skill) || 0;
         demandMap.set(skill, currentCount + parseInt(row.count));
       }
     });
 
-    // Process job descriptions (secondary source - filter for known skills)
+    // Process job descriptions (secondary source - filter for known skills and length)
     jobDescriptionsResult.rows.forEach(row => {
       const skill = row.skill?.trim().toLowerCase();
-      if (skill && skill !== '' && knownSkills.some(knownSkill => skill.includes(knownSkill))) {
+      if (skill && skill !== '' && skill.length > 2 && knownSkills.some(knownSkill => skill.includes(knownSkill))) {
         const currentCount = demandMap.get(skill) || 0;
         demandMap.set(skill, currentCount + parseInt(row.count));
       }
