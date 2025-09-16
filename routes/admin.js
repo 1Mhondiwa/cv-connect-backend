@@ -1322,16 +1322,17 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
   }
 });
 
-// Get skills demand data from job postings and associate requests
+// Get skills demand data from ALL sources where associates require skills
 router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔍 Fetching skills demand data...');
+    console.log('🔍 Fetching skills demand data from ALL sources...');
     
-    // Get skills from job postings (TEXT field - comma separated)
+    // 1. Get skills from job postings (TEXT field - comma separated)
     const jobPostingsResult = await db.query(`
       SELECT 
         TRIM(UNNEST(string_to_array(required_skills, ','))) as skill,
-        COUNT(*) as count
+        COUNT(*) as count,
+        'job_posting' as source
       FROM "Job_Posting"
       WHERE is_active = true
         AND required_skills IS NOT NULL
@@ -1342,13 +1343,14 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
 
     console.log('📊 Job Postings Skills:', jobPostingsResult.rows);
 
-    // Get skills from associate freelancer requests (TEXT[] field - proper array)
+    // 2. Get skills from associate freelancer requests (TEXT[] field - proper array)
     const associateRequestsResult = await db.query(`
       SELECT 
         UNNEST(required_skills) as skill,
-        COUNT(*) as count
+        COUNT(*) as count,
+        'associate_request' as source
       FROM "Associate_Freelancer_Request"
-      WHERE status IN ('pending', 'reviewed', 'provided')
+      WHERE status IN ('pending', 'reviewed', 'provided', 'completed')
         AND required_skills IS NOT NULL
         AND array_length(required_skills, 1) > 0
       GROUP BY UNNEST(required_skills)
@@ -1356,26 +1358,82 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
 
     console.log('📊 Associate Requests Skills:', associateRequestsResult.rows);
 
-    // Combine and aggregate the data
+    // 3. Get skills from project descriptions in Freelancer_Hire (TEXT field - might contain skills)
+    const projectDescriptionsResult = await db.query(`
+      SELECT 
+        TRIM(UNNEST(string_to_array(project_description, ' '))) as skill,
+        COUNT(*) as count,
+        'project_description' as source
+      FROM "Freelancer_Hire"
+      WHERE project_description IS NOT NULL
+        AND project_description != ''
+        AND LENGTH(TRIM(project_description)) > 0
+        AND status IN ('active', 'completed')
+      GROUP BY TRIM(UNNEST(string_to_array(project_description, ' ')))
+      HAVING LENGTH(TRIM(UNNEST(string_to_array(project_description, ' ')))) > 2
+    `);
+
+    console.log('📊 Project Descriptions Skills:', projectDescriptionsResult.rows);
+
+    // 4. Get skills from job descriptions in Job_Posting (TEXT field - might contain skills)
+    const jobDescriptionsResult = await db.query(`
+      SELECT 
+        TRIM(UNNEST(string_to_array(description, ' '))) as skill,
+        COUNT(*) as count,
+        'job_description' as source
+      FROM "Job_Posting"
+      WHERE description IS NOT NULL
+        AND description != ''
+        AND LENGTH(TRIM(description)) > 0
+        AND is_active = true
+      GROUP BY TRIM(UNNEST(string_to_array(description, ' ')))
+      HAVING LENGTH(TRIM(UNNEST(string_to_array(description, ' ')))) > 2
+    `);
+
+    console.log('📊 Job Descriptions Skills:', jobDescriptionsResult.rows);
+
+    // Combine and aggregate the data from ALL sources
     const demandMap = new Map();
     
-    // Process job postings
+    // Process job postings (primary source)
     jobPostingsResult.rows.forEach(row => {
       const skill = row.skill?.trim().toLowerCase();
       if (skill && skill !== '') {
-        demandMap.set(skill, (demandMap.get(skill) || 0) + parseInt(row.count));
+        const currentCount = demandMap.get(skill) || 0;
+        demandMap.set(skill, currentCount + parseInt(row.count));
       }
     });
 
-    // Process associate requests
+    // Process associate requests (primary source)
     associateRequestsResult.rows.forEach(row => {
       const skill = row.skill?.trim().toLowerCase();
       if (skill && skill !== '') {
-        demandMap.set(skill, (demandMap.get(skill) || 0) + parseInt(row.count));
+        const currentCount = demandMap.get(skill) || 0;
+        demandMap.set(skill, currentCount + parseInt(row.count));
       }
     });
 
-    console.log('📊 Combined Demand Map:', Array.from(demandMap.entries()));
+    // Process project descriptions (secondary source - filter for known skills)
+    const knownSkills = ['javascript', 'react', 'node', 'python', 'java', 'html', 'css', 'sql', 'mongodb', 'postgresql', 'aws', 'docker', 'git', 'agile', 'scrum', 'typescript', 'vue', 'angular', 'php', 'c++', 'c#', 'ruby', 'go', 'swift', 'kotlin', 'flutter', 'django', 'spring', 'express', 'laravel', 'rails', 'next', 'nuxt', 'svelte', 'jquery', 'bootstrap', 'tailwind', 'sass', 'less', 'webpack', 'babel', 'eslint', 'prettier', 'jest', 'mocha', 'cypress', 'selenium', 'jira', 'confluence', 'slack', 'trello', 'figma', 'sketch', 'photoshop', 'illustrator', 'xd', 'invision', 'zeplin', 'framer', 'principle', 'after', 'effects', 'premiere', 'final', 'cut', 'pro', 'logic', 'pro', 'ableton', 'live', 'pro', 'tools', 'cubase', 'nuendo', 'reaper', 'audacity', 'garageband', 'fl', 'studio', 'reason', 'bitwig', 'studio', 'tracktion', 'waveform', 'reaper', 'audacity', 'garageband', 'fl', 'studio', 'reason', 'bitwig', 'studio', 'tracktion', 'waveform'];
+    
+    projectDescriptionsResult.rows.forEach(row => {
+      const skill = row.skill?.trim().toLowerCase();
+      if (skill && skill !== '' && knownSkills.some(knownSkill => skill.includes(knownSkill))) {
+        const currentCount = demandMap.get(skill) || 0;
+        demandMap.set(skill, currentCount + parseInt(row.count));
+      }
+    });
+
+    // Process job descriptions (secondary source - filter for known skills)
+    jobDescriptionsResult.rows.forEach(row => {
+      const skill = row.skill?.trim().toLowerCase();
+      if (skill && skill !== '' && knownSkills.some(knownSkill => skill.includes(knownSkill))) {
+        const currentCount = demandMap.get(skill) || 0;
+        demandMap.set(skill, currentCount + parseInt(row.count));
+      }
+    });
+
+    console.log('📊 Combined Demand Map from ALL sources:', Array.from(demandMap.entries()));
 
     // Convert to array and sort by count
     const demandData = Array.from(demandMap.entries())
@@ -1407,34 +1465,38 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
   }
 });
 
-// Test endpoint to check skills demand data structure
+// Test endpoint to check skills demand data structure from ALL sources
 router.get('/analytics/skills-demand-test', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔍 Testing skills demand data structure...');
+    console.log('🔍 Testing skills demand data structure from ALL sources...');
     
-    // Check Job_Posting table structure
+    // Check all table structures
     const jobPostingsStructure = await db.query(`
       SELECT column_name, data_type, is_nullable 
       FROM information_schema.columns 
-      WHERE table_name = 'Job_Posting' AND column_name = 'required_skills'
+      WHERE table_name = 'Job_Posting' AND column_name IN ('required_skills', 'description')
     `);
     
-    // Check Associate_Freelancer_Request table structure
     const associateRequestsStructure = await db.query(`
       SELECT column_name, data_type, is_nullable 
       FROM information_schema.columns 
       WHERE table_name = 'Associate_Freelancer_Request' AND column_name = 'required_skills'
     `);
     
-    // Get sample data from Job_Posting
+    const freelancerHireStructure = await db.query(`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'Freelancer_Hire' AND column_name = 'project_description'
+    `);
+    
+    // Get sample data from all sources
     const jobPostingsSample = await db.query(`
-      SELECT required_skills, title 
+      SELECT required_skills, description, title 
       FROM "Job_Posting" 
-      WHERE required_skills IS NOT NULL 
+      WHERE required_skills IS NOT NULL OR description IS NOT NULL
       LIMIT 5
     `);
     
-    // Get sample data from Associate_Freelancer_Request
     const associateRequestsSample = await db.query(`
       SELECT required_skills, title 
       FROM "Associate_Freelancer_Request" 
@@ -1442,19 +1504,65 @@ router.get('/analytics/skills-demand-test', authenticateToken, requireRole(['adm
       LIMIT 5
     `);
     
-    // Count total records
+    const projectDescriptionsSample = await db.query(`
+      SELECT project_description, project_title 
+      FROM "Freelancer_Hire" 
+      WHERE project_description IS NOT NULL 
+      LIMIT 5
+    `);
+    
+    // Count total records from all sources
     const jobPostingsCount = await db.query('SELECT COUNT(*) FROM "Job_Posting" WHERE required_skills IS NOT NULL');
     const associateRequestsCount = await db.query('SELECT COUNT(*) FROM "Associate_Freelancer_Request" WHERE required_skills IS NOT NULL');
+    const projectDescriptionsCount = await db.query('SELECT COUNT(*) FROM "Freelancer_Hire" WHERE project_description IS NOT NULL');
+    
+    // Test actual skills extraction
+    const testJobPostingsSkills = await db.query(`
+      SELECT 
+        TRIM(UNNEST(string_to_array(required_skills, ','))) as skill,
+        COUNT(*) as count
+      FROM "Job_Posting"
+      WHERE is_active = true
+        AND required_skills IS NOT NULL
+        AND required_skills != ''
+      GROUP BY TRIM(UNNEST(string_to_array(required_skills, ',')))
+      LIMIT 10
+    `);
+    
+    const testAssociateRequestsSkills = await db.query(`
+      SELECT 
+        UNNEST(required_skills) as skill,
+        COUNT(*) as count
+      FROM "Associate_Freelancer_Request"
+      WHERE status IN ('pending', 'reviewed', 'provided', 'completed')
+        AND required_skills IS NOT NULL
+        AND array_length(required_skills, 1) > 0
+      GROUP BY UNNEST(required_skills)
+      LIMIT 10
+    `);
     
     return res.status(200).json({
       success: true,
       data: {
-        jobPostingsStructure: jobPostingsStructure.rows,
-        associateRequestsStructure: associateRequestsStructure.rows,
-        jobPostingsSample: jobPostingsSample.rows,
-        associateRequestsSample: associateRequestsSample.rows,
-        jobPostingsCount: parseInt(jobPostingsCount.rows[0].count),
-        associateRequestsCount: parseInt(associateRequestsCount.rows[0].count)
+        structures: {
+          jobPostings: jobPostingsStructure.rows,
+          associateRequests: associateRequestsStructure.rows,
+          freelancerHire: freelancerHireStructure.rows
+        },
+        samples: {
+          jobPostings: jobPostingsSample.rows,
+          associateRequests: associateRequestsSample.rows,
+          projectDescriptions: projectDescriptionsSample.rows
+        },
+        counts: {
+          jobPostings: parseInt(jobPostingsCount.rows[0].count),
+          associateRequests: parseInt(associateRequestsCount.rows[0].count),
+          projectDescriptions: parseInt(projectDescriptionsCount.rows[0].count)
+        },
+        extractedSkills: {
+          jobPostings: testJobPostingsSkills.rows,
+          associateRequests: testAssociateRequestsSkills.rows
+        }
       }
     });
   } catch (error) {
