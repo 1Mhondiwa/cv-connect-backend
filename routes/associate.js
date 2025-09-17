@@ -884,7 +884,6 @@ router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), 
          h.signed_contract_uploaded_at,
          f.first_name,
          f.last_name,
-         f.email,
          f.phone,
          f.profile_picture_url,
          u.email as freelancer_email
