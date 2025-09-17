@@ -6,7 +6,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs-extra');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit'); // Removed - no longer using rate limiting
 const { pool, testConnection } = require('./config/database');
 const SignalingServer = require('./signalingServer');
 const logger = require('./utils/logger');
@@ -72,25 +72,8 @@ app.use(express.urlencoded({ extended: true }));
   res.send("🎉 Welcome to CV-Connect backend! The server is running.");
 });*/
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-
-// Apply rate limiting to all routes
-app.use('/api', limiter);
-
-// Stricter rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 login/register attempts per 15 minutes
-  message: 'Too many authentication attempts, please try again later.'
-});
-
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+// Rate limiting removed to prevent login blocking
+// Users can now login without being blocked by rate limits
 
 // Mount routes
 app.use('/api/auth', authRoutes);
