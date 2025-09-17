@@ -24,7 +24,12 @@ async function runSignedContractMigration() {
     console.error('❌ Migration failed:', error);
     process.exit(1);
   } finally {
-    await db.end();
+    // Close database connection if it has a close method
+    if (db.close) {
+      await db.close();
+    } else if (db.pool && db.pool.end) {
+      await db.pool.end();
+    }
   }
 }
 

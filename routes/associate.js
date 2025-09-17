@@ -841,5 +841,76 @@ router.post('/freelancer-requests/:requestId/respond', authenticateToken, requir
   }
 });
 
+// Get associate's hired freelancers with contracts
+router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    
+    console.log(`🔍 Fetching hired freelancers for associate ${userId}`);
+    
+    // Get associate ID
+    const associateResult = await db.query(
+      'SELECT associate_id FROM "Associate" WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (associateResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associate profile not found'
+      });
+    }
+    
+    const associateId = associateResult.rows[0].associate_id;
+    
+    // Get hired freelancers with contract information
+    const hiredFreelancersResult = await db.query(
+      `SELECT 
+         h.hire_id,
+         h.hire_date,
+         h.project_title,
+         h.project_description,
+         h.agreed_terms,
+         h.agreed_rate,
+         h.rate_type,
+         h.start_date,
+         h.expected_end_date,
+         h.actual_end_date,
+         h.status,
+         h.associate_notes,
+         h.freelancer_notes,
+         h.contract_pdf_path,
+         h.signed_contract_pdf_path,
+         h.signed_contract_uploaded_at,
+         f.first_name,
+         f.last_name,
+         f.email,
+         f.phone,
+         f.profile_picture_url,
+         u.email as freelancer_email
+       FROM "Freelancer_Hire" h
+       JOIN "Freelancer" f ON h.freelancer_id = f.freelancer_id
+       JOIN "User" u ON f.user_id = u.user_id
+       WHERE h.associate_id = $1
+       ORDER BY h.hire_date DESC`,
+      [associateId]
+    );
+    
+    console.log(`✅ Found ${hiredFreelancersResult.rowCount} hired freelancers for associate ${userId}`);
+    
+    return res.status(200).json({
+      success: true,
+      hired_freelancers: hiredFreelancersResult.rows
+    });
+    
+  } catch (error) {
+    console.error('❌ Get hired freelancers error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hired freelancers',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;
