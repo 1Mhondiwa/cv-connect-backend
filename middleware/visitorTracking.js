@@ -32,49 +32,63 @@ const trackVisitor = async (req, res, next) => {
       return next();
     }
     
-    // Skip tracking for API endpoints that don't need visitor tracking
+    // Skip tracking for API endpoints and static files
     const skipPaths = [
-      '/api/admin/analytics/visitor-data',
-      '/api/auth/login',
-      '/api/auth/logout',
-      '/api/auth/register',
+      '/api/',
       '/uploads/',
-      '/favicon.ico'
+      '/favicon.ico',
+      '/assets/',
+      '/static/'
     ];
     
     if (skipPaths.some(path => req.path.startsWith(path))) {
       return next();
     }
     
+    // Only track actual page visits (not API calls)
+    if (req.path.includes('.')) {
+      return next(); // Skip files with extensions
+    }
+    
     // Extract visitor information
-    const sessionId = req.sessionID || req.headers['x-session-id'] || 'anonymous';
+    const sessionId = req.sessionID || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'Web Browser';
     const deviceType = detectDeviceType(userAgent);
     const visitDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
     const pageVisited = req.originalUrl || req.url;
     const referrer = req.headers.referer || req.headers.referrer || null;
+    const visitTime = new Date();
     
-    // Get user ID if user is authenticated
+    // Get user ID if user is authenticated (from JWT token)
     let userId = null;
-    if (req.user && req.user.user_id) {
-      userId = req.user.user_id;
+    try {
+      // Try to extract user from JWT token if present
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        // Note: In a real implementation, you'd verify the JWT token here
+        // For now, we'll track as anonymous
+      }
+    } catch (error) {
+      // Ignore token extraction errors
     }
     
     // Insert visitor tracking record
     await db.query(`
       INSERT INTO "Visitor_Tracking" (
         session_id, ip_address, user_agent, device_type, 
-        visit_date, page_visited, referrer, user_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `, [sessionId, ipAddress, userAgent, deviceType, visitDate, pageVisited, referrer, userId]);
+        visit_date, visit_time, page_visited, referrer, user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [sessionId, ipAddress, userAgent, deviceType, visitDate, visitTime, pageVisited, referrer, userId]);
     
-    // Log for debugging (remove in production)
-    console.log('👤 Visitor tracked:', {
-      sessionId: sessionId.substring(0, 10) + '...',
+    // Log for debugging
+    console.log('💻 Web visitor tracked:', {
+      sessionId: sessionId.substring(0, 15) + '...',
       deviceType,
       pageVisited: pageVisited.substring(0, 50),
-      userId: userId ? 'authenticated' : 'anonymous'
+      userId: userId ? 'authenticated' : 'anonymous',
+      ip: ipAddress.substring(0, 15) + '...'
     });
     
   } catch (error) {

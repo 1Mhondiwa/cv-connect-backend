@@ -22,6 +22,7 @@ const messageRoutes = require('./routes/message');
 const associateRequestRoutes = require('./routes/associateRequest');
 const hiringRoutes = require('./routes/hiring');
 const interviewRoutes = require('./routes/interview');
+const visitorRoutes = require('./routes/visitor');
 
 // Import middleware
 const { visitorTrackingRateLimit } = require('./middleware/visitorTracking');
@@ -91,6 +92,7 @@ app.use('/api/message', messageRoutes);
 app.use('/api/associate-request', associateRequestRoutes);
 app.use('/api/hiring', hiringRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/api/visitor', visitorRoutes);
 
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
