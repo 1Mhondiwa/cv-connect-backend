@@ -1792,19 +1792,38 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
       total: parseInt(row.total_visits) || 0
     }));
 
+    // If we have only one data point, add yesterday with zero values to make lines visible
+    let finalData = visitorData;
+    if (visitorData.length === 1) {
+      const yesterday = new Date(visitorData[0].date);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      finalData = [
+        {
+          date: yesterday,
+          desktop: 0,
+          mobile: 0,
+          total: 0
+        },
+        ...visitorData
+      ];
+      console.log('📊 Added yesterday data point for line chart visibility');
+    }
+
     console.log('📊 Real visitor tracking data:', {
       totalRows: result.rows.length,
-      dateRange: result.rows.length > 0 ? {
-        firstDate: result.rows[0].date,
-        lastDate: result.rows[result.rows.length - 1].date
+      finalDataPoints: finalData.length,
+      dateRange: finalData.length > 0 ? {
+        firstDate: finalData[0].date,
+        lastDate: finalData[finalData.length - 1].date
       } : null,
-      totalVisits: visitorData.reduce((sum, day) => sum + day.total, 0),
-      sampleData: visitorData.slice(0, 3)
+      totalVisits: finalData.reduce((sum, day) => sum + day.total, 0),
+      sampleData: finalData.slice(0, 3)
     });
 
     return res.status(200).json({
       success: true,
-      data: visitorData
+      data: finalData
     });
   } catch (error) {
     console.error('Analytics visitor data error:', error);
