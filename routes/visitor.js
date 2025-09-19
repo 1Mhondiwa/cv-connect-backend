@@ -13,7 +13,7 @@ router.post('/track', async (req, res) => {
       session_id,
       user_agent,
       referrer = null,
-      user_id = null // Optional - if user is logged in
+      user_id = null // Optional - if user is logged in (must be integer)
     } = req.body;
 
     // Validate required fields
@@ -22,6 +22,33 @@ router.post('/track', async (req, res) => {
         success: false,
         message: 'page_visited is required'
       });
+    }
+
+    // Validate user_id format if provided
+    if (user_id && (isNaN(user_id) || !Number.isInteger(Number(user_id)))) {
+      return res.status(400).json({
+        success: false,
+        message: 'user_id must be a valid integer'
+      });
+    }
+
+    // Convert user_id to integer if provided, but set to null if user doesn't exist
+    let finalUserId = null;
+    if (user_id) {
+      const userIdInt = parseInt(user_id);
+      // Check if user exists in database
+      try {
+        const userCheck = await db.query('SELECT user_id FROM "User" WHERE user_id = $1', [userIdInt]);
+        if (userCheck.rows.length > 0) {
+          finalUserId = userIdInt;
+        } else {
+          console.log(`⚠️ User ID ${userIdInt} not found in database, tracking as anonymous`);
+          finalUserId = null;
+        }
+      } catch (error) {
+        console.log(`⚠️ Error checking user ID ${userIdInt}, tracking as anonymous:`, error.message);
+        finalUserId = null;
+      }
     }
 
     // Generate session ID if not provided
@@ -41,7 +68,7 @@ router.post('/track', async (req, res) => {
       sessionId: finalSessionId.substring(0, 15) + '...',
       deviceType: device_type,
       pageVisited: page_visited,
-      userId: user_id ? 'authenticated' : 'anonymous',
+      userId: finalUserId ? `user_${finalUserId}` : 'anonymous',
       ip: ipAddress.substring(0, 15) + '...'
     });
 
@@ -51,7 +78,7 @@ router.post('/track', async (req, res) => {
         session_id, ip_address, user_agent, device_type, 
         visit_date, visit_time, page_visited, referrer, user_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [finalSessionId, ipAddress, finalUserAgent, device_type, visitDate, visitTime, page_visited, referrer, user_id]);
+    `, [finalSessionId, ipAddress, finalUserAgent, device_type, visitDate, visitTime, page_visited, referrer, finalUserId]);
 
     res.status(200).json({
       success: true,
@@ -172,7 +199,13 @@ router.get('/stats', authenticateToken, async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        summary: statsResult.rows[0],
+        summary: {
+          total_visits: parseInt(statsResult.rows[0].total_visits),
+          desktop_visits: parseInt(statsResult.rows[0].desktop_visits),
+          mobile_visits: parseInt(statsResult.rows[0].mobile_visits),
+          authenticated_visits: parseInt(statsResult.rows[0].authenticated_visits),
+          anonymous_visits: parseInt(statsResult.rows[0].anonymous_visits)
+        },
         daily: dailyResult.rows
       }
     });

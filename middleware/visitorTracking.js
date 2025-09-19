@@ -45,9 +45,22 @@ const trackVisitor = async (req, res, next) => {
       return next();
     }
     
-    // Only track actual page visits (not API calls)
-    if (req.path.includes('.')) {
-      return next(); // Skip files with extensions
+    // Only track actual page visits (not API calls or files)
+    if (req.path.includes('.') || req.path.includes('/api/')) {
+      return next(); // Skip files with extensions and API calls
+    }
+    
+    // Skip tracking for certain paths
+    const skipPaths = [
+      '/favicon.ico',
+      '/robots.txt',
+      '/sitemap.xml',
+      '/health',
+      '/ping'
+    ];
+    
+    if (skipPaths.includes(req.path)) {
+      return next();
     }
     
     // Extract visitor information
