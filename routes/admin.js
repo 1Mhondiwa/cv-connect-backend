@@ -1758,6 +1758,8 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
   try {
     const { days = 90 } = req.query;
     
+    console.log('📊 Visitor data API called with days parameter:', days);
+    
     // Get user activity data grouped by date and device type
     // For now, we'll simulate web vs mobile based on user activity patterns
     // In a real implementation, you'd track actual device types from login logs
@@ -1773,20 +1775,16 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
       });
     }
     
-    // Get the date range of existing users
-    const dateRangeResult = await db.query(`
-      SELECT 
-        MIN(created_at) as earliest,
-        MAX(created_at) as latest
-      FROM "User"
-    `);
-    
-    const earliestDate = dateRangeResult.rows[0].earliest;
-    const latestDate = dateRangeResult.rows[0].latest;
-    
-    // Always start from June 19, 2025 (your system start date)
-    const startDate = new Date('2025-06-19');
+    // Calculate date range based on days parameter
     const endDate = new Date(); // Today
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - parseInt(days));
+    
+    console.log('📅 Date range calculation:', {
+      days: parseInt(days),
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
     
     const result = await db.query(`
       SELECT 
@@ -1806,6 +1804,15 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
       desktop: parseInt(row.web_users), // Associates typically use web
       mobile: parseInt(row.mobile_users) // Freelancers may use mobile more
     }));
+
+    console.log('📊 Query result:', {
+      totalRows: result.rows.length,
+      dateRange: result.rows.length > 0 ? {
+        firstDate: result.rows[0].date,
+        lastDate: result.rows[result.rows.length - 1].date
+      } : null,
+      sampleData: visitorData.slice(0, 3)
+    });
 
     return res.status(200).json({
       success: true,
