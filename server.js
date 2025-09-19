@@ -113,9 +113,15 @@ app.get('/api/health', (req, res) => {
 // Make io globally available for notifications
 global.io = io;
 
+// Initialize signaling server for WebRTC (integrated with main io server)
+const signalingServer = new SignalingServer(io);
+
 // Socket.io event handlers
 io.on('connection', (socket) => {
   logger.debug('User connected:', socket.id);
+
+  // Add WebRTC signaling handlers
+  signalingServer.addWebRTCHandlers(socket);
 
   // Join user room for notifications
   socket.on('join_user_room', (userId) => {
@@ -174,9 +180,6 @@ io.on('connection', (socket) => {
     logger.debug('User disconnected:', socket.id);
   });
 });
-
-// Initialize signaling server for WebRTC
-const signalingServer = new SignalingServer(server);
 
 // Start the server
 const PORT = process.env.PORT || 5000;

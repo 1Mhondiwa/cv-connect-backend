@@ -1,25 +1,21 @@
-const { Server } = require('socket.io');
-const http = require('http');
-
 class SignalingServer {
-  constructor(server) {
-    this.io = new Server(server, {
-      cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-      }
-    });
+  constructor(io) {
+    this.io = io; // Use the existing Socket.IO instance
     
     this.rooms = new Map(); // Store room information
     this.setupEventHandlers();
   }
 
   setupEventHandlers() {
-    this.io.on('connection', (socket) => {
-      console.log('📡 Client connected:', socket.id);
+    // Set up WebRTC event handlers on the existing io instance
+    // These will be added to each connection automatically
+    console.log('📡 WebRTC signaling server initialized');
+  }
 
-      // Handle joining a room
-      socket.on('join-room', (data) => {
+  // Method to add WebRTC handlers to a socket connection
+  addWebRTCHandlers(socket) {
+    // Handle joining a room
+    socket.on('join-room', (data) => {
         const { roomId, userId } = data;
         console.log(`👤 User ${userId} joining room ${roomId}`);
         
@@ -134,7 +130,6 @@ class SignalingServer {
       socket.on('error', (error) => {
         console.error('❌ Socket error:', error);
       });
-    });
   }
 
   // Get room statistics
