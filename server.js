@@ -23,6 +23,9 @@ const associateRequestRoutes = require('./routes/associateRequest');
 const hiringRoutes = require('./routes/hiring');
 const interviewRoutes = require('./routes/interview');
 
+// Import middleware
+const { visitorTrackingRateLimit } = require('./middleware/visitorTracking');
+
 // Initialize express app
 const app = express();
 const server = http.createServer(app);
@@ -74,6 +77,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting removed to prevent login blocking
 // Users can now login without being blocked by rate limits
+
+// Add visitor tracking middleware (before routes)
+app.use(visitorTrackingRateLimit);
 
 // Mount routes
 app.use('/api/auth', authRoutes);

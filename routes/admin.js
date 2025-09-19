@@ -1753,27 +1753,12 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
   }
 });
 
-// Get visitor analytics data (web vs mobile activity)
+// Get visitor analytics data (real visitor tracking data)
 router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { days = 90 } = req.query;
     
     console.log('📊 Visitor data API called with days parameter:', days);
-    
-    // Get user activity data grouped by date and device type
-    // For now, we'll simulate web vs mobile based on user activity patterns
-    // In a real implementation, you'd track actual device types from login logs
-    
-    // First, check if we have any users at all
-    const userCountResult = await db.query('SELECT COUNT(*) FROM "User"');
-    const totalUsers = parseInt(userCountResult.rows[0].count);
-    
-    if (totalUsers === 0) {
-      return res.status(200).json({
-        success: true,
-        data: []
-      });
-    }
     
     // Calculate date range based on days parameter
     const endDate = new Date(); // Today
@@ -1786,31 +1771,34 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
       endDate: endDate.toISOString()
     });
     
+    // Query real visitor tracking data
     const result = await db.query(`
       SELECT 
-        DATE(u.created_at) as date,
-        COUNT(*) as total_users,
-        COUNT(CASE WHEN u.user_type = 'associate' THEN 1 END) as web_users,
-        COUNT(CASE WHEN u.user_type = 'freelancer' THEN 1 END) as mobile_users
-      FROM "User" u
-      WHERE u.created_at >= $1 AND u.created_at <= $2
-      GROUP BY DATE(u.created_at)
-      ORDER BY date ASC
+        visit_date as date,
+        COUNT(CASE WHEN device_type = 'desktop' THEN 1 END) as desktop_visits,
+        COUNT(CASE WHEN device_type = 'mobile' THEN 1 END) as mobile_visits,
+        COUNT(*) as total_visits
+      FROM "Visitor_Tracking"
+      WHERE visit_date >= $1 AND visit_date <= $2
+      GROUP BY visit_date
+      ORDER BY visit_date ASC
     `, [startDate, endDate]);
 
     // Format the data for the chart
     const visitorData = result.rows.map(row => ({
       date: row.date,
-      desktop: parseInt(row.web_users), // Associates typically use web
-      mobile: parseInt(row.mobile_users) // Freelancers may use mobile more
+      desktop: parseInt(row.desktop_visits) || 0,
+      mobile: parseInt(row.mobile_visits) || 0,
+      total: parseInt(row.total_visits) || 0
     }));
 
-    console.log('📊 Query result:', {
+    console.log('📊 Real visitor tracking data:', {
       totalRows: result.rows.length,
       dateRange: result.rows.length > 0 ? {
         firstDate: result.rows[0].date,
         lastDate: result.rows[result.rows.length - 1].date
       } : null,
+      totalVisits: visitorData.reduce((sum, day) => sum + day.total, 0),
       sampleData: visitorData.slice(0, 3)
     });
 
