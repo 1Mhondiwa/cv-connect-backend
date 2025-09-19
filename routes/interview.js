@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const db = require('../config/database');
+const NotificationService = require('../services/notificationService');
 const {
   scheduleInterview,
   getInterviews,
@@ -108,6 +109,52 @@ router.get('/my-feedback', authenticateToken, requireRole(['freelancer']), async
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch interview feedback',
+      error: error.message
+    });
+  }
+});
+
+// Get user notifications (for mobile app)
+router.get('/notifications', authenticateToken, requireRole(['freelancer', 'associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { limit = 50 } = req.query;
+    
+    console.log(`📱 User ${userId} requesting notifications`);
+    
+    const notifications = await NotificationService.getUserNotifications(userId, parseInt(limit));
+    
+    return res.status(200).json({
+      success: true,
+      data: notifications
+    });
+  } catch (error) {
+    console.error('❌ Get notifications error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notifications',
+      error: error.message
+    });
+  }
+});
+
+// Mark notification as read
+router.put('/notifications/:id/read', authenticateToken, requireRole(['freelancer', 'associate']), async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { id } = req.params;
+    
+    await NotificationService.markAsRead(id, userId);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    console.error('❌ Mark notification as read error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read',
       error: error.message
     });
   }

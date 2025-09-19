@@ -26,6 +26,7 @@ const visitorRoutes = require('./routes/visitor');
 
 // Import middleware
 const { visitorTrackingRateLimit } = require('./middleware/visitorTracking');
+const scheduledNotificationProcessor = require('./services/scheduledNotificationProcessor');
 
 // Initialize express app
 const app = express();
@@ -109,9 +110,24 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Make io globally available for notifications
+global.io = io;
+
 // Socket.io event handlers
 io.on('connection', (socket) => {
   logger.debug('User connected:', socket.id);
+
+  // Join user room for notifications
+  socket.on('join_user_room', (userId) => {
+    socket.join(`user_${userId}`);
+    logger.debug(`Socket ${socket.id} joined user room ${userId}`);
+  });
+
+  // Leave user room
+  socket.on('leave_user_room', (userId) => {
+    socket.leave(`user_${userId}`);
+    logger.debug(`Socket ${socket.id} left user room ${userId}`);
+  });
 
   // Join a conversation room
   socket.on('join_conversation', (conversationId) => {
@@ -181,9 +197,16 @@ const PORT = process.env.PORT || 5000;
   }
 })();
 
+// Start scheduled notification processor
+scheduledNotificationProcessor.start();
+
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   logger.production('Gracefully shutting down...');
+  
+  // Stop scheduled notification processor
+  scheduledNotificationProcessor.stop();
+  
   // Close the database pool
   await pool.end();
   logger.production('Database pool closed.');

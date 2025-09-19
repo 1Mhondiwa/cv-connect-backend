@@ -2,6 +2,7 @@
 const db = require('../config/database');
 const { logActivity } = require('../utils/activityLogger');
 const { v4: uuidv4 } = require('uuid');
+const NotificationService = require('../services/notificationService');
 
 // Schedule a new interview
 const scheduleInterview = async (req, res) => {
@@ -164,6 +165,48 @@ const scheduleInterview = async (req, res) => {
 
     // Commit transaction
     await client.query('COMMIT');
+
+    // Get freelancer user ID for notifications
+    const freelancerResult = await db.query(
+      'SELECT user_id FROM "Freelancer" WHERE freelancer_id = $1',
+      [freelancer_id]
+    );
+
+    if (freelancerResult.rowCount > 0) {
+      const freelancer_user_id = freelancerResult.rows[0].user_id;
+
+      try {
+        // Create immediate notification for freelancer
+        const notification = await NotificationService.createInterviewScheduledNotification({
+          freelancer_user_id,
+          associate_user_id: userId,
+          interview_id: interviewId,
+          interview_type,
+          scheduled_date,
+          job_title: request.title,
+          associate_name: request.contact_person || 'Associate'
+        });
+
+        // Send notification via WebSocket if available
+        if (global.io) {
+          await NotificationService.sendNotification(global.io, notification);
+        }
+
+        // Create scheduled reminder notifications
+        await NotificationService.createInterviewReminders(
+          interviewId,
+          freelancer_user_id,
+          new Date(scheduled_date),
+          request.title,
+          request.contact_person || 'Associate'
+        );
+
+        console.log(`📱 Interview notifications created for freelancer ${freelancer_user_id}`);
+      } catch (notificationError) {
+        console.error('❌ Notification creation failed:', notificationError);
+        // Don't fail the interview creation if notifications fail
+      }
+    }
 
     console.log(`✅ Interview ${interviewId} scheduled successfully by associate ${userId}`);
 
