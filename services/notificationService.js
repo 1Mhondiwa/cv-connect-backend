@@ -85,58 +85,27 @@ class NotificationService {
     return freelancerNotification;
   }
 
-  // Create interview reminder notifications
+  // Create a single smart interview reminder notification
   static async createInterviewReminders(interview_id, freelancer_user_id, scheduled_date, job_title, associate_name) {
-    const reminders = [
-      {
-        hours: 24,
-        type: 'interview_reminder_24h',
-        title: 'Interview Reminder - 24 Hours',
-        message: `You have an interview tomorrow for "${job_title}" with ${associate_name}`
-      },
-      {
-        hours: 2,
-        type: 'interview_reminder_2h',
-        title: 'Interview Reminder - 2 Hours',
-        message: `Your interview for "${job_title}" with ${associate_name} is in 2 hours`
-      },
-      {
-        hours: 0.5,
-        type: 'interview_reminder_30min',
-        title: 'Interview Starting Soon - 30 Minutes',
-        message: `Your interview for "${job_title}" with ${associate_name} starts in 30 minutes`
-      }
-    ];
+    // Create a single reminder notification that will show real-time countdown
+    const notificationData = {
+      interview_id,
+      job_title,
+      associate_name,
+      scheduled_date: scheduled_date.toISOString(),
+      interview_type: 'video' // Default, can be enhanced later
+    };
 
-    const createdReminders = [];
+    const reminderNotification = await this.createNotification({
+      user_id: freelancer_user_id,
+      notification_type: 'interview_reminder',
+      title: 'Interview Reminder',
+      message: `You have an upcoming interview for "${job_title}" with ${associate_name}`,
+      data: notificationData,
+      scheduled_for: null // No scheduled sending, always visible with countdown
+    });
 
-    for (const reminder of reminders) {
-      const reminderTime = new Date(scheduled_date.getTime() - (reminder.hours * 60 * 60 * 1000));
-      
-      // Only create reminder if it's in the future
-      if (reminderTime > new Date()) {
-        const notificationData = {
-          interview_id,
-          job_title,
-          associate_name,
-          scheduled_date,
-          reminder_type: reminder.type
-        };
-
-        const reminderNotification = await this.createNotification({
-          user_id: freelancer_user_id,
-          notification_type: reminder.type,
-          title: reminder.title,
-          message: reminder.message,
-          data: notificationData,
-          scheduled_for: reminderTime
-        });
-
-        createdReminders.push(reminderNotification);
-      }
-    }
-
-    return createdReminders;
+    return [reminderNotification];
   }
 
   // Get user notifications
