@@ -37,7 +37,7 @@ class NotificationService {
           notification_type: notification.notification_type,
           title: notification.title,
           message: notification.message,
-          data: notification.data ? JSON.parse(notification.data) : null,
+          data: notification.data, // Already an object from database
           created_at: notification.created_at
         }
       });
@@ -78,7 +78,7 @@ class NotificationService {
       user_id: freelancer_user_id,
       notification_type: 'interview_scheduled',
       title: 'New Interview Scheduled',
-      message: `${associate_name} has scheduled a ${interview_type} interview with you for "${job_title}" on ${new Date(scheduled_date).toLocaleString()}`,
+      message: `${associate_name} has scheduled a ${interview_type} interview with you for "${job_title}" on ${new Date(scheduled_date).toLocaleDateString()} at ${new Date(scheduled_date).toLocaleTimeString()}`,
       data: notificationData
     });
 
