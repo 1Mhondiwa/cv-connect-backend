@@ -1069,52 +1069,62 @@ router.get('/analytics/registration-trends', authenticateToken, requireRole(['ad
     const endDate = new Date();
     endDate.setHours(23, 59, 59, 999); // Set to end of today
     
-    // Get registration data for ALL users (not just those created after June 19)
+    // Get registration data for ALL users with proper timezone handling
     const result = await db.query(`
       SELECT 
-        DATE(created_at) as date,
+        DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg') as date,
         COUNT(*) as total_users,
         COUNT(CASE WHEN user_type = 'associate' THEN 1 END) as associates,
         COUNT(CASE WHEN user_type = 'freelancer' THEN 1 END) as freelancers,
         COUNT(CASE WHEN user_type = 'admin' THEN 1 END) as admins,
         COUNT(CASE WHEN user_type = 'ecs_employee' THEN 1 END) as ecs_employees
       FROM "User"
-      GROUP BY DATE(created_at)
+      WHERE created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg' >= $1
+      GROUP BY DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg')
       ORDER BY date ASC
-    `);
+    `, [startDate]);
 
-
-
-    // Only include dates where we actually have data (no more filling with zeros)
-    const dateRange = result.rows.map(row => ({
-      date: row.date.toISOString().split('T')[0],
-      total_users: parseInt(row.total_users),
-      associates: parseInt(row.associates),
-      freelancers: parseInt(row.freelancers),
-      admins: parseInt(row.admins),
-      ecs_employees: parseInt(row.ecs_employees)
-    }));
-    
-    // Always include today's date (even if no registrations)
-    const today = new Date().toISOString().split('T')[0];
-    const hasToday = dateRange.some(item => item.date === today);
-    
-    if (!hasToday) {
-      dateRange.push({
-        date: today,
-        total_users: 0,
-        associates: 0,
-        freelancers: 0,
-        admins: 0,
-        ecs_employees: 0
+    // Create a map of actual registration data
+    const registrationDataMap = new Map();
+    result.rows.forEach(row => {
+      registrationDataMap.set(row.date.toISOString().split('T')[0], {
+        date: row.date.toISOString().split('T')[0],
+        total_users: parseInt(row.total_users),
+        associates: parseInt(row.associates),
+        freelancers: parseInt(row.freelancers),
+        admins: parseInt(row.admins),
+        ecs_employees: parseInt(row.ecs_employees)
       });
+    });
+
+    // Generate complete date range from June 19 to today
+    const trends = [];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const existingData = registrationDataMap.get(dateStr);
+      
+      if (existingData) {
+        trends.push(existingData);
+      } else {
+        // No registrations on this date
+        trends.push({
+          date: dateStr,
+          total_users: 0,
+          associates: 0,
+          freelancers: 0,
+          admins: 0,
+          ecs_employees: 0
+        });
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-
-
 
     return res.status(200).json({
       success: true,
-      data: dateRange
+      data: trends
     });
   } catch (error) {
     console.error('Analytics registration trends error:', error);
@@ -1228,13 +1238,15 @@ router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin
       startDate = systemStartDate;
     }
     
+    // Get CV upload data with proper timezone handling
     const result = await db.query(`
       SELECT 
-        DATE(upload_date) as date,
+        DATE(upload_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg') as date,
         COUNT(*) as uploads
       FROM "CV"
-      WHERE upload_date >= $1 AND upload_date <= $2
-      GROUP BY DATE(upload_date)
+      WHERE upload_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg' >= $1 
+        AND upload_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg' <= $2
+      GROUP BY DATE(upload_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg')
       ORDER BY date ASC
     `, [startDate, endDate]);
 
@@ -1691,17 +1703,19 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
     // Always start from June 19, 2025 (your system start date)
     const startDate = new Date('2025-06-19');
     const endDate = new Date(); // Today
+    endDate.setHours(23, 59, 59, 999); // Set to end of today
     
-    // Get hired freelancers data grouped by date
+    // Get hired freelancers data grouped by date with proper timezone handling
     const result = await db.query(`
       SELECT 
-        DATE(h.hire_date) as date,
+        DATE(h.hire_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg') as date,
         COUNT(*) as hires,
         COUNT(CASE WHEN h.status = 'active' THEN 1 END) as active_hires,
         COUNT(CASE WHEN h.status = 'completed' THEN 1 END) as completed_hires
       FROM "Freelancer_Hire" h
-      WHERE h.hire_date >= $1 AND h.hire_date <= $2
-      GROUP BY DATE(h.hire_date)
+      WHERE h.hire_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg' >= $1 
+        AND h.hire_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg' <= $2
+      GROUP BY DATE(h.hire_date AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Johannesburg')
       ORDER BY date ASC
     `, [startDate, endDate]);
 
