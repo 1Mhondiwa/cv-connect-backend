@@ -13,5 +13,8 @@ router.get('/recent-hires', authenticateToken, requireRole(['admin', 'ecs_employ
 // ECS Employee/Admin gets hiring statistics
 router.get('/stats', authenticateToken, requireRole(['admin', 'ecs_employee']), hiringController.getHiringStats);
 
+// Admin endpoint to manually check for expired contracts
+router.post('/check-expired-contracts', authenticateToken, requireRole(['admin']), hiringController.checkExpiredContracts);
+
 module.exports = router;
 

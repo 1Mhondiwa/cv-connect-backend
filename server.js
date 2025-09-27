@@ -27,6 +27,7 @@ const visitorRoutes = require('./routes/visitor');
 // Import middleware
 const { visitorTrackingRateLimit } = require('./middleware/visitorTracking');
 const scheduledNotificationProcessor = require('./services/scheduledNotificationProcessor');
+const contractScheduler = require('./services/contractScheduler');
 
 // Initialize express app
 const app = express();
@@ -203,12 +204,18 @@ const PORT = process.env.PORT || 5000;
 // Start scheduled notification processor
 scheduledNotificationProcessor.start();
 
+// Start contract expiration scheduler
+contractScheduler.start();
+
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   logger.production('Gracefully shutting down...');
   
   // Stop scheduled notification processor
   scheduledNotificationProcessor.stop();
+  
+  // Stop contract expiration scheduler
+  contractScheduler.stop();
   
   // Close the database pool
   await pool.end();

@@ -1,6 +1,7 @@
 // controllers/hiringController.js
 const db = require('../config/database');
 const { logActivity } = require('../utils/activityLogger');
+const { updateExpiredContracts, checkFreelancerAvailability } = require('../utils/contractManager');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -118,7 +119,13 @@ const hireFreelancer = async (req, res) => {
       });
     }
 
-    // Check if already hired
+    // Check if freelancer is available for hiring (considers expired contracts)
+    console.log(`🔍 Checking availability for freelancer ${freelancer_id}`);
+    
+    // Update any expired contracts first
+    await updateExpiredContracts();
+    
+    // Check if freelancer has any active contracts (including this specific request)
     const existingHireResult = await client.query(
       'SELECT * FROM "Freelancer_Hire" WHERE request_id = $1 AND freelancer_id = $2 AND status = $3',
       [request_id, freelancer_id, 'active']
@@ -129,6 +136,27 @@ const hireFreelancer = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'This freelancer is already hired for this request'
+      });
+    }
+
+    // Check if freelancer has any other active contracts that haven't expired
+    const freelancerAvailability = await checkFreelancerAvailability(freelancer_id);
+    
+    if (!freelancerAvailability.success) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({
+        success: false,
+        message: 'Error checking freelancer availability',
+        error: freelancerAvailability.error
+      });
+    }
+
+    if (!freelancerAvailability.is_available && freelancerAvailability.active_contracts.length > 0) {
+      await client.query('ROLLBACK');
+      const activeContract = freelancerAvailability.active_contracts[0];
+      return res.status(400).json({
+        success: false,
+        message: `This freelancer is currently engaged in another project: "${activeContract.project_title}" (Ends: ${activeContract.expected_end_date || 'TBD'})`
       });
     }
 
@@ -315,10 +343,35 @@ const getHiringStats = async (req, res) => {
   }
 };
 
+// Manually trigger contract expiration check (for admin/testing)
+const checkExpiredContracts = async (req, res) => {
+  try {
+    console.log('🔍 Manual contract expiration check requested');
+    
+    const result = await updateExpiredContracts();
+    
+    return res.status(200).json({
+      success: result.success,
+      message: result.message,
+      updated_count: result.updated_count,
+      error: result.error || null
+    });
+    
+  } catch (error) {
+    console.error('❌ Manual contract check error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to check expired contracts',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   hireFreelancer,
   getRecentHires,
   getHiringStats,
+  checkExpiredContracts,
   upload
 };
 
