@@ -55,6 +55,29 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       [freelancerResult.rows[0].freelancer_id]
     );
     
+    // Get completed contracts/jobs
+    const completedJobsResult = await db.query(
+      `SELECT 
+         h.hire_id,
+         h.hire_date,
+         h.project_title,
+         h.project_description,
+         h.agreed_rate,
+         h.rate_type,
+         h.start_date,
+         h.expected_end_date,
+         h.actual_end_date,
+         h.status,
+         a.contact_person as company_contact,
+         a.industry as company_industry,
+         a.website as company_website
+       FROM "Freelancer_Hire" h
+       JOIN "Associate" a ON h.associate_id = a.associate_id
+       WHERE h.freelancer_id = $1 AND h.status = 'completed'
+       ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
+      [freelancerResult.rows[0].freelancer_id]
+    );
+    
     // Ensure CV data has IDs for editing (backward compatibility)
     let cvData = cvResult.rows[0];
     if (cvData && cvData.parsed_data) {
@@ -103,7 +126,8 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       ...userResult.rows[0],
       ...freelancerResult.rows[0],
       skills: skillsResult.rows,
-      cv: cvData || null
+      cv: cvData || null,
+      completed_jobs: completedJobsResult.rows
     };
     
     return res.status(200).json({

@@ -802,11 +802,40 @@ router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(
       [freelancerId]
     );
     
+    // Get completed contracts/jobs
+    const completedJobsResult = await db.query(
+      `SELECT 
+         h.hire_id,
+         h.hire_date,
+         h.project_title,
+         h.project_description,
+         h.agreed_rate,
+         h.rate_type,
+         h.start_date,
+         h.expected_end_date,
+         h.actual_end_date,
+         h.status,
+         h.associate_notes,
+         h.freelancer_notes,
+         h.admin_notes,
+         a.contact_person as company_contact,
+         a.industry as company_industry,
+         a.website as company_website,
+         a.phone as company_phone,
+         a.address as company_address
+       FROM "Freelancer_Hire" h
+       JOIN "Associate" a ON h.associate_id = a.associate_id
+       WHERE h.freelancer_id = $1 AND h.status = 'completed'
+       ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
+      [freelancerId]
+    );
+    
     // Combine all data
     const freelancerProfile = {
       ...freelancer,
       skills: skillsResult.rows,
-      cv: cvResult.rows[0] || null
+      cv: cvResult.rows[0] || null,
+      completed_jobs: completedJobsResult.rows
     };
     
     console.log(`✅ Detailed profile fetched for freelancer ${freelancerId}`);
