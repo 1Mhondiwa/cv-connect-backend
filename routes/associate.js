@@ -706,7 +706,7 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
       });
     }
 
-    // Get recommendations with freelancer details
+    // Get recommendations with freelancer details and completed jobs
     const recommendationsResult = await db.query(
       `SELECT 
          fr.*,
@@ -717,7 +717,29 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
          f.availability_status,
          f.hourly_rate,
          u.email,
-         u.is_verified
+         u.is_verified,
+         (
+           SELECT COALESCE(
+             json_agg(
+               json_build_object(
+                 'hire_id', h.hire_id,
+                 'project_title', h.project_title,
+                 'agreed_rate', h.agreed_rate,
+                 'rate_type', h.rate_type,
+                 'start_date', h.start_date,
+                 'expected_end_date', h.expected_end_date,
+                 'actual_end_date', h.actual_end_date,
+                 'status', h.status,
+                 'company_contact', a.contact_person,
+                 'company_industry', a.industry
+               ) ORDER BY h.actual_end_date DESC
+             ),
+             '[]'::json
+           )
+           FROM "Freelancer_Hire" h
+           JOIN "Associate" a ON h.associate_id = a.associate_id
+           WHERE h.freelancer_id = f.freelancer_id AND h.status = 'completed'
+         ) as completed_jobs
        FROM "Freelancer_Recommendation" fr
        JOIN "Freelancer" f ON fr.freelancer_id = f.freelancer_id
        JOIN "User" u ON f.user_id = u.user_id
@@ -731,6 +753,7 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
     // Log each recommendation for debugging
     recommendationsResult.rows.forEach((rec, index) => {
       console.log(`   ${index + 1}. ${rec.first_name} ${rec.last_name} (${rec.headline})`);
+      console.log(`      Completed jobs: ${rec.completed_jobs ? rec.completed_jobs.length : 0}`);
     });
 
     return res.status(200).json({
