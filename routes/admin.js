@@ -133,7 +133,7 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     const totalCount = parseInt(countResult.rows[0].count);
     console.log('🔍 Admin freelancers query - Count result:', totalCount);
 
-    // Main query with all new ECS Admin management fields
+    // Main query with all new ECS Admin management fields and completed jobs
     const mainQuery = `
       SELECT 
          f.freelancer_id,
@@ -164,7 +164,29 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
          u.created_at,
          u.last_login,
          u.is_active,
-         u.is_verified
+         u.is_verified,
+         (
+           SELECT COALESCE(
+             json_agg(
+               json_build_object(
+                 'hire_id', h.hire_id,
+                 'project_title', h.project_title,
+                 'agreed_rate', h.agreed_rate,
+                 'rate_type', h.rate_type,
+                 'start_date', h.start_date,
+                 'expected_end_date', h.expected_end_date,
+                 'actual_end_date', h.actual_end_date,
+                 'status', h.status,
+                 'company_contact', a.contact_person,
+                 'company_industry', a.industry
+               ) ORDER BY h.actual_end_date DESC
+             ),
+             '[]'::json
+           )
+           FROM "Freelancer_Hire" h
+           JOIN "Associate" a ON h.associate_id = a.associate_id
+           WHERE h.freelancer_id = f.freelancer_id AND h.status = 'completed'
+         ) as completed_jobs
        FROM "Freelancer" f
        JOIN "User" u ON f.user_id = u.user_id
        ${whereClause}
