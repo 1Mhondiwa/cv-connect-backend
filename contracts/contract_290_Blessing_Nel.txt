@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-290-2025
+Date: 2025/08/06
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Blessing Nel
+Email: blessing.nel@gmail.com
+Phone: +27 17 525 3402
+
+PROJECT DETAILS:
+Title: Web Application Development
+Description: Built responsive mobile applications for iOS and Android
+Start Date: 2025/08/06
+End Date: 2025/10/24
+Rate: R41608.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

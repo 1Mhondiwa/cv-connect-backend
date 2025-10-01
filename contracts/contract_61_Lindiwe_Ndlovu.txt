@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-61-2025
+Date: 2025/08/25
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Lindiwe Ndlovu
+Email: lindiwe.ndlovu@datascience.com
+Phone: +27 85 222 3333
+
+PROJECT DETAILS:
+Title: Code Review and Refactoring
+Description: Implemented cloud-based solutions and DevOps practices
+Start Date: 2025/08/26
+End Date: 2025/09/19
+Rate: R889.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

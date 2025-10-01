@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-178-2025
+Date: 2024/12/02
+
+BETWEEN:
+Associate: Accenture South Africa
+Contact: Jane Doe
+Industry: Tech
+Phone: 1234567890
+
+AND:
+Freelancer: Mandla Nkosi
+Email: dr.mandla.nkosi@healthit.co.za
+Phone: +27 88 555 6666
+
+PROJECT DETAILS:
+Title: Data Analysis
+Description: Conducted comprehensive security audits and vulnerability assessments
+Start Date: 2024/12/02
+End Date: 2025/01/24
+Rate: R19272.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

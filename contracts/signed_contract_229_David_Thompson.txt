@@ -1,0 +1,40 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-229-2025
+Date: 2025/06/05
+
+BETWEEN:
+Associate: SAP South Africa
+Contact: Comic
+Industry: Software Development
+Phone: +11 47829382
+
+AND:
+Freelancer: David Thompson
+Email: david.thompson@email.com
+Phone: (555) 789-4321
+
+PROJECT DETAILS:
+Title: Code Review & Refactoring
+Description: Developed a scalable e-commerce platform with payment integration
+Start Date: 2025/06/05
+End Date: 2025/07/10
+Rate: R43662.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.
+
+        
+SIGNED COPY - UPLOADED: 2025/10/02
+Status: Contract signed and uploaded by both parties.

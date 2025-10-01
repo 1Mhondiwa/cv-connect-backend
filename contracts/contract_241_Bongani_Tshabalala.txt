@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-241-2025
+Date: 2025/02/08
+
+BETWEEN:
+Associate: Motheo Construction
+Contact: Mbada
+Industry: Commerce
+Phone: 0691565066
+
+AND:
+Freelancer: Bongani Tshabalala
+Email: bongani.tshabalala@logistics.co.za
+Phone: +27 75 222 3333
+
+PROJECT DETAILS:
+Title: UI/UX Design
+Description: Built a responsive mobile application for iOS and Android platforms
+Start Date: 2025/02/08
+End Date: 2025/05/06
+Rate: R519.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

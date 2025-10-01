@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-131-2025
+Date: 2024/10/06
+
+BETWEEN:
+Associate: Accenture South Africa
+Contact: Dolce
+Industry: Information Technology
+Phone: 0680303938
+
+AND:
+Freelancer: Amahle Dube
+Email: amahle.dube@frontend.dev
+Phone: +27 71 777 8888
+
+PROJECT DETAILS:
+Title: Website Development
+Description: Built a responsive mobile application for iOS and Android platforms
+Start Date: 2024/10/06
+End Date: 2024/12/22
+Rate: R28683.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

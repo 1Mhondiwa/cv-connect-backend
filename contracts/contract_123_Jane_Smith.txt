@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-123-2025
+Date: 2025/01/17
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Jane Smith
+Email: freelancer@example.com
+Phone: 9876543210
+
+PROJECT DETAILS:
+Title: Web Application Development
+Description: Built responsive mobile applications for iOS and Android
+Start Date: 2025/01/17
+End Date: 2025/03/20
+Rate: R728.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

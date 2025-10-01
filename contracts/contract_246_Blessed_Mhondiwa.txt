@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-246-2025
+Date: 2024/12/12
+
+BETWEEN:
+Associate: Aveng Grinaker-LTA
+Contact: Tapiwa
+Industry: Supply Chain
+Phone: 0680303938
+
+AND:
+Freelancer: Blessed Mhondiwa
+Email: blessedmho@gmail.com
+Phone: +27 82 123 4567
+
+PROJECT DETAILS:
+Title: API Integration
+Description: Performed system maintenance and optimization tasks
+Start Date: 2024/12/12
+End Date: 2025/03/10
+Rate: R770.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-548-2025
+Date: 2025/02/15
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Simphiwe Govender
+Email: simphiwe.govender@outlook.com
+Phone: +27 23 703 1803
+
+PROJECT DETAILS:
+Title: System Architecture Design
+Description: Optimized application performance and user experience
+Start Date: 2025/02/16
+End Date: 2025/05/25
+Rate: R450.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

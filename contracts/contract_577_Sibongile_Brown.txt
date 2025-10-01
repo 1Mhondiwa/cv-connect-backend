@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-577-2025
+Date: 2025/03/30
+
+BETWEEN:
+Associate: Metrorail
+Contact: Tapiwa
+Industry: Logistics
+Phone: 0678789098
+
+AND:
+Freelancer: Sibongile Brown
+Email: sibongile.brown@protonmail.com
+Phone: +27 67 803 4072
+
+PROJECT DETAILS:
+Title: Commercial Electrical Installation
+Description: Installed and maintained electrical systems for commercial buildings
+Start Date: 2025/03/31
+End Date: 2025/07/01
+Rate: R585.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

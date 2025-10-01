@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-531-2025
+Date: 2024/12/24
+
+BETWEEN:
+Associate: ArcelorMittal
+Contact: Darrell
+Industry: Industrial Manufacturing
+Phone: 0897876543
+
+AND:
+Freelancer: Sizwe Ngcobo
+Email: sizwe.ngcobo@gmail.com
+Phone: +27 68 769 6064
+
+PROJECT DETAILS:
+Title: Water Management System
+Description: Coordinated with construction teams and government agencies
+Start Date: 2024/12/30
+End Date: 2025/04/08
+Rate: R1248.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

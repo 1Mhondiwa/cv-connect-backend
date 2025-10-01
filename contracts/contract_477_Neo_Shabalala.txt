@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-477-2025
+Date: 2024/12/31
+
+BETWEEN:
+Associate: SAP South Africa
+Contact: Comic
+Industry: Software Development
+Phone: +11 47829382
+
+AND:
+Freelancer: Neo Shabalala
+Email: neo.shabalala@icloud.com
+Phone: +27 42 391 6623
+
+PROJECT DETAILS:
+Title: Data Analysis
+Description: Performed system maintenance and optimization tasks
+Start Date: 2024/12/31
+End Date: 2025/01/17
+Rate: R727.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

@@ -1,0 +1,40 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-282-2025
+Date: 2025/09/01
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Karabo Mthembu
+Email: karabo.mthembu@protonmail.com
+Phone: +27 42 405 4806
+
+PROJECT DETAILS:
+Title: Mobile App Development
+Description: Developed scalable web applications using modern frameworks
+Start Date: 2025/09/01
+End Date: 2025/11/04
+Rate: R724.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.
+
+        
+SIGNED COPY - UPLOADED: 2025/10/02
+Status: Contract signed and uploaded by both parties.

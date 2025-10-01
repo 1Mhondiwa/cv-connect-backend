@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-212-2025
+Date: 2025/09/29
+
+BETWEEN:
+Associate: Accenture South Africa
+Contact: Jane Doe
+Industry: Tech
+Phone: 1234567890
+
+AND:
+Freelancer: Farai Moyo
+Email: farai.moyo@devops.co.za
+Phone: +27 84 111 2222
+
+PROJECT DETAILS:
+Title: Website Development
+Description: Developed a comprehensive web application with modern technologies
+Start Date: 2025/09/29
+End Date: 2025/12/11
+Rate: R46551.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

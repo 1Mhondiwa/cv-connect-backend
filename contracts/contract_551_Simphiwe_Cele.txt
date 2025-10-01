@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-551-2025
+Date: 2025/04/30
+
+BETWEEN:
+Associate: Aveng Grinaker-LTA
+Contact: Professor
+Industry: Commerce
+Phone: +11 47829382
+
+AND:
+Freelancer: Simphiwe Cele
+Email: simphiwe.cele@protonmail.com
+Phone: +27 53 550 2436
+
+PROJECT DETAILS:
+Title: Software Testing and QA
+Description: Optimized application performance and user experience
+Start Date: 2025/05/07
+End Date: 2025/08/27
+Rate: R204.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

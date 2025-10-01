@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-524-2025
+Date: 2025/03/15
+
+BETWEEN:
+Associate: Motheo Construction
+Contact: Mbada
+Industry: Commerce
+Phone: 0691565066
+
+AND:
+Freelancer: Emmanuel Darrell
+Email: emmanuel.darrell@dba.co.za
+Phone: +27 82 888 9999
+
+PROJECT DETAILS:
+Title: Code Review and Refactoring
+Description: Developed scalable web applications using modern frameworks
+Start Date: 2025/03/18
+End Date: 2025/06/07
+Rate: R332.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

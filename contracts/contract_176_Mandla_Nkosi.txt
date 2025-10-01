@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-176-2025
+Date: 2024/10/09
+
+BETWEEN:
+Associate: Accenture South Africa
+Contact: Dolce
+Industry: Information Technology
+Phone: 0680303938
+
+AND:
+Freelancer: Mandla Nkosi
+Email: dr.mandla.nkosi@healthit.co.za
+Phone: +27 88 555 6666
+
+PROJECT DETAILS:
+Title: System Maintenance
+Description: Migrated legacy systems to cloud infrastructure
+Start Date: 2024/10/09
+End Date: 2024/11/25
+Rate: R9193.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

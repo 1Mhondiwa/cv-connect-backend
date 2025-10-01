@@ -376,14 +376,25 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
             skillId = skillResult.rows[0].skill_id;
           }
           
+          // Validate and normalize proficiency level
+          const validProficiencyLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+          const normalizedProficiency = validProficiencyLevels.includes(skill.proficiency) 
+            ? skill.proficiency 
+            : 'Intermediate';
+          
+          // Ensure years_experience is not null and is a valid number
+          const validatedYearsExperience = skill.years_experience !== null && skill.years_experience !== undefined 
+            ? parseInt(skill.years_experience) || 1 
+            : 1;
+          
           // Add skill to freelancer (no need to check for existence since we cleared all)
           await db.query(
             'INSERT INTO "Freelancer_Skill" (freelancer_id, skill_id, proficiency_level, years_experience) VALUES ($1, $2, $3, $4)',
             [
               freelancerId,
               skillId,
-              skill.proficiency || 'Intermediate',
-              skill.years_experience || 1
+              normalizedProficiency,
+              validatedYearsExperience
             ]
           );
         }
@@ -547,12 +558,27 @@ router.post('/skills', authenticateToken, requireRole(['freelancer']), async (re
     const userId = req.user.user_id;
     const { skill_name, proficiency_level, years_experience } = req.body;
     
+    // Validate required fields
     if (!skill_name || !proficiency_level) {
       return res.status(400).json({
         success: false,
         message: 'Skill name and proficiency level are required'
       });
     }
+    
+    // Validate proficiency level enum values
+    const validProficiencyLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+    if (!validProficiencyLevels.includes(proficiency_level)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid proficiency level. Must be one of: ${validProficiencyLevels.join(', ')}`
+      });
+    }
+    
+    // Ensure years_experience is not null and is a valid number
+    const validatedYearsExperience = years_experience !== null && years_experience !== undefined 
+      ? parseInt(years_experience) || 0 
+      : 0;
     
     // Get freelancer ID
     const freelancerResult = await db.query(
@@ -603,7 +629,7 @@ router.post('/skills', authenticateToken, requireRole(['freelancer']), async (re
     // Add skill to freelancer
     const freelancerSkillResult = await db.query(
       'INSERT INTO "Freelancer_Skill" (freelancer_id, skill_id, proficiency_level, years_experience) VALUES ($1, $2, $3, $4) RETURNING freelancer_skill_id',
-      [freelancerId, skillId, proficiency_level, years_experience || 0]
+      [freelancerId, skillId, proficiency_level, validatedYearsExperience]
     );
     
     // After successful skill add/update/delete
@@ -634,6 +660,22 @@ router.put('/skills/:skillId', authenticateToken, requireRole(['freelancer']), a
     const userId = req.user.user_id;
     const { skillId } = req.params;
     const { proficiency_level, years_experience } = req.body;
+    
+    // Validate proficiency level if provided
+    if (proficiency_level) {
+      const validProficiencyLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+      if (!validProficiencyLevels.includes(proficiency_level)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid proficiency level. Must be one of: ${validProficiencyLevels.join(', ')}`
+        });
+      }
+    }
+    
+    // Ensure years_experience is not null and is a valid number
+    const validatedYearsExperience = years_experience !== null && years_experience !== undefined 
+      ? parseInt(years_experience) || 0 
+      : 0;
     
     // Get freelancer ID
     const freelancerResult = await db.query(
@@ -666,7 +708,7 @@ router.put('/skills/:skillId', authenticateToken, requireRole(['freelancer']), a
     // Update skill
     await db.query(
       'UPDATE "Freelancer_Skill" SET proficiency_level = $1, years_experience = $2 WHERE freelancer_skill_id = $3',
-      [proficiency_level, years_experience, skillId]
+      [proficiency_level, validatedYearsExperience, skillId]
     );
     
     // After successful skill add/update/delete

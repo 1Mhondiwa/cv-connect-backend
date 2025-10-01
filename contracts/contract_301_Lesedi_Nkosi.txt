@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-301-2025
+Date: 2024/12/06
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Lesedi Nkosi
+Email: lesedi.nkosi@gmail.com
+Phone: +27 83 580 2447
+
+PROJECT DETAILS:
+Title: System Architecture Design
+Description: Developed scalable web applications using modern frameworks
+Start Date: 2024/12/06
+End Date: 2024/12/19
+Rate: R154.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

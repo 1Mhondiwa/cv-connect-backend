@@ -1,0 +1,36 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-245-2025
+Date: 2024/10/22
+
+BETWEEN:
+Associate: Dimension Data
+Contact: John Doe
+Industry: Technology
+Phone: +1234567890
+
+AND:
+Freelancer: Blessed Mhondiwa
+Email: blessedmho@gmail.com
+Phone: +27 82 123 4567
+
+PROJECT DETAILS:
+Title: DevOps Implementation
+Description: Developed a scalable e-commerce platform with payment integration
+Start Date: 2024/10/22
+End Date: 2025/01/08
+Rate: R539.00/hourly
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.

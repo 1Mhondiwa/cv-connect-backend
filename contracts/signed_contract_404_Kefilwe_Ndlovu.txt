@@ -1,0 +1,40 @@
+
+CONTRACT AGREEMENT
+
+Contract ID: CT-404-2025
+Date: 2025/09/17
+
+BETWEEN:
+Associate: WBHO Construction
+Contact: Tapiwanashe
+Industry: Construction
+Phone: 0680303938
+
+AND:
+Freelancer: Kefilwe Ndlovu
+Email: kefilwe.ndlovu@outlook.com
+Phone: +27 26 726 4814
+
+PROJECT DETAILS:
+Title: Data Analysis Platform
+Description: Designed and implemented robust database architectures
+Start Date: 2025/09/17
+End Date: 2025/12/10
+Rate: R47990.00/fixed
+
+TERMS AND CONDITIONS:
+1. The Freelancer agrees to provide services as described in the project details.
+2. Payment will be made according to the agreed rate and schedule.
+3. Both parties agree to maintain confidentiality of project information.
+4. The contract may be terminated with 7 days written notice by either party.
+5. All work will be completed to professional standards.
+
+SIGNATURES:
+Associate Signature: _________________ Date: _______
+Freelancer Signature: _________________ Date: _______
+
+This contract is binding and enforceable under applicable law.
+
+        
+SIGNED COPY - UPLOADED: 2025/10/02
+Status: Contract signed and uploaded by both parties.
