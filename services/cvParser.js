@@ -147,7 +147,7 @@ class CVParser {
     text = text.replace(/[•\*\u2022\u25AA\u25CF\u25CB\u25A0]/g, '•');
     text = text.replace(/\n\s*\d+\./g, '\n•');
     
-    // Clean up excessive newlines
+    // Clean up excessive newlines that are not between paragraphs
     text = text.replace(/\n{3,}/g, '\n\n');
     
     // Remove empty lines and trim
