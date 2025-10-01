@@ -745,7 +745,7 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
          a.contact_person,
          a.industry,
          u.email as associate_email,
-         ar.company_name,
+         COALESCE(ar.company_name, a.company_name) AS company_name,
          COUNT(fr.recommendation_id) as recommendation_count,
          COUNT(rr.response_id) as response_count
        FROM "Associate_Freelancer_Request" r
@@ -755,7 +755,7 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
        LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
        LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
        ${whereClause}
-       GROUP BY r.request_id, a.contact_person, a.industry, u.email, ar.company_name
+       GROUP BY r.request_id, a.contact_person, a.industry, u.email, ar.company_name, a.company_name
        ORDER BY r.created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
