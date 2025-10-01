@@ -186,11 +186,19 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
            FROM "Freelancer_Hire" h
            JOIN "Associate" a ON h.associate_id = a.associate_id
            WHERE h.freelancer_id = f.freelancer_id AND h.status = 'completed'
-         ) as completed_jobs
+         ) as completed_jobs,
+         (
+           SELECT COUNT(*) 
+           FROM "Freelancer_Hire" h 
+           WHERE h.freelancer_id = f.freelancer_id AND h.status = 'completed'
+         ) as completed_jobs_count
        FROM "Freelancer" f
        JOIN "User" u ON f.user_id = u.user_id
        ${whereClause}
-       ORDER BY f.availability_status ASC, f.freelancer_id DESC
+       ORDER BY 
+         (SELECT COUNT(*) FROM "Freelancer_Hire" h WHERE h.freelancer_id = f.freelancer_id AND h.status = 'completed') DESC,
+         f.availability_status ASC, 
+         f.freelancer_id DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     
     console.log('🔍 Admin freelancers query - Main query:', mainQuery);
@@ -745,7 +753,7 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
          a.contact_person,
          a.industry,
          u.email as associate_email,
-         COALESCE(ar.company_name, a.company_name) AS company_name,
+         COALESCE(a.company_name, ar.company_name, 'Professional Services Ltd') AS company_name,
          COUNT(fr.recommendation_id) as recommendation_count,
          COUNT(rr.response_id) as response_count
        FROM "Associate_Freelancer_Request" r
@@ -755,7 +763,7 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
        LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
        LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
        ${whereClause}
-       GROUP BY r.request_id, a.contact_person, a.industry, u.email, ar.company_name, a.company_name
+       GROUP BY r.request_id, a.contact_person, a.industry, u.email, a.company_name, ar.company_name
        ORDER BY r.created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]

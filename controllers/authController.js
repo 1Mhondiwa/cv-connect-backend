@@ -99,7 +99,7 @@ const addAssociate = async (req, res) => {
   const client = await db.pool.connect();
   
   try {
-    const { email, password, industry, contact_person, phone, address, website } = req.body;
+    const { email, password, industry, contact_person, phone, address, website, company_name } = req.body;
     
     // Check if email already exists
     const existingUser = await client.query(
@@ -131,8 +131,8 @@ const addAssociate = async (req, res) => {
     
     // Create associate record
     const associateResult = await client.query(
-      'INSERT INTO "Associate" (user_id, industry, contact_person, phone, address, website, verified) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING associate_id',
-      [userId, industry, contact_person, phone, address || null, website || null, true]
+      'INSERT INTO "Associate" (user_id, industry, contact_person, phone, address, website, company_name, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING associate_id',
+      [userId, industry, contact_person, phone, address || null, website || null, company_name || null, true]
     );
     
     const associateId = associateResult.rows[0].associate_id;

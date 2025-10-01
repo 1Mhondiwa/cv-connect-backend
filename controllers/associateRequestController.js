@@ -233,8 +233,8 @@ const reviewAssociateRequest = async (req, res) => {
         // Create associate record
         console.log(`🏢 Creating associate record for user ${userId}`);
         await client.query(
-          'INSERT INTO "Associate" (user_id, industry, contact_person, phone, address, website, verified) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [userId, request.industry, request.contact_person, request.phone, request.address, request.website, true]
+          'INSERT INTO "Associate" (user_id, industry, contact_person, phone, address, website, company_name, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          [userId, request.industry, request.contact_person, request.phone, request.address, request.website, request.company_name, true]
         );
         console.log(`✅ Associate record created successfully`);
   
