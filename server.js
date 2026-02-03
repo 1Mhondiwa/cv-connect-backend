@@ -7,7 +7,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs-extra');
 // const rateLimit = require('express-rate-limit'); // Removed - no longer using rate limiting
-const { pool, testConnection } = require('./config/database-direct');
+const { pool, testConnection } = require('./config/database-no-test');
 const SignalingServer = require('./signalingServer');
 const logger = require('./utils/logger');
 require('dotenv').config();
@@ -196,20 +196,17 @@ io.on('connection', (socket) => {
 // Start the server
 const PORT = process.env.PORT || 5000;
 
-// Test database connection before starting server
+// Test database connection before starting server (but don't fail)
 (async () => {
   const dbConnected = await testConnection();
   
-  if (dbConnected) {
-    server.listen(PORT, () => {
-      logger.production(`Server running on port ${PORT}`);
-      logger.production(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.production(`📡 Signaling server ready for WebRTC connections`);
-    });
-  } else {
-    logger.error('Unable to connect to the database. Server not started.');
-    process.exit(1);
-  }
+  // Start server regardless of database connection
+  server.listen(PORT, () => {
+    logger.production(`Server running on port ${PORT}`);
+    logger.production(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.production(`📡 Signaling server ready for WebRTC connections`);
+    logger.production(`Database status: ${dbConnected ? '✅ Connected' : '⚠️  Disconnected (will retry)'}`);
+  });
 })();
 
 // Start scheduled notification processor
