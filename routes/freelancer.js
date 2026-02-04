@@ -361,8 +361,12 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
         }));
       }
     } catch (parseError) {
-      console.error('CV parsing error:', parseError);
-      parsedData = { parsing_error: 'Failed to parse CV' };
+      console.warn('CV parsing warning (not critical):', parseError.message);
+      // Continue anyway - CV can still be stored without parsing
+      parsedData = { 
+        parsing_error: 'Failed to parse CV content',
+        raw_filename: req.file.originalname
+      };
     }
     
     // Determine file type
@@ -406,59 +410,69 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
       const syncResult = await syncCVDataWithProfile(freelancerId, parsedData, false);
       
       if (!syncResult.success) {
-        console.error('Failed to sync CV data with profile:', syncResult.error);
+        console.warn('Failed to sync CV data with profile:', syncResult.error);
         // Continue with the upload even if sync fails
       }
       
       // Add extracted skills if available
       if (parsedData.skills && Array.isArray(parsedData.skills) && parsedData.skills.length > 0) {
-        // FIRST: Remove ALL existing skills for this freelancer (to replace, not append)
-        await db.query(
-          'DELETE FROM "Freelancer_Skill" WHERE freelancer_id = $1',
-          [freelancerId]
-        );
-        
-        // THEN: Add all new skills from the CV
-        for (const skill of parsedData.skills) {
-          // Check if skill exists in database
-          let skillId;
-          const skillResult = await db.query(
-            'SELECT skill_id FROM "Skill" WHERE LOWER(skill_name) = LOWER($1)',
-            [skill.name]
-          );
-          
-          if (skillResult.rowCount === 0) {
-            // Create new skill
-            const newSkillResult = await db.query(
-              'INSERT INTO "Skill" (skill_name, normalized_name) VALUES ($1, $2) RETURNING skill_id',
-              [skill.name, skill.name.toLowerCase()]
-            );
-            skillId = newSkillResult.rows[0].skill_id;
-          } else {
-            skillId = skillResult.rows[0].skill_id;
-          }
-          
-          // Validate and normalize proficiency level
-          const validProficiencyLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
-          const normalizedProficiency = validProficiencyLevels.includes(skill.proficiency) 
-            ? skill.proficiency 
-            : 'Intermediate';
-          
-          // Ensure years_experience is not null and is a valid number
-          const validatedYearsExperience = skill.years_experience !== null && skill.years_experience !== undefined 
-            ? parseInt(skill.years_experience) || 1 
-            : 1;
-          
-          // Add skill to freelancer (no need to check for existence since we cleared all)
+        try {
+          // FIRST: Remove ALL existing skills for this freelancer (to replace, not append)
           await db.query(
-            'INSERT INTO "Freelancer_Skill" (freelancer_id, skill_id, proficiency_level, years_experience) VALUES ($1, $2, $3, $4)',
-            [
-              freelancerId,
-              skillId,
-              normalizedProficiency,
-              validatedYearsExperience
-            ]
+            'DELETE FROM "Freelancer_Skill" WHERE freelancer_id = $1',
+            [freelancerId]
           );
+          
+          // THEN: Add all new skills from the CV
+          for (const skill of parsedData.skills) {
+            try {
+              // Check if skill exists in database
+              let skillId;
+              const skillResult = await db.query(
+                'SELECT skill_id FROM "Skill" WHERE LOWER(skill_name) = LOWER($1)',
+                [skill.name]
+              );
+              
+              if (skillResult.rowCount === 0) {
+                // Create new skill
+                const newSkillResult = await db.query(
+                  'INSERT INTO "Skill" (skill_name, normalized_name) VALUES ($1, $2) RETURNING skill_id',
+                  [skill.name, skill.name.toLowerCase()]
+                );
+                skillId = newSkillResult.rows[0].skill_id;
+              } else {
+                skillId = skillResult.rows[0].skill_id;
+              }
+              
+              // Validate and normalize proficiency level
+              const validProficiencyLevels = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
+              const normalizedProficiency = validProficiencyLevels.includes(skill.proficiency) 
+                ? skill.proficiency 
+                : 'Intermediate';
+              
+              // Ensure years_experience is not null and is a valid number
+              const validatedYearsExperience = skill.years_experience !== null && skill.years_experience !== undefined 
+                ? parseInt(skill.years_experience) || 1 
+                : 1;
+              
+              // Add skill to freelancer (no need to check for existence since we cleared all)
+              await db.query(
+                'INSERT INTO "Freelancer_Skill" (freelancer_id, skill_id, proficiency_level, years_experience) VALUES ($1, $2, $3, $4)',
+                [
+                  freelancerId,
+                  skillId,
+                  normalizedProficiency,
+                  validatedYearsExperience
+                ]
+              );
+            } catch (skillError) {
+              console.warn(`Warning: Failed to add skill "${skill.name}":`, skillError.message);
+              // Continue adding other skills
+            }
+          }
+        } catch (skillsError) {
+          console.warn('Warning: Failed to process skills:', skillsError.message);
+          // Continue - CV upload is still successful even if skills fail
         }
       }
     }
@@ -483,17 +497,30 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
       parsed_data: parsedData
     });
   } catch (error) {
-    console.error('CV upload error:', error);
+    console.error('=== CV Upload Error ===');
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error detail:', error.detail);
+    console.error('Error stack:', error.stack);
+    console.error('========================');
     
     // Delete the uploaded file if there was an error
     if (req.file && req.file.path) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Failed to delete uploaded file:', unlinkError.message);
+      }
     }
     
     return res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      error: error.message
+      message: 'Failed to upload CV',
+      error: error.message,
+      details: {
+        code: error.code,
+        detail: error.detail
+      }
     });
   }
 });
