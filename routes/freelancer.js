@@ -55,6 +55,54 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       [freelancerResult.rows[0].freelancer_id]
     );
     
+    // Handle missing CV gracefully
+    let cvData = null;
+    if (cvResult.rowCount > 0) {
+      cvData = cvResult.rows[0];
+      
+      // Ensure CV data has IDs for editing (backward compatibility)
+      if (cvData && cvData.parsed_data) {
+        let needsUpdate = false;
+        
+        // Add IDs to work experience if missing
+        if (cvData.parsed_data.work_experience && cvData.parsed_data.work_experience.length > 0) {
+          cvData.parsed_data.work_experience = cvData.parsed_data.work_experience.map((work, index) => {
+            if (!work.id) {
+              needsUpdate = true;
+              return {
+                ...work,
+                id: `work_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+              };
+            }
+            return work;
+          });
+        }
+        
+        // Add IDs to education if missing
+        if (cvData.parsed_data.education && cvData.parsed_data.education.length > 0) {
+          cvData.parsed_data.education = cvData.parsed_data.education.map((edu, index) => {
+            if (!edu.id) {
+              needsUpdate = true;
+              return {
+                ...edu,
+                id: `edu_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+              };
+            }
+            return edu;
+          });
+        }
+        
+        // Update database if IDs were added
+        if (needsUpdate) {
+          await db.query(
+            'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
+            [JSON.stringify(cvData.parsed_data), cvData.cv_id]
+          );
+          console.log('Added missing IDs to CV data for freelancer:', freelancerResult.rows[0].freelancer_id);
+        }
+      }
+    }
+    
     // Get completed contracts/jobs
     const completedJobsResult = await db.query(
       `SELECT 
@@ -77,49 +125,6 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
        ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
       [freelancerResult.rows[0].freelancer_id]
     );
-    
-    // Ensure CV data has IDs for editing (backward compatibility)
-    let cvData = cvResult.rows[0];
-    if (cvData && cvData.parsed_data) {
-      let needsUpdate = false;
-      
-      // Add IDs to work experience if missing
-      if (cvData.parsed_data.work_experience && cvData.parsed_data.work_experience.length > 0) {
-        cvData.parsed_data.work_experience = cvData.parsed_data.work_experience.map((work, index) => {
-          if (!work.id) {
-            needsUpdate = true;
-            return {
-              ...work,
-              id: `work_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
-            };
-          }
-          return work;
-        });
-      }
-      
-      // Add IDs to education if missing
-      if (cvData.parsed_data.education && cvData.parsed_data.education.length > 0) {
-        cvData.parsed_data.education = cvData.parsed_data.education.map((edu, index) => {
-          if (!edu.id) {
-            needsUpdate = true;
-            return {
-              ...edu,
-              id: `edu_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
-            };
-          }
-          return edu;
-        });
-      }
-      
-      // Update database if IDs were added
-      if (needsUpdate) {
-        await db.query(
-          'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
-          [JSON.stringify(cvData.parsed_data), cvData.cv_id]
-        );
-        console.log('Added missing IDs to CV data for freelancer:', freelancerResult.rows[0].freelancer_id);
-      }
-    }
     
     // Combine all data
     const profileData = {
