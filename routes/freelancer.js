@@ -151,11 +151,31 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       profile: profileData
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error('=== Freelancer Profile Error Details ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error code:', error.code);
+    console.error('Error severity:', error.severity);
+    console.error('Error detail:', error.detail);
+    console.error('Error hint:', error.hint);
+    console.error('Error table:', error.table);
+    console.error('Error column:', error.column);
+    console.error('Error constraint:', error.constraint);
+    console.error('========================================');
+    
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: error.message
+      error: error.message,
+      details: {
+        code: error.code,
+        severity: error.severity,
+        detail: error.detail,
+        hint: error.hint,
+        table: error.table,
+        column: error.column,
+        constraint: error.constraint
+      }
     });
   }
 });
