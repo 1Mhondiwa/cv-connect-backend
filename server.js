@@ -168,7 +168,7 @@ io.on('connection', (socket) => {
       
       // Insert message into database
       const result = await pool.query(
-        'INSERT INTO "Message" (conversation_id, sender_id, content, sent_at, is_delivered) VALUES ($1, $2, $3, NOW(), true) RETURNING *',
+        'INSERT INTO "Message" (conversation_id, sender_id, message_content, sent_at, is_read) VALUES ($1, $2, $3, NOW(), false) RETURNING *',
         [conversation_id, sender_id, content]
       );
       

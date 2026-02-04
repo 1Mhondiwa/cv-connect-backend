@@ -427,15 +427,15 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
               // Check if skill exists in database
               let skillId;
               const skillResult = await db.query(
-                'SELECT skill_id FROM "Skill" WHERE LOWER(skill_name) = LOWER($1)',
+                'SELECT skill_id FROM "Skill" WHERE LOWER(name) = LOWER($1)',
                 [skill.name]
               );
               
               if (skillResult.rowCount === 0) {
                 // Create new skill
                 const newSkillResult = await db.query(
-                  'INSERT INTO "Skill" (skill_name, normalized_name) VALUES ($1, $2) RETURNING skill_id',
-                  [skill.name, skill.name.toLowerCase()]
+                  'INSERT INTO "Skill" (name) VALUES ($1) RETURNING skill_id',
+                  [skill.name]
                 );
                 skillId = newSkillResult.rows[0].skill_id;
               } else {
@@ -685,15 +685,15 @@ router.post('/skills', authenticateToken, requireRole(['freelancer']), async (re
     // Check if skill exists or create it
     let skillId;
     const skillResult = await db.query(
-      'SELECT skill_id FROM "Skill" WHERE LOWER(skill_name) = LOWER($1)',
+      'SELECT skill_id FROM "Skill" WHERE LOWER(name) = LOWER($1)',
       [skill_name]
     );
     
     if (skillResult.rowCount === 0) {
       // Create new skill
       const newSkillResult = await db.query(
-        'INSERT INTO "Skill" (skill_name, normalized_name) VALUES ($1, $2) RETURNING skill_id',
-        [skill_name, skill_name.toLowerCase()]
+        'INSERT INTO "Skill" (name) VALUES ($1) RETURNING skill_id',
+        [skill_name]
       );
       skillId = newSkillResult.rows[0].skill_id;
     } else {

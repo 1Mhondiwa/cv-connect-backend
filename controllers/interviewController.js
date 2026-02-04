@@ -122,8 +122,8 @@ const scheduleInterview = async (req, res) => {
     const interviewResult = await client.query(
       `INSERT INTO "Interview" 
        (request_id, associate_id, freelancer_id, interview_type, scheduled_date, 
-        duration_minutes, meeting_link, location, interview_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        location, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING interview_id`,
       [
         request_id, 
@@ -131,30 +131,12 @@ const scheduleInterview = async (req, res) => {
         freelancer_id, 
         interview_type,
         scheduled_date,
-        duration_minutes,
-        meetingLink,
         location,
         interview_notes
       ]
     );
 
     const interviewId = interviewResult.rows[0].interview_id;
-
-    // Create interview invitation
-    const invitationResult = await client.query(
-      `INSERT INTO "Interview_Invitation" 
-       (interview_id, associate_id, freelancer_id, invitation_message, expires_at)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING invitation_id`,
-      [
-        interviewId,
-        request.associate_id,
-        freelancer_id,
-        invitation_message,
-        new Date(scheduledDate.getTime() + (24 * 60 * 60 * 1000)) // Expires in 24 hours
-      ]
-    );
-
     // Log the activity
     await logActivity({
       user_id: userId,
@@ -404,13 +386,12 @@ const respondToInvitation = async (req, res) => {
     // Begin transaction
     await client.query('BEGIN');
 
-    // Verify the interview invitation exists and belongs to this freelancer
+    // Verify the interview exists and belongs to this freelancer
     const invitationResult = await client.query(
-      `SELECT ii.*, f.user_id as freelancer_user_id, i.status as interview_status
-       FROM "Interview_Invitation" ii
-       JOIN "Freelancer" f ON ii.freelancer_id = f.freelancer_id
-       JOIN "Interview" i ON ii.interview_id = i.interview_id
-       WHERE ii.interview_id = $1 AND f.user_id = $2`,
+      `SELECT i.*, f.user_id as freelancer_user_id
+       FROM "Interview" i
+       JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
+       WHERE i.interview_id = $1 AND f.user_id = $2`,
       [interview_id, userId]
     );
 
@@ -418,47 +399,28 @@ const respondToInvitation = async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
-        message: 'Interview invitation not found or access denied'
+        message: 'Interview not found or access denied'
       });
     }
 
-    const invitation = invitationResult.rows[0];
+    const interview = invitationResult.rows[0];
 
-    // Check if invitation has already been responded to
-    if (invitation.invitation_status !== 'pending') {
+    // Check if interview is already completed
+    if (interview.status !== 'scheduled') {
       await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        message: 'This invitation has already been responded to'
+        message: 'Can only respond to scheduled interviews'
       });
     }
 
-    // Check if invitation has expired
-    if (new Date() > new Date(invitation.expires_at)) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        success: false,
-        message: 'This invitation has expired'
-      });
-    }
-
-    // Update invitation status
+    // Update interview status
     await client.query(
-      `UPDATE "Interview_Invitation" 
-       SET invitation_status = $1, response_notes = $2, responded_at = CURRENT_TIMESTAMP
-       WHERE interview_id = $3`,
-      [response, response_notes, interview_id]
+      `UPDATE "Interview" 
+       SET status = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE interview_id = $2`,
+      [response === 'declined' ? 'cancelled' : 'accepted', interview_id]
     );
-
-    // If declined, cancel the interview
-    if (response === 'declined') {
-      await client.query(
-        `UPDATE "Interview" 
-         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-         WHERE interview_id = $1`,
-        [interview_id]
-      );
-    }
 
     // Log the activity
     await logActivity({
@@ -517,28 +479,25 @@ const submitFeedback = async (req, res) => {
       interview_id,
       technical_skills_rating,
       communication_rating,
-      cultural_fit_rating,
-      overall_rating,
-      strengths,
-      areas_for_improvement,
-      recommendation,
-      detailed_feedback
+      rating,
+      feedback,
+      recommendation
     } = req.body;
 
     console.log(`🔍 ${userType} ${userId} submitting feedback for interview ${interview_id}`);
 
     // Validate required fields
-    if (!interview_id || !overall_rating || !recommendation) {
+    if (!interview_id || !feedback || !recommendation) {
       return res.status(400).json({
         success: false,
-        message: 'Interview ID, overall rating, and recommendation are required'
+        message: 'Interview ID, feedback, and recommendation are required'
       });
     }
 
     // Validate ratings (1-5)
-    const ratings = [technical_skills_rating, communication_rating, cultural_fit_rating, overall_rating];
-    for (const rating of ratings) {
-      if (rating && (rating < 1 || rating > 5)) {
+    const ratings = [technical_skills_rating, communication_rating, rating];
+    for (const r of ratings) {
+      if (r && (r < 1 || r > 5)) {
         return res.status(400).json({
           success: false,
           message: 'All ratings must be between 1 and 5'
@@ -607,7 +566,7 @@ const submitFeedback = async (req, res) => {
 
     // Check if feedback already exists from this user
     const existingFeedbackResult = await client.query(
-      'SELECT * FROM "Interview_Feedback" WHERE interview_id = $1 AND evaluator_id = $2',
+      'SELECT * FROM "Interview_Feedback" WHERE interview_id = $1 AND reviewer_id = $2',
       [interview_id, userId]
     );
 
@@ -622,10 +581,9 @@ const submitFeedback = async (req, res) => {
     // Insert feedback
     const feedbackResult = await client.query(
       `INSERT INTO "Interview_Feedback" 
-       (interview_id, evaluator_id, evaluator_type, technical_skills_rating, 
-        communication_rating, cultural_fit_rating, overall_rating, strengths, 
-        areas_for_improvement, recommendation, detailed_feedback)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (interview_id, reviewer_id, evaluator_type, technical_skills_rating, 
+        communication_rating, rating, feedback, recommendation)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING feedback_id`,
       [
         interview_id,
@@ -633,12 +591,9 @@ const submitFeedback = async (req, res) => {
         userType,
         technical_skills_rating || null,
         communication_rating || null,
-        cultural_fit_rating || null,
-        overall_rating,
-        strengths || null,
-        areas_for_improvement || null,
-        recommendation,
-        detailed_feedback || null
+        rating || null,
+        feedback,
+        recommendation
       ]
     );
 
