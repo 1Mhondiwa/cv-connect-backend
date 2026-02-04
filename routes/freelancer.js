@@ -1882,7 +1882,7 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
     const hiringHistoryResult = await db.query(
       `SELECT 
          h.hire_id,
-         h.hire_date,
+         h.created_at as hire_date,
          h.project_title,
          h.project_description,
          h.agreed_terms,
@@ -1907,7 +1907,7 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
        JOIN "Associate" a ON h.associate_id = a.associate_id
        JOIN "User" u ON a.user_id = u.user_id
        WHERE h.freelancer_id = $1
-       ORDER BY h.hire_date DESC`,
+       ORDER BY h.created_at DESC`,
       [freelancerId]
     );
 
