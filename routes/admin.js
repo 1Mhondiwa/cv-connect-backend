@@ -174,12 +174,11 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
                  'agreed_rate', h.agreed_rate,
                  'rate_type', h.rate_type,
                  'start_date', h.start_date,
-                 'expected_end_date', h.expected_end_date,
-                 'actual_end_date', h.actual_end_date,
+                 'end_date', h.end_date,
                  'status', h.status,
                  'company_contact', a.contact_person,
                  'company_industry', a.industry
-               ) ORDER BY h.actual_end_date DESC
+               ) ORDER BY h.end_date DESC
              ),
              '[]'::json
            )
@@ -836,18 +835,14 @@ router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(
     const completedJobsResult = await db.query(
       `SELECT 
          h.hire_id,
-         h.hire_date,
+         h.created_at as hire_date,
          h.project_title,
          h.project_description,
          h.agreed_rate,
          h.rate_type,
          h.start_date,
-         h.expected_end_date,
-         h.actual_end_date,
+         h.end_date,
          h.status,
-         h.associate_notes,
-         h.freelancer_notes,
-         h.admin_notes,
          a.contact_person as company_contact,
          a.industry as company_industry,
          a.website as company_website,
@@ -856,7 +851,7 @@ router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(
        FROM "Freelancer_Hire" h
        JOIN "Associate" a ON h.associate_id = a.associate_id
        WHERE h.freelancer_id = $1 AND h.status = 'completed'
-       ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
+       ORDER BY h.end_date DESC, h.created_at DESC`,
       [freelancerId]
     );
     

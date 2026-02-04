@@ -727,12 +727,11 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
                  'agreed_rate', h.agreed_rate,
                  'rate_type', h.rate_type,
                  'start_date', h.start_date,
-                 'expected_end_date', h.expected_end_date,
-                 'actual_end_date', h.actual_end_date,
+                 'end_date', h.end_date,
                  'status', h.status,
                  'company_contact', a.contact_person,
                  'company_industry', a.industry
-               ) ORDER BY h.actual_end_date DESC
+               ) ORDER BY h.end_date DESC
              ),
              '[]'::json
            )
@@ -890,18 +889,15 @@ router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), 
     const hiredFreelancersResult = await db.query(
       `SELECT 
          h.hire_id,
-         h.hire_date,
+         h.created_at as hire_date,
          h.project_title,
          h.project_description,
          h.agreed_terms,
          h.agreed_rate,
          h.rate_type,
          h.start_date,
-         h.expected_end_date,
-         h.actual_end_date,
+         h.end_date,
          h.status,
-         h.associate_notes,
-         h.freelancer_notes,
          h.contract_pdf_path,
          h.signed_contract_pdf_path,
          h.signed_contract_uploaded_at,
@@ -914,7 +910,7 @@ router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), 
        JOIN "Freelancer" f ON h.freelancer_id = f.freelancer_id
        JOIN "User" u ON f.user_id = u.user_id
        WHERE h.associate_id = $1
-       ORDER BY h.hire_date DESC`,
+       ORDER BY h.created_at DESC`,
       [associateId]
     );
     

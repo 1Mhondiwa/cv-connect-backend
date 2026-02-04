@@ -58,7 +58,7 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     let skillsResult = { rows: [] };
     try {
       skillsResult = await db.query(
-        `SELECT fs.*, s.skill_name 
+        `SELECT fs.freelancer_skill_id, fs.freelancer_id, fs.skill_id, s.skill_id as skill_id_name, s.skill_name 
          FROM "Freelancer_Skill" fs 
          LEFT JOIN "Skill" s ON fs.skill_id = s.skill_id 
          WHERE fs.freelancer_id = $1`,
@@ -138,14 +138,13 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       completedJobsResult = await db.query(
         `SELECT 
            h.hire_id,
-           h.hire_date,
+           h.created_at as hire_date,
            h.project_title,
            h.project_description,
            h.agreed_rate,
            h.rate_type,
            h.start_date,
-           h.expected_end_date,
-           h.actual_end_date,
+           h.end_date,
            h.status,
            a.contact_person as company_contact,
            a.industry as company_industry,
@@ -153,7 +152,7 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
          FROM "Freelancer_Hire" h
          LEFT JOIN "Associate" a ON h.associate_id = a.associate_id
          WHERE h.freelancer_id = $1 AND h.status = 'completed'
-         ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
+         ORDER BY h.end_date DESC, h.created_at DESC`,
         [freelancerId]
       );
       console.log('Completed jobs query result:', completedJobsResult.rowCount, 'rows');
