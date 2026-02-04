@@ -7,7 +7,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs-extra');
 // const rateLimit = require('express-rate-limit'); // Removed - no longer using rate limiting
-const { pool, testConnection } = require('./config/database-no-test');
+const { pool, testConnection } = require('./config/database-final');
 const SignalingServer = require('./signalingServer');
 const logger = require('./utils/logger');
 require('dotenv').config();
