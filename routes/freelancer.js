@@ -1,7 +1,7 @@
 // routes/freelancer.js
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, authenticateTokenSSE } = require('../middleware/auth');
 const { validateFreelancerProfile } = require('../middleware/validation');
 const { uploadCV, uploadProfileImage, uploadSignedContract } = require('../middleware/upload');
 const cvParser = require('../services/cvParser');
@@ -1706,17 +1706,19 @@ router.put('/availability', authenticateToken, requireRole(['freelancer']), asyn
 });
 
 // SSE endpoint for real-time availability updates
-router.get('/availability/stream', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+router.get('/availability/stream', authenticateTokenSSE, requireRole(['freelancer']), async (req, res) => {
   try {
     const userId = req.user.user_id;
     
-    // Set headers for SSE
+    // Set headers for SSE with comprehensive CORS support
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
+      'Access-Control-Allow-Origin': process.env.CLIENT_URL || 'https://cv-connect-app.vercel.app',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept'
     });
 
     // Send initial connection message
@@ -1750,17 +1752,19 @@ router.get('/availability/stream', authenticateToken, requireRole(['freelancer']
 });
 
 // SSE endpoint for real-time activity updates
-router.get('/activity/stream', authenticateToken, requireRole(['freelancer']), async (req, res) => {
+router.get('/activity/stream', authenticateTokenSSE, requireRole(['freelancer']), async (req, res) => {
   try {
     const userId = req.user.user_id;
     
-    // Set headers for SSE
+    // Set headers for SSE with comprehensive CORS support
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
+      'Access-Control-Allow-Origin': process.env.CLIENT_URL || 'https://cv-connect-app.vercel.app',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept'
     });
 
     // Send initial connection message

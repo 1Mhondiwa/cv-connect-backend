@@ -68,6 +68,81 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+// Authentication middleware for EventSource (SSE) - supports query parameter tokens
+const authenticateTokenSSE = async (req, res, next) => {
+  try {
+    let token;
+    
+    // Try to get token from Authorization header first (standard)
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.split(' ')[1]) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+      // Fall back to query parameter (for EventSource connections)
+      token = req.query.token;
+    }
+    
+    if (!token) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required' 
+      });
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('JWT_SECRET environment variable is not set');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Server configuration error' 
+      });
+    }
+    
+    const decoded = jwt.verify(token, jwtSecret);
+    
+    const userResult = await db.query(
+      'SELECT * FROM "User" WHERE user_id = $1', 
+      [decoded.userId]
+    );
+    
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Check if user is active
+    if (!userResult.rows[0].is_active) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is inactive. Please contact admin.'
+      });
+    }
+    
+    req.user = userResult.rows[0];
+    next();
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid token' 
+      });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Token expired' 
+      });
+    }
+    console.error('SSE Authentication error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+};
+
 // Optional authentication middleware
 const optionalAuth = async (req, res, next) => {
   try {
@@ -168,6 +243,7 @@ const checkResourceOwnership = (resourceGetter) => {
 
 module.exports = {
   authenticateToken,
+  authenticateTokenSSE,
   optionalAuth,
   requireRole,
   verifyAccountStatus,
