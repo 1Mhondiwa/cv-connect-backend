@@ -51,23 +51,23 @@ router.get('/my-feedback', authenticateToken, requireRole(['freelancer']), async
         a.contact_person as interviewer_name,
         
         -- Feedback details
-        if.feedback_id,
-        if.technical_skills_rating,
-        if.communication_rating,
-        if.cultural_fit_rating,
-        if.overall_rating,
-        if.strengths,
-        if.areas_for_improvement,
-        if.recommendation,
-        if.detailed_feedback,
-        if.submitted_at as feedback_date
+        ifb.feedback_id,
+        ifb.technical_skills_rating,
+        ifb.communication_rating,
+        ifb.cultural_fit_rating,
+        ifb.overall_rating,
+        ifb.strengths,
+        ifb.areas_for_improvement,
+        ifb.recommendation,
+        ifb.detailed_feedback,
+        ifb.submitted_at as feedback_date
         
       FROM "Interview" i
       JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
       JOIN "Associate" a ON i.associate_id = a.associate_id
       JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
-      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id 
-        AND if.evaluator_type = 'associate'  -- Only get feedback from associates
+      LEFT JOIN "Interview_Feedback" ifb ON i.interview_id = ifb.interview_id 
+        AND ifb.evaluator_type = 'associate'  -- Only get feedback from associates
       
       WHERE f.user_id = $1 
         AND i.status = 'completed'  -- Only show feedback for completed interviews

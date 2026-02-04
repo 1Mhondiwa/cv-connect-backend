@@ -257,60 +257,95 @@ const getInterviews = async (req, res) => {
 
     if (userType === 'associate') {
       // Get associate's interviews
-      query = `
-        SELECT 
-          i.*,
-          f.first_name as freelancer_first_name,
-          f.last_name as freelancer_last_name,
-          f.headline as freelancer_headline,
-          f.profile_picture_url as freelancer_photo,
-          r.title as request_title,
-          r.description as request_description,
-          ii.invitation_status,
-          ii.invitation_message
-        FROM "Interview" i
-        JOIN "Associate" a ON i.associate_id = a.associate_id
-        JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
-        JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
-        LEFT JOIN "Interview_Invitation" ii ON i.interview_id = ii.interview_id
-        WHERE a.user_id = $1
-        ${status ? 'AND i.status = $2' : ''}
-        ORDER BY i.scheduled_date DESC
-        LIMIT $${status ? '3' : '2'} OFFSET $${status ? '4' : '3'}
-      `;
-      params = [userId];
       if (status) {
-        params.push(status, limit, offset);
+        query = `
+          SELECT 
+            i.*,
+            f.first_name as freelancer_first_name,
+            f.last_name as freelancer_last_name,
+            f.headline as freelancer_headline,
+            f.profile_picture_url as freelancer_photo,
+            r.title as request_title,
+            r.description as request_description,
+            ii.invitation_status,
+            ii.invitation_message
+          FROM "Interview" i
+          JOIN "Associate" a ON i.associate_id = a.associate_id
+          JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
+          JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
+          LEFT JOIN "Interview_Invitation" ii ON i.interview_id = ii.interview_id
+          WHERE a.user_id = $1 AND i.status = $2
+          ORDER BY i.scheduled_date DESC
+          LIMIT $3 OFFSET $4
+        `;
+        params = [userId, status, limit, offset];
       } else {
-        params.push(limit, offset);
+        query = `
+          SELECT 
+            i.*,
+            f.first_name as freelancer_first_name,
+            f.last_name as freelancer_last_name,
+            f.headline as freelancer_headline,
+            f.profile_picture_url as freelancer_photo,
+            r.title as request_title,
+            r.description as request_description,
+            ii.invitation_status,
+            ii.invitation_message
+          FROM "Interview" i
+          JOIN "Associate" a ON i.associate_id = a.associate_id
+          JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
+          JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
+          LEFT JOIN "Interview_Invitation" ii ON i.interview_id = ii.interview_id
+          WHERE a.user_id = $1
+          ORDER BY i.scheduled_date DESC
+          LIMIT $2 OFFSET $3
+        `;
+        params = [userId, limit, offset];
       }
     } else if (userType === 'freelancer') {
       // Get freelancer's interviews
-      query = `
-        SELECT 
-          i.*,
-          a.industry as associate_company,
-          a.contact_person as associate_contact,
-          r.title as request_title,
-          r.description as request_description,
-          ii.invitation_status,
-          ii.invitation_message,
-          ii.expires_at
-        FROM "Interview" i
-        JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
-        JOIN "Associate" a ON i.associate_id = a.associate_id
-        JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
-        LEFT JOIN "Interview_Invitation" ii ON i.interview_id = ii.interview_id
-        WHERE f.user_id = $1
-        ${status ? 'AND i.status = $2' : ''}
-        ORDER BY i.scheduled_date DESC
-        LIMIT $${status ? '3' : '2'} OFFSET $${status ? '4' : '3'}
-      `;
-      params = [userId];
       if (status) {
-        params.push(status, limit, offset);
+        query = `
+          SELECT 
+            i.*,
+            a.industry as associate_company,
+            a.contact_person as associate_contact,
+            r.title as request_title,
+            r.description as request_description,
+            ii.invitation_status,
+            ii.invitation_message,
+            ii.expires_at
+          FROM "Interview" i
+          JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
+          JOIN "Associate" a ON i.associate_id = a.associate_id
+          JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
+          LEFT JOIN "Interview_Invitation" ii ON i.interview_id = ii.interview_id
+          WHERE f.user_id = $1 AND i.status = $2
+          ORDER BY i.scheduled_date DESC
+          LIMIT $3 OFFSET $4
+        `;
+        params = [userId, status, limit, offset];
       } else {
-        params.push(limit, offset);
+        query = `
+          SELECT 
+            i.*,
+            a.industry as associate_company,
+            a.contact_person as associate_contact,
+            r.title as request_title,
+            r.description as request_description,
+            ii.invitation_status,
+            ii.invitation_message,
+            ii.expires_at
+          FROM "Interview" i
+          JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
+          JOIN "Associate" a ON i.associate_id = a.associate_id
+          JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
+          LEFT JOIN "Interview_Invitation" ii ON i.interview_id = ii.interview_id
+          WHERE f.user_id = $1
+          ORDER BY i.scheduled_date DESC
+          LIMIT $2 OFFSET $3
+        `;
+        params = [userId, limit, offset];
       }
     } else {
       return res.status(403).json({

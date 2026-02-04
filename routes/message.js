@@ -219,7 +219,7 @@ router.get('/conversations', authenticateToken, async (req, res) => {
       // Get conversations where user is the associate
       conversations = await db.query(
         `SELECT c.*, 
-          CONCAT(f.first_name, ' ', f.last_name) as freelancer_name,
+          (f.first_name || ' ' || f.last_name) as freelancer_name,
           u.email as freelancer_email,
           (
             SELECT COUNT(*) 
