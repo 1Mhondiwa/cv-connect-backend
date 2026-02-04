@@ -3499,13 +3499,13 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
       SELECT 
         COUNT(DISTINCT i.interview_id) as total_interviews,
         COUNT(DISTINCT CASE WHEN i.status = 'completed' THEN i.interview_id END) as completed_interviews,
-        COUNT(DISTINCT if.feedback_id) as total_feedback_submissions,
-        ROUND(AVG(if.overall_rating), 2) as avg_overall_rating,
-        COUNT(DISTINCT CASE WHEN if.recommendation = 'hire' THEN if.feedback_id END) as hire_recommendations,
-        COUNT(DISTINCT CASE WHEN if.recommendation = 'no_hire' THEN if.feedback_id END) as no_hire_recommendations,
-        COUNT(DISTINCT CASE WHEN if.recommendation = 'maybe' THEN if.feedback_id END) as maybe_recommendations
+        COUNT(DISTINCT ifb.feedback_id) as total_feedback_submissions,
+        ROUND(AVG(ifb.overall_rating), 2) as avg_overall_rating,
+        COUNT(DISTINCT CASE WHEN ifb.recommendation = 'hire' THEN ifb.feedback_id END) as hire_recommendations,
+        COUNT(DISTINCT CASE WHEN ifb.recommendation = 'no_hire' THEN ifb.feedback_id END) as no_hire_recommendations,
+        COUNT(DISTINCT CASE WHEN ifb.recommendation = 'maybe' THEN ifb.feedback_id END) as maybe_recommendations
       FROM "Interview" i
-      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      LEFT JOIN "Interview_Feedback" ifb ON i.interview_id = ifb.interview_id
       WHERE i.created_at >= $1
     `;
 
@@ -3519,10 +3519,10 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
         ROUND(AVG(cultural_fit_rating), 2) as avg_cultural_fit,
         ROUND(AVG(overall_rating), 2) as avg_overall,
         COUNT(*) as total_ratings
-      FROM "Interview_Feedback" if
-      JOIN "Interview" i ON if.interview_id = i.interview_id
+      FROM "Interview_Feedback" ifb
+      JOIN "Interview" i ON ifb.interview_id = i.interview_id
       WHERE i.created_at >= $1 
-        AND if.overall_rating IS NOT NULL
+        AND ifb.overall_rating IS NOT NULL
     `;
 
     const ratingBreakdown = await db.query(ratingBreakdownQuery, [startDate]);
@@ -3533,8 +3533,8 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
         recommendation,
         COUNT(*) as count,
         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER()), 1) as percentage
-      FROM "Interview_Feedback" if
-      JOIN "Interview" i ON if.interview_id = i.interview_id
+      FROM "Interview_Feedback" ifb
+      JOIN "Interview" i ON ifb.interview_id = i.interview_id
       WHERE i.created_at >= $1 
         AND recommendation IS NOT NULL
       GROUP BY recommendation
@@ -3549,10 +3549,10 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
         DATE_TRUNC('week', i.created_at) as week,
         COUNT(DISTINCT i.interview_id) as interviews_count,
         COUNT(DISTINCT CASE WHEN i.status = 'completed' THEN i.interview_id END) as completed_count,
-        ROUND(AVG(if.overall_rating), 2) as avg_rating,
-        COUNT(DISTINCT CASE WHEN if.recommendation = 'hire' THEN if.feedback_id END) as hire_count
+        ROUND(AVG(ifb.overall_rating), 2) as avg_rating,
+        COUNT(DISTINCT CASE WHEN ifb.recommendation = 'hire' THEN ifb.feedback_id END) as hire_count
       FROM "Interview" i
-      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      LEFT JOIN "Interview_Feedback" ifb ON i.interview_id = ifb.interview_id
       WHERE i.created_at >= $1
       GROUP BY DATE_TRUNC('week', i.created_at)
       ORDER BY week ASC
@@ -3565,14 +3565,14 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
       SELECT 
         a.industry,
         COUNT(DISTINCT i.interview_id) as interview_count,
-        ROUND(AVG(if.overall_rating), 2) as avg_rating,
-        COUNT(DISTINCT CASE WHEN if.recommendation = 'hire' THEN if.feedback_id END) as hire_count
+        ROUND(AVG(ifb.overall_rating), 2) as avg_rating,
+        COUNT(DISTINCT CASE WHEN ifb.recommendation = 'hire' THEN ifb.feedback_id END) as hire_count
       FROM "Interview" i
       JOIN "Associate" a ON i.associate_id = a.associate_id
-      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      LEFT JOIN "Interview_Feedback" ifb ON i.interview_id = ifb.interview_id
       WHERE i.created_at >= $1 
         AND a.industry IS NOT NULL
-        AND if.overall_rating IS NOT NULL
+        AND ifb.overall_rating IS NOT NULL
       GROUP BY a.industry
       HAVING COUNT(DISTINCT i.interview_id) >= 2  -- Only include industries with 2+ interviews
       ORDER BY avg_rating DESC, interview_count DESC
@@ -3588,8 +3588,8 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
         COUNT(*) as feedback_count,
         ROUND(AVG(overall_rating), 2) as avg_rating,
         COUNT(CASE WHEN recommendation = 'hire' THEN 1 END) as hire_count
-      FROM "Interview_Feedback" if
-      JOIN "Interview" i ON if.interview_id = i.interview_id
+      FROM "Interview_Feedback" ifb
+      JOIN "Interview" i ON ifb.interview_id = i.interview_id
       WHERE i.created_at >= $1
       GROUP BY evaluator_type
     `;
@@ -3687,10 +3687,10 @@ router.get('/analytics/interview-feedback/detailed', authenticateToken, requireR
       JOIN "Freelancer" f ON i.freelancer_id = f.freelancer_id
       JOIN "User" fu ON f.user_id = fu.user_id
       JOIN "Associate_Freelancer_Request" r ON i.request_id = r.request_id
-      LEFT JOIN "Interview_Feedback" if ON i.interview_id = if.interview_id
+      LEFT JOIN "Interview_Feedback" ifb ON i.interview_id = ifb.interview_id
       
       WHERE i.created_at >= $1
-      ORDER BY i.created_at DESC, if.submitted_at DESC
+      ORDER BY i.created_at DESC, ifb.submitted_at DESC
       LIMIT $2 OFFSET $3
     `;
 
