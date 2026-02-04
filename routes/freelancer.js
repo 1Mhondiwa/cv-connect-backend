@@ -20,7 +20,7 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     console.log('User object:', req.user);
     
     // Get user information
-    console.log('Querying User table...');
+    console.log('Step 1: Querying User table...');
     const userResult = await db.query(
       'SELECT email, created_at, last_login FROM "User" WHERE user_id = $1',
       [userId]
@@ -36,7 +36,7 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     }
     
     // Get freelancer information
-    console.log('Querying Freelancer table...');
+    console.log('Step 2: Querying Freelancer table...');
     const freelancerResult = await db.query(
       'SELECT * FROM "Freelancer" WHERE user_id = $1',
       [userId]
@@ -51,91 +51,116 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       });
     }
     
-    // Get freelancer skills
-    const skillsResult = await db.query(
-      `SELECT fs.*, s.skill_name 
-       FROM "Freelancer_Skill" fs 
-       JOIN "Skill" s ON fs.skill_id = s.skill_id 
-       WHERE fs.freelancer_id = $1`,
-      [freelancerResult.rows[0].freelancer_id]
-    );
+    const freelancerId = freelancerResult.rows[0].freelancer_id;
     
-    // Get freelancer CV
-    const cvResult = await db.query(
-      'SELECT * FROM "CV" WHERE freelancer_id = $1',
-      [freelancerResult.rows[0].freelancer_id]
-    );
-    
-    // Handle missing CV gracefully
-    let cvData = null;
-    if (cvResult.rowCount > 0) {
-      cvData = cvResult.rows[0];
-      
-      // Ensure CV data has IDs for editing (backward compatibility)
-      if (cvData && cvData.parsed_data) {
-        let needsUpdate = false;
-        
-        // Add IDs to work experience if missing
-        if (cvData.parsed_data.work_experience && cvData.parsed_data.work_experience.length > 0) {
-          cvData.parsed_data.work_experience = cvData.parsed_data.work_experience.map((work, index) => {
-            if (!work.id) {
-              needsUpdate = true;
-              return {
-                ...work,
-                id: `work_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
-              };
-            }
-            return work;
-          });
-        }
-        
-        // Add IDs to education if missing
-        if (cvData.parsed_data.education && cvData.parsed_data.education.length > 0) {
-          cvData.parsed_data.education = cvData.parsed_data.education.map((edu, index) => {
-            if (!edu.id) {
-              needsUpdate = true;
-              return {
-                ...edu,
-                id: `edu_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
-              };
-            }
-            return edu;
-          });
-        }
-        
-        // Update database if IDs were added
-        if (needsUpdate) {
-          await db.query(
-            'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
-            [JSON.stringify(cvData.parsed_data), cvData.cv_id]
-          );
-          console.log('Added missing IDs to CV data for freelancer:', freelancerResult.rows[0].freelancer_id);
-        }
-      }
+    // Get freelancer skills (with error handling for missing Skill table)
+    console.log('Step 3: Querying Freelancer_Skill...');
+    let skillsResult = { rows: [] };
+    try {
+      skillsResult = await db.query(
+        `SELECT fs.*, s.skill_name 
+         FROM "Freelancer_Skill" fs 
+         LEFT JOIN "Skill" s ON fs.skill_id = s.skill_id 
+         WHERE fs.freelancer_id = $1`,
+        [freelancerId]
+      );
+      console.log('Skills query result:', skillsResult.rowCount, 'rows');
+    } catch (skillError) {
+      console.warn('Warning: Failed to fetch skills:', skillError.message);
+      // Continue anyway - skills are not critical
     }
     
-    // Get completed contracts/jobs
-    const completedJobsResult = await db.query(
-      `SELECT 
-         h.hire_id,
-         h.hire_date,
-         h.project_title,
-         h.project_description,
-         h.agreed_rate,
-         h.rate_type,
-         h.start_date,
-         h.expected_end_date,
-         h.actual_end_date,
-         h.status,
-         a.contact_person as company_contact,
-         a.industry as company_industry,
-         a.website as company_website
-       FROM "Freelancer_Hire" h
-       JOIN "Associate" a ON h.associate_id = a.associate_id
-       WHERE h.freelancer_id = $1 AND h.status = 'completed'
-       ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
-      [freelancerResult.rows[0].freelancer_id]
-    );
+    // Get freelancer CV
+    console.log('Step 4: Querying CV...');
+    let cvData = null;
+    try {
+      const cvResult = await db.query(
+        'SELECT * FROM "CV" WHERE freelancer_id = $1',
+        [freelancerId]
+      );
+      console.log('CV query result:', cvResult.rowCount, 'rows');
+      
+      // Handle missing CV gracefully
+      if (cvResult.rowCount > 0) {
+        cvData = cvResult.rows[0];
+        
+        // Ensure CV data has IDs for editing (backward compatibility)
+        if (cvData && cvData.parsed_data) {
+          let needsUpdate = false;
+          
+          // Add IDs to work experience if missing
+          if (cvData.parsed_data.work_experience && cvData.parsed_data.work_experience.length > 0) {
+            cvData.parsed_data.work_experience = cvData.parsed_data.work_experience.map((work, index) => {
+              if (!work.id) {
+                needsUpdate = true;
+                return {
+                  ...work,
+                  id: `work_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+                };
+              }
+              return work;
+            });
+          }
+          
+          // Add IDs to education if missing
+          if (cvData.parsed_data.education && cvData.parsed_data.education.length > 0) {
+            cvData.parsed_data.education = cvData.parsed_data.education.map((edu, index) => {
+              if (!edu.id) {
+                needsUpdate = true;
+                return {
+                  ...edu,
+                  id: `edu_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+                };
+              }
+              return edu;
+            });
+          }
+          
+          // Update database if IDs were added
+          if (needsUpdate) {
+            await db.query(
+              'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
+              [JSON.stringify(cvData.parsed_data), cvData.cv_id]
+            );
+            console.log('Added missing IDs to CV data for freelancer:', freelancerId);
+          }
+        }
+      }
+    } catch (cvError) {
+      console.warn('Warning: Failed to fetch CV:', cvError.message);
+      // CV is not critical - continue anyway
+    }
+    
+    // Get completed contracts/jobs (with error handling for missing tables)
+    console.log('Step 5: Querying Freelancer_Hire and Associate...');
+    let completedJobsResult = { rows: [] };
+    try {
+      completedJobsResult = await db.query(
+        `SELECT 
+           h.hire_id,
+           h.hire_date,
+           h.project_title,
+           h.project_description,
+           h.agreed_rate,
+           h.rate_type,
+           h.start_date,
+           h.expected_end_date,
+           h.actual_end_date,
+           h.status,
+           a.contact_person as company_contact,
+           a.industry as company_industry,
+           a.website as company_website
+         FROM "Freelancer_Hire" h
+         LEFT JOIN "Associate" a ON h.associate_id = a.associate_id
+         WHERE h.freelancer_id = $1 AND h.status = 'completed'
+         ORDER BY h.actual_end_date DESC, h.hire_date DESC`,
+        [freelancerId]
+      );
+      console.log('Completed jobs query result:', completedJobsResult.rowCount, 'rows');
+    } catch (jobError) {
+      console.warn('Warning: Failed to fetch completed jobs:', jobError.message);
+      // Jobs are not critical - continue anyway
+    }
     
     // Combine all data
     const profileData = {
@@ -146,6 +171,7 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       completed_jobs: completedJobsResult.rows
     };
     
+    console.log('Profile data compiled successfully');
     return res.status(200).json({
       success: true,
       profile: profileData
