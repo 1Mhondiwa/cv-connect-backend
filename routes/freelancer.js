@@ -1706,6 +1706,15 @@ router.put('/availability', authenticateToken, requireRole(['freelancer']), asyn
 });
 
 // SSE endpoint for real-time availability updates
+// Handle preflight requests for SSE endpoints
+router.options('/availability/stream', (req, res) => {
+  res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL || 'https://cv-connect-app.vercel.app');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.status(200).send();
+});
+
 router.get('/availability/stream', authenticateTokenSSE, requireRole(['freelancer']), async (req, res) => {
   try {
     const userId = req.user.user_id;
@@ -1749,6 +1758,15 @@ router.get('/availability/stream', authenticateTokenSSE, requireRole(['freelance
     console.error('SSE connection error:', error);
     res.end();
   }
+});
+
+// Handle preflight requests for activity stream SSE endpoint
+router.options('/activity/stream', (req, res) => {
+  res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL || 'https://cv-connect-app.vercel.app');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.status(200).send();
 });
 
 // SSE endpoint for real-time activity updates
