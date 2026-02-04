@@ -312,7 +312,7 @@ router.get('/conversations/:id/messages', authenticateToken, async (req, res) =>
         u.email as sender_email,
         CASE 
           WHEN u.user_type = 'freelancer' THEN (
-            SELECT CONCAT(first_name, ' ', last_name) 
+            SELECT (first_name || ' ' || last_name) 
             FROM "Freelancer" 
             WHERE user_id = u.user_id
           )
