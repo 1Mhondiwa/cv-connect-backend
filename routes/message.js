@@ -197,7 +197,7 @@ router.get('/conversations', authenticateToken, async (req, res) => {
         JOIN "Associate" a ON c.associate_id = a.associate_id
         JOIN "User" u ON a.user_id = u.user_id
         WHERE c.freelancer_id = $2
-        ORDER BY c.updated_at DESC`,
+        ORDER BY COALESCE(c.updated_at, c.created_at) DESC`,
         [userId, freelancerId]
       );
     } else if (userType === 'associate') {
@@ -246,7 +246,7 @@ router.get('/conversations', authenticateToken, async (req, res) => {
         JOIN "Freelancer" f ON c.freelancer_id = f.freelancer_id
         JOIN "User" u ON f.user_id = u.user_id
         WHERE c.associate_id = $2
-        ORDER BY c.updated_at DESC`,
+        ORDER BY COALESCE(c.updated_at, c.created_at) DESC`,
         [userId, associateId]
       );
     } else {
