@@ -50,11 +50,10 @@ router.get('/my-feedback', authenticateToken, requireRole(['freelancer']), async
         a.industry as company_industry,
         a.contact_person as interviewer_name,
         
-        -- Feedback details
+        -- Feedback details (only select columns that exist)
         ifb.feedback_id,
         ifb.technical_skills_rating,
         ifb.communication_rating,
-        ifb.cultural_fit_rating,
         ifb.overall_rating,
         ifb.strengths,
         ifb.areas_for_improvement,

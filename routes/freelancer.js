@@ -58,9 +58,8 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     let skillsResult = { rows: [] };
     try {
       skillsResult = await db.query(
-        `SELECT fs.freelancer_skill_id, fs.freelancer_id, fs.skill_id, s.skill_id as skill_id_name, s.skill_name 
+        `SELECT fs.freelancer_skill_id, fs.freelancer_id, fs.skill_id
          FROM "Freelancer_Skill" fs 
-         LEFT JOIN "Skill" s ON fs.skill_id = s.skill_id 
          WHERE fs.freelancer_id = $1`,
         [freelancerId]
       );
