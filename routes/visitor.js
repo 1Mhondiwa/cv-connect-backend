@@ -7,6 +7,10 @@ const { authenticateToken } = require('../middleware/auth');
 // Track visitor from mobile app
 router.post('/track', async (req, res) => {
   try {
+    console.log('=== Visitor Track Debug ===');
+    console.log('Request body:', req.body);
+    console.log('Request headers:', req.headers);
+    
     const { 
       device_type = 'mobile', // Default to mobile for mobile app
       page_visited = '/',
@@ -15,6 +19,8 @@ router.post('/track', async (req, res) => {
       referrer = null,
       user_id = null // Optional - if user is logged in (must be integer)
     } = req.body;
+
+    console.log('Extracted data:', { device_type, page_visited, session_id, user_agent, referrer, user_id });
 
     // Validate required fields
     if (!page_visited) {
