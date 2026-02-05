@@ -59,11 +59,11 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     try {
       skillsResult = await db.query(
         `SELECT fs.freelancer_skill_id, fs.freelancer_id, fs.skill_id, 
-                s.skill_name, fs.proficiency_level, fs.years_experience
+                s.name as skill_name, fs.proficiency_level, fs.years_experience
          FROM "Freelancer_Skill" fs 
          JOIN "Skill" s ON fs.skill_id = s.skill_id
          WHERE fs.freelancer_id = $1
-         ORDER BY s.skill_name ASC`,
+         ORDER BY s.name ASC`,
         [freelancerId]
       );
       console.log('Skills query result:', skillsResult.rowCount, 'rows');

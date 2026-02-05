@@ -210,11 +210,11 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     const freelancers = await Promise.all(
       freelancersResult.rows.map(async (freelancer) => {
         const skillsQuery = `
-          SELECT s.skill_id, s.skill_name, fs.proficiency_level, fs.years_experience
+          SELECT s.skill_id, s.name as skill_name, fs.proficiency_level, fs.years_experience
           FROM "Freelancer_Skill" fs
           JOIN "Skill" s ON fs.skill_id = s.skill_id
           WHERE fs.freelancer_id = $1
-          ORDER BY fs.proficiency_level DESC, s.skill_name ASC
+          ORDER BY fs.proficiency_level DESC, s.name ASC
         `;
         
         const skillsResult = await db.query(skillsQuery, [freelancer.freelancer_id]);
@@ -817,11 +817,11 @@ router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(
     
     // Get skills with proficiency levels
     const skillsResult = await db.query(
-      `SELECT fs.*, s.skill_name
+      `SELECT fs.*, s.name as skill_name
        FROM "Freelancer_Skill" fs
        JOIN "Skill" s ON fs.skill_id = s.skill_id
        WHERE fs.freelancer_id = $1
-       ORDER BY fs.proficiency_level DESC, s.skill_name ASC`,
+       ORDER BY fs.proficiency_level DESC, s.name ASC`,
       [freelancerId]
     );
     
@@ -1343,13 +1343,13 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
     // Get skills from normalized Skill and Freelancer_Skill tables for accurate counts
     const result = await db.query(`
       SELECT 
-        s.skill_name as skill,
+        s.name as skill,
         COUNT(fs.freelancer_id) as count
       FROM "Skill" s
       LEFT JOIN "Freelancer_Skill" fs ON s.skill_id = fs.skill_id
-      WHERE s.skill_name IS NOT NULL 
-        AND s.skill_name != ''
-      GROUP BY s.skill_id, s.skill_name
+      WHERE s.name IS NOT NULL 
+        AND s.name != ''
+      GROUP BY s.skill_id, s.name
       HAVING COUNT(fs.freelancer_id) > 0
       ORDER BY count DESC
       LIMIT 10

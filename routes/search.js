@@ -63,7 +63,7 @@ router.get('/freelancers', authenticateToken, requireRole(['associate', 'admin']
               SELECT 1 FROM "Freelancer_Skill" fs 
               JOIN "Skill" s ON fs.skill_id = s.skill_id 
               WHERE fs.freelancer_id = f.freelancer_id 
-              AND s.skill_name ILIKE $${paramIndex}
+              AND s.name ILIKE $${paramIndex}
             )
           `;
         });
@@ -110,11 +110,11 @@ router.get('/freelancers', authenticateToken, requireRole(['associate', 'admin']
     const freelancers = await Promise.all(
       searchResult.rows.map(async (freelancer) => {
         const skillsQuery = `
-          SELECT s.skill_id, s.skill_name, fs.proficiency_level, fs.years_experience
+          SELECT s.skill_id, s.name as skill_name, fs.proficiency_level, fs.years_experience
           FROM "Freelancer_Skill" fs
           JOIN "Skill" s ON fs.skill_id = s.skill_id
           WHERE fs.freelancer_id = $1
-          ORDER BY fs.proficiency_level DESC, s.skill_name ASC
+          ORDER BY fs.proficiency_level DESC, s.name ASC
         `;
         
         const skillsResult = await db.query(skillsQuery, [freelancer.freelancer_id]);
@@ -214,7 +214,7 @@ router.get('/freelancers-single-query', authenticateToken, requireRole(['associa
               SELECT 1 FROM "Freelancer_Skill" fs 
               JOIN "Skill" s ON fs.skill_id = s.skill_id 
               WHERE fs.freelancer_id = f.freelancer_id 
-              AND s.skill_name ILIKE $${paramIndex}
+              AND s.name ILIKE $${paramIndex}
             )
           `;
         });
@@ -326,11 +326,11 @@ router.get('/freelancers/:id', authenticateToken, requireRole(['associate', 'adm
     
     // Get skills separately
     const skillsResult = await db.query(
-      `SELECT fs.*, s.skill_name
+      `SELECT fs.*, s.name as skill_name
        FROM "Freelancer_Skill" fs
        JOIN "Skill" s ON fs.skill_id = s.skill_id
        WHERE fs.freelancer_id = $1
-       ORDER BY fs.proficiency_level DESC, s.skill_name ASC`,
+       ORDER BY fs.proficiency_level DESC, s.name ASC`,
       [id]
     );
     
@@ -428,11 +428,11 @@ router.get('/freelancers/by-skill/:skillId', authenticateToken, requireRole(['as
     const freelancers = await Promise.all(
       searchResult.rows.map(async (freelancer) => {
         const skillsQuery = `
-          SELECT s.skill_id, s.skill_name, fs.proficiency_level, fs.years_experience
+          SELECT s.skill_id, s.name, fs.proficiency_level, fs.years_experience
           FROM "Freelancer_Skill" fs
           JOIN "Skill" s ON fs.skill_id = s.skill_id
           WHERE fs.freelancer_id = $1
-          ORDER BY fs.proficiency_level DESC, s.skill_name ASC
+          ORDER BY fs.proficiency_level DESC, s.name ASC
         `;
         
         const skillsResult = await db.query(skillsQuery, [freelancer.freelancer_id]);
@@ -478,8 +478,8 @@ router.get('/skills', authenticateToken, requireRole(['associate', 'admin']), as
       `SELECT s.*, COUNT(fs.freelancer_id) as freelancer_count
        FROM "Skill" s
        LEFT JOIN "Freelancer_Skill" fs ON s.skill_id = fs.skill_id
-       GROUP BY s.skill_id, s.skill_name, s.normalized_name
-       ORDER BY freelancer_count DESC, s.skill_name ASC`
+       GROUP BY s.skill_id, s.name, s.normalized_name
+       ORDER BY freelancer_count DESC, s.name ASC`
     );
     
     return res.status(200).json({
