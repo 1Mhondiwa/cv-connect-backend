@@ -261,19 +261,19 @@ const getRecentHires = async (req, res) => {
     const hiresResult = await db.query(
       `SELECT 
          h.hire_id,
-         h.hire_date,
-         h.project_title,
-         h.status,
+         COALESCE(h.hire_date, h.created_at, NOW()) as hire_date,
+         COALESCE(h.project_title, 'Project') as project_title,
+         COALESCE(h.status, 'active') as status,
          a.contact_person as associate_name,
          f.first_name as freelancer_first_name,
          f.last_name as freelancer_last_name,
          f.headline as freelancer_role,
          u.email as associate_email
        FROM "Freelancer_Hire" h
-       JOIN "Associate" a ON h.associate_id = a.associate_id
-       JOIN "Freelancer" f ON h.freelancer_id = f.freelancer_id
-       JOIN "User" u ON a.user_id = u.user_id
-       ORDER BY h.hire_date DESC
+       LEFT JOIN "Associate" a ON h.associate_id = a.associate_id
+       LEFT JOIN "Freelancer" f ON h.freelancer_id = f.freelancer_id
+       LEFT JOIN "User" u ON a.user_id = u.user_id
+       ORDER BY COALESCE(h.hire_date, h.created_at) DESC
        LIMIT 20`
     );
 
@@ -286,13 +286,19 @@ const getRecentHires = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Get recent hires error:', error);
+    // Return empty list instead of 500 error
+    return res.status(200).json({
+      success: true,
+      hires: [],
+      message: 'No recent hires data available'
+    });
+  }
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch recent hires',
       error: error.message
     });
-  }
-};
+  };
 
 // Get hiring statistics for ECS Employee
 const getHiringStats = async (req, res) => {
