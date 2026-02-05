@@ -54,13 +54,16 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     const freelancerId = freelancerResult.rows[0].freelancer_id;
     
     // Get freelancer skills (with error handling for missing Skill table)
-    console.log('Step 3: Querying Freelancer_Skill...');
+    console.log('Step 3: Querying Freelancer_Skill with Skill details...');
     let skillsResult = { rows: [] };
     try {
       skillsResult = await db.query(
-        `SELECT fs.freelancer_skill_id, fs.freelancer_id, fs.skill_id
+        `SELECT fs.freelancer_skill_id, fs.freelancer_id, fs.skill_id, 
+                s.skill_name, fs.proficiency_level, fs.years_experience
          FROM "Freelancer_Skill" fs 
-         WHERE fs.freelancer_id = $1`,
+         JOIN "Skill" s ON fs.skill_id = s.skill_id
+         WHERE fs.freelancer_id = $1
+         ORDER BY s.skill_name ASC`,
         [freelancerId]
       );
       console.log('Skills query result:', skillsResult.rowCount, 'rows');
