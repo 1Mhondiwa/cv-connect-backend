@@ -544,12 +544,22 @@ const createECSEmployee = async (req, res) => {
     });
   } catch (error) {
     // Rollback transaction on error
-    await client.query('ROLLBACK');
-    console.error('ECS Employee creation error:', error);
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Rollback error:', rollbackError);
+    }
+    console.error('ECS Employee creation error:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      stack: error.stack
+    });
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: error.message
+      error: error.message,
+      detail: error.detail
     });
   } finally {
     // Release client back to pool
