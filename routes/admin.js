@@ -753,14 +753,12 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
          a.industry,
          u.email as associate_email,
          COALESCE(a.company_name, ar.company_name, 'Professional Services Ltd') AS company_name,
-         COUNT(fr.recommendation_id) as recommendation_count,
-         COUNT(rr.response_id) as response_count
+         COUNT(fr.recommendation_id) as recommendation_count
        FROM "Associate_Freelancer_Request" r
        JOIN "Associate" a ON r.associate_id = a.associate_id
        JOIN "User" u ON a.user_id = u.user_id
        LEFT JOIN "Associate_Request" ar ON u.email = ar.email
        LEFT JOIN "Freelancer_Recommendation" fr ON r.request_id = fr.request_id
-       LEFT JOIN "Request_Response" rr ON r.request_id = rr.request_id
        ${whereClause}
        GROUP BY r.request_id, a.contact_person, a.industry, u.email, a.company_name, ar.company_name
        ORDER BY r.created_at DESC
@@ -935,14 +933,14 @@ router.get('/associate-requests/:requestId', authenticateToken, requireRole(['ad
     // Get associate responses
     const responsesResult = await db.query(
       `SELECT 
-         rr.*,
+         fr.*,
          f.first_name,
          f.last_name,
          u.email as freelancer_email
-       FROM "Request_Response" rr
-       JOIN "Freelancer" f ON rr.freelancer_id = f.freelancer_id
+       FROM "Freelancer_Response" fr
+       JOIN "Freelancer" f ON fr.freelancer_id = f.freelancer_id
        JOIN "User" u ON f.user_id = u.user_id
-       WHERE rr.request_id = $1`,
+       WHERE fr.request_id = $1`,
       [requestId]
     );
 

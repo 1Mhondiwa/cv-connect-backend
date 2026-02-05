@@ -646,7 +646,7 @@ router.get('/freelancer-requests', authenticateToken, requireRole(['associate'])
          SELECT 
            request_id, 
            COUNT(*) as resp_count
-         FROM "Request_Response"
+         FROM "Freelancer_Response"
          GROUP BY request_id
        ) resp_counts ON r.request_id = resp_counts.request_id
        WHERE r.associate_id = $1
@@ -817,14 +817,14 @@ router.post('/freelancer-requests/:requestId/respond', authenticateToken, requir
 
     // Check if response already exists
     const existingResponse = await db.query(
-      'SELECT response_id FROM "Request_Response" WHERE request_id = $1 AND freelancer_id = $2',
+      'SELECT freelancer_response_id FROM "Freelancer_Response" WHERE request_id = $1 AND freelancer_id = $2',
       [requestId, freelancer_id]
     );
 
     if (existingResponse.rowCount > 0) {
       // Update existing response
       await db.query(
-        `UPDATE "Request_Response" 
+        `UPDATE "Freelancer_Response" 
          SET associate_response = $1, associate_notes = $2, response_date = CURRENT_TIMESTAMP
          WHERE request_id = $3 AND freelancer_id = $4`,
         [response, notes, requestId, freelancer_id]
@@ -832,7 +832,7 @@ router.post('/freelancer-requests/:requestId/respond', authenticateToken, requir
     } else {
       // Create new response
       await db.query(
-        `INSERT INTO "Request_Response" 
+        `INSERT INTO "Freelancer_Response" 
          (request_id, freelancer_id, associate_response, associate_notes)
          VALUES ($1, $2, $3, $4)`,
         [requestId, freelancer_id, response, notes]

@@ -193,7 +193,7 @@ const hireFreelancer = async (req, res) => {
 
     // If no response exists, create one
     const responseCheck = await client.query(
-      'SELECT * FROM "Request_Response" WHERE request_id = $1 AND freelancer_id = $2',
+      'SELECT * FROM "Freelancer_Response" WHERE request_id = $1 AND freelancer_id = $2',
       [request_id, freelancer_id]
     );
 
@@ -268,12 +268,10 @@ const getRecentHires = async (req, res) => {
          f.first_name as freelancer_first_name,
          f.last_name as freelancer_last_name,
          f.headline as freelancer_role,
-         r.title as request_title,
          u.email as associate_email
        FROM "Freelancer_Hire" h
        JOIN "Associate" a ON h.associate_id = a.associate_id
        JOIN "Freelancer" f ON h.freelancer_id = f.freelancer_id
-       JOIN "Associate_Freelancer_Request" r ON h.request_id = r.request_id
        JOIN "User" u ON a.user_id = u.user_id
        ORDER BY h.hire_date DESC
        LIMIT 20`
