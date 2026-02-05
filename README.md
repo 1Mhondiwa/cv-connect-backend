@@ -174,12 +174,9 @@ npm run test:coverage
 
 ---
 
-## 📊 Development Stats
+## 🤝 Contributing
 
-- **Total Commits**: 61+ commits
-- **API Endpoints**: 45+ endpoints
-- **Database Tables**: 12+ tables
-- **Test Coverage**: 85%+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
