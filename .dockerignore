@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.env.*
+!.env.example
+*.md
+test-*.js
+check-*.js
+fix-*.js
+run-*-migration.js
+scripts/
+uploads/
+coverage/
+.DS_Store
