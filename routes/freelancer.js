@@ -15,20 +15,14 @@ const { logActivity } = require('../utils/activityLogger');
 router.get('/profile', authenticateToken, requireRole(['freelancer']), async (req, res) => {
   try {
     const userId = req.user.user_id;
-    console.log('=== Freelancer Profile Debug ===');
-    console.log('Fetching profile for freelancer user_id:', userId);
-    console.log('User object:', req.user);
-    
+
     // Get user information
-    console.log('Step 1: Querying User table...');
     const userResult = await db.query(
       'SELECT email, created_at, last_login FROM "User" WHERE user_id = $1',
       [userId]
     );
-    console.log('User query result:', userResult.rowCount, 'rows');
-    
+
     if (userResult.rowCount === 0) {
-      console.log('User not found');
       return res.status(404).json({
         success: false,
         message: 'User not found'
