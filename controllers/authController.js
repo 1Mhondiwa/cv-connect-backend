@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const { validatePassword } = require('../utils/passwordValidator');
 
 // Generate JWT token
@@ -307,18 +308,24 @@ const requestPasswordReset = async (req, res) => {
       [resetToken, tokenExpires, userId]
     );
     
-    // In a real implementation, you would send an email with the reset link
-    // For this MVP, we'll just return the token in the response
-    
-    return res.status(200).json({
+// Send the reset link by email when email delivery is configured.
+    // For this MVP, log the token server-side so it can be used in development.
+    logger.debug(`Password reset token for user ${userId}: ${resetToken}`);
+
+    const response = {
       success: true,
-      message: 'If your email exists in our system, you will receive a password reset link',
-      // In production, remove this debug information
-      debug: {
+      message: 'If your email exists in our system, you will receive a password reset link'
+    };
+
+    // Only expose the token in non-production environments
+    if (process.env.NODE_ENV !== 'production') {
+      response.debug = {
         reset_token: resetToken,
         expires: tokenExpires
-      }
-    });
+      };
+    }
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error('Password reset request error:', error);
     return res.status(500).json({
