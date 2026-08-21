@@ -178,6 +178,9 @@ EMAIL_FROM=
 - CORS protection
 - SQL injection prevention
 
+### ⚠️ Credential Rotation Required
+A previous commit (`test-pooler-connection.js`) contained live Supabase pooler credentials that were committed to git history. Although the file was removed in PR #3, the credentials remain in git history. **Action required:** Rotate the Supabase database password and pooler credentials in the Supabase dashboard, then update `DB_PASSWORD` in your environment configuration.
+
 ---
 
 ## 🧪 Testing
