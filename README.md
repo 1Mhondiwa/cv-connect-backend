@@ -124,20 +124,38 @@ GET /api/admin/analytics/user-stats
 
 ### Environment Variables
 ```env
-# Database
-DB_HOST=localhost
+# Database (Supabase PostgreSQL)
+DB_HOST=your-db-host.supabase.co
 DB_PORT=5432
-DB_NAME=cv_connect
+DB_NAME=postgres
 DB_USER=postgres
-DB_PASSWORD=your_password
+DB_PASSWORD=your-db-password
+DB_SSL=true
+DB_POOL_MAX=10
+DB_POOL_MIN=2
+DB_IDLE_TIMEOUT=30000
+DB_CONNECTION_TIMEOUT=10000
+DB_MAX_USES=7500
 
-# JWT
-JWT_SECRET=your_secret_key
-JWT_EXPIRES_IN=7d
+# Auth
+JWT_SECRET=your-jwt-secret
+JWT_EXPIRES_IN=1h
+ADMIN_SECRET_KEY=your-admin-secret-key
+ECS_EMPLOYEE_SECRET_KEY=your-ecs-employee-secret-key
 
-# File Upload
-MAX_FILE_SIZE=5242880
-UPLOAD_PATH=./uploads
+# App settings
+CLIENT_URL=https://your-frontend.vercel.app
+MOBILE_URL=
+PORT=5000
+NODE_ENV=production
+LOG_LEVEL=info
+MAX_FILE_SIZE=10485760
+
+# Email (password reset)
+EMAIL_SERVICE=
+EMAIL_USER=
+EMAIL_PASS=
+EMAIL_FROM=
 ```
 
 ---
