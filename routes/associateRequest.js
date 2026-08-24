@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Submit associate request
 const submitAssociateRequest = async (req, res) => {
@@ -132,9 +133,11 @@ const reviewAssociateRequest = async (req, res) => {
 };
 
 // Routes
+// Public: companies apply through the website form
 router.post('/submit', submitAssociateRequest);
-router.get('/requests', getAllAssociateRequests);
-router.get('/requests/:requestId', getAssociateRequestById);
-router.put('/requests/:requestId/review', reviewAssociateRequest);
+// Admin/ECS only: request data contains applicant PII
+router.get('/requests', authenticateToken, requireRole(['admin']), getAllAssociateRequests);
+router.get('/requests/:requestId', authenticateToken, requireRole(['admin']), getAssociateRequestById);
+router.put('/requests/:requestId/review', authenticateToken, requireRole(['admin']), reviewAssociateRequest);
 
 module.exports = router;
