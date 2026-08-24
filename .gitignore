@@ -1,7 +1,8 @@
 # .gitignore
 # Dependencies
 node_modules/
-package-lock.json
+# (lockfile intentionally tracked for reproducible installs)
+# package-lock.json
 
 # Environment variables
 .env
