@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: cv-connect-backend
+    runtime: node
+    plan: free
+    buildCommand: npm ci --only=production
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Database - already on Supabase, just need these:
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: "1h"
+      - key: ADMIN_SECRET_KEY
+        sync: false
+      - key: ECS_EMPLOYEE_SECRET_KEY
+        sync: false
+      - key: CLIENT_URL
+        value: https://cv-connect-frontend.vercel.app
+      - key: MOBILE_URL
+        value: https://cv-connect-mobile.vercel.app
+      - key: EMAIL_SERVICE
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: LOG_LEVEL
+        value: info
