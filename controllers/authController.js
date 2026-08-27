@@ -83,7 +83,7 @@ const registerFreelancer = async (req, res) => {
     // Rollback transaction on error
     await client.query('ROLLBACK');
     
-    console.error('Freelancer registration error:', error);
+    logger.error('Freelancer registration error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -158,7 +158,7 @@ const addAssociate = async (req, res) => {
     // Rollback transaction on error
     await client.query('ROLLBACK');
     
-    console.error('Associate creation error:', error);
+    logger.error('Associate creation error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -175,7 +175,7 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    console.log('Login attempt for email:', email);
+    logger.auth('Login attempt', { email });
     
     // Check if user exists
     const userResult = await db.query(
@@ -184,7 +184,7 @@ const login = async (req, res) => {
     );
     
     if (userResult.rowCount === 0) {
-      console.log('User not found for email:', email);
+      logger.auth('User not found', { email });
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -192,13 +192,13 @@ const login = async (req, res) => {
     }
     
     const user = userResult.rows[0];
-    console.log('User found:', { user_id: user.user_id, user_type: user.user_type });
+    logger.auth('User found', { user_id: user.user_id, user_type: user.user_type });
     
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.hashed_password);
     
     if (!isPasswordValid) {
-      console.log('Invalid password for user:', user.user_id);
+      logger.auth('Invalid password', { user_id: user.user_id });
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -207,7 +207,7 @@ const login = async (req, res) => {
     
     // Check if user is active
     if (!user.is_active) {
-      console.log('Inactive user attempt to login:', user.user_id);
+      logger.auth('Inactive user login attempt', { user_id: user.user_id });
       return res.status(403).json({
         success: false,
         message: 'Account is inactive. Please contact admin.'
@@ -222,7 +222,7 @@ const login = async (req, res) => {
     
     // Generate token
     const token = generateToken(user.user_id);
-    console.log('Token generated for user:', user.user_id);
+    logger.auth('Token generated', { user_id: user.user_id });
     
     // Return different data based on user type
     let userData = {
@@ -267,7 +267,7 @@ const login = async (req, res) => {
       user: userData
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -327,7 +327,7 @@ const requestPasswordReset = async (req, res) => {
 
     return res.status(200).json(response);
   } catch (error) {
-    console.error('Password reset request error:', error);
+    logger.error('Password reset request error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -387,7 +387,7 @@ const resetPassword = async (req, res) => {
       message: 'Password updated successfully'
     });
   } catch (error) {
-    console.error('Password reset error:', error);
+    logger.error('Password reset error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -449,7 +449,7 @@ const createAdmin = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Admin creation error:', error);
+    logger.error('Admin creation error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -554,9 +554,9 @@ const createECSEmployee = async (req, res) => {
     try {
       await client.query('ROLLBACK');
     } catch (rollbackError) {
-      console.error('Rollback error:', rollbackError);
+      logger.error('Rollback error:', rollbackError);
     }
-    console.error('ECS Employee creation error:', {
+    logger.error('ECS Employee creation error:', {
       message: error.message,
       code: error.code,
       detail: error.detail,
@@ -605,7 +605,7 @@ const verifyEmail = async (req, res) => {
       message: 'Email verified successfully'
     });
   } catch (error) {
-    console.error('Email verification error:', error);
+    logger.error('Email verification error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
