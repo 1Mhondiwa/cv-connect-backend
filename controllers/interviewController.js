@@ -1,5 +1,6 @@
 // controllers/interviewController.js
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLogger');
 const { v4: uuidv4 } = require('uuid');
 const NotificationService = require('../services/notificationService');
@@ -21,7 +22,7 @@ const scheduleInterview = async (req, res) => {
       invitation_message = null
     } = req.body;
 
-    console.log(`🔍 Associate ${userId} scheduling interview with freelancer ${freelancer_id} for request ${request_id}`);
+    logger.debug(`Associate ${userId} scheduling interview with freelancer ${freelancer_id} for request ${request_id}`);
 
     // Validate required fields
     if (!request_id || !freelancer_id || !scheduled_date) {
@@ -183,14 +184,14 @@ const scheduleInterview = async (req, res) => {
           request.contact_person || 'Associate'
         );
 
-        console.log(`📱 Interview notifications created for freelancer ${freelancer_user_id}`);
+        logger.debug(`Interview notifications created for freelancer ${freelancer_user_id}`);
       } catch (notificationError) {
-        console.error('❌ Notification creation failed:', notificationError);
+        logger.error('Notification creation failed:', notificationError);
         // Don't fail the interview creation if notifications fail
       }
     }
 
-    console.log(`✅ Interview ${interviewId} scheduled successfully by associate ${userId}`);
+    logger.info(`Interview ${interviewId} scheduled successfully by associate ${userId}`);
 
     return res.status(201).json({
       success: true,
@@ -204,13 +205,13 @@ const scheduleInterview = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Schedule interview error:', error);
+    logger.error('Schedule interview error:', error);
     
     if (client) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('❌ Rollback failed:', rollbackError);
+        logger.error('Rollback failed:', rollbackError);
       }
     }
 
@@ -233,7 +234,7 @@ const getInterviews = async (req, res) => {
     const userType = req.user.user_type;
     const { status, limit = 50, offset = 0 } = req.query;
 
-    console.log(`🔍 Getting interviews for ${userType} ${userId}`);
+    logger.debug(`Getting interviews for ${userType} ${userId}`);
 
     let query, params;
 
@@ -353,7 +354,7 @@ const getInterviews = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get interviews error:', error);
+    logger.error('Get interviews error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch interviews',
@@ -370,7 +371,7 @@ const respondToInvitation = async (req, res) => {
     const userId = req.user.user_id;
     const { interview_id, response, response_notes = null } = req.body;
 
-    console.log(`🔍 Freelancer ${userId} responding to interview invitation ${interview_id} with response: ${response}`);
+    logger.debug(`Freelancer ${userId} responding to interview invitation ${interview_id} with response: ${response}`);
 
     // Validate response
     if (!['accepted', 'declined'].includes(response)) {
@@ -433,7 +434,7 @@ const respondToInvitation = async (req, res) => {
     // Commit transaction
     await client.query('COMMIT');
 
-    console.log(`✅ Interview invitation ${interview_id} ${response} by freelancer ${userId}`);
+    logger.info(`Interview invitation ${interview_id} ${response} by freelancer ${userId}`);
 
     return res.status(200).json({
       success: true,
@@ -446,13 +447,13 @@ const respondToInvitation = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Respond to invitation error:', error);
+    logger.error('Respond to invitation error:', error);
     
     if (client) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('❌ Rollback failed:', rollbackError);
+        logger.error('Rollback failed:', rollbackError);
       }
     }
 
@@ -484,7 +485,7 @@ const submitFeedback = async (req, res) => {
       recommendation
     } = req.body;
 
-    console.log(`🔍 ${userType} ${userId} submitting feedback for interview ${interview_id}`);
+    logger.debug(`${userType} ${userId} submitting feedback for interview ${interview_id}`);
 
     // Validate required fields
     if (!interview_id || !feedback || !recommendation) {
@@ -610,7 +611,7 @@ const submitFeedback = async (req, res) => {
     // Commit transaction
     await client.query('COMMIT');
 
-    console.log(`✅ Feedback ${feedbackId} submitted successfully by ${userType} ${userId}`);
+    logger.info(`Feedback ${feedbackId} submitted successfully by ${userType} ${userId}`);
 
     return res.status(201).json({
       success: true,
@@ -623,13 +624,13 @@ const submitFeedback = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Submit feedback error:', error);
+    logger.error('Submit feedback error:', error);
     
     if (client) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('❌ Rollback failed:', rollbackError);
+        logger.error('Rollback failed:', rollbackError);
       }
     }
 
@@ -654,7 +655,7 @@ const updateInterviewStatus = async (req, res) => {
     const userType = req.user.user_type;
     const { interview_id, status, notes = null } = req.body;
 
-    console.log(`🔍 ${userType} ${userId} updating interview ${interview_id} status to ${status}`);
+    logger.debug(`${userType} ${userId} updating interview ${interview_id} status to ${status}`);
 
     // Validate status
     if (!['in_progress', 'completed', 'cancelled'].includes(status)) {
@@ -741,7 +742,7 @@ const updateInterviewStatus = async (req, res) => {
     // Commit transaction
     await client.query('COMMIT');
 
-    console.log(`✅ Interview ${interview_id} status updated to ${status} by ${userType} ${userId}`);
+    logger.info(`Interview ${interview_id} status updated to ${status} by ${userType} ${userId}`);
 
     return res.status(200).json({
       success: true,
@@ -754,13 +755,13 @@ const updateInterviewStatus = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Update interview status error:', error);
+    logger.error('Update interview status error:', error);
     
     if (client) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('❌ Rollback failed:', rollbackError);
+        logger.error('Rollback failed:', rollbackError);
       }
     }
 
