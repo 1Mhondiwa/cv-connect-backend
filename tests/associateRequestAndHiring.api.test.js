@@ -244,6 +244,144 @@ describe('Hiring API', () => {
       expect(res.status).toBe(400);
       expect(res.body.message).toMatch(/contract.*pdf/i);
     });
+
+    it('rejects when request is not found', async () => {
+      db.query.mockResolvedValueOnce({ rowCount: 1, rows: [associateRow()] });
+      mockClient.query
+        .mockResolvedValueOnce({})                       // BEGIN
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // request lookup
+        .mockResolvedValueOnce({});                       // ROLLBACK
+
+      const res = await request(app)
+        .post('/api/hiring/hire')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .field('request_id', 999)
+        .field('freelancer_id', 1)
+        .field('project_title', 'Test')
+        .attach('contract_pdf', Buffer.from('%PDF-1.4 test'), 'contract.pdf');
+
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects when request does not belong to associate', async () => {
+      db.query.mockResolvedValueOnce({ rowCount: 1, rows: [associateRow()] });
+      mockClient.query
+        .mockResolvedValueOnce({})                       // BEGIN
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ associate_user_id: 99 }] }) // request lookup
+        .mockResolvedValueOnce({});                       // ROLLBACK
+
+      const res = await request(app)
+        .post('/api/hiring/hire')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .field('request_id', 1)
+        .field('freelancer_id', 1)
+        .field('project_title', 'Test')
+        .attach('contract_pdf', Buffer.from('%PDF-1.4 test'), 'contract.pdf');
+
+      expect(res.status).toBe(403);
+    });
+
+    it('rejects when freelancer was not recommended', async () => {
+      db.query.mockResolvedValueOnce({ rowCount: 1, rows: [associateRow()] });
+      mockClient.query
+        .mockResolvedValueOnce({})                       // BEGIN
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ associate_user_id: 3 }] }) // request lookup
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // recommendation lookup
+        .mockResolvedValueOnce({});                       // ROLLBACK
+
+      const res = await request(app)
+        .post('/api/hiring/hire')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .field('request_id', 1)
+        .field('freelancer_id', 1)
+        .field('project_title', 'Test')
+        .attach('contract_pdf', Buffer.from('%PDF-1.4 test'), 'contract.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/not recommended/i);
+    });
+
+    it('rejects when freelancer already hired for request', async () => {
+      db.query.mockResolvedValueOnce({ rowCount: 1, rows: [associateRow()] });
+      mockClient.query
+        .mockResolvedValueOnce({})                       // BEGIN
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ associate_user_id: 3 }] }) // request lookup
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{}] }) // recommendation
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ hire_id: 1 }] }) // existing active hire
+        .mockResolvedValueOnce({});                       // ROLLBACK
+
+      const res = await request(app)
+        .post('/api/hiring/hire')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .field('request_id', 1)
+        .field('freelancer_id', 1)
+        .field('project_title', 'Test')
+        .attach('contract_pdf', Buffer.from('%PDF-1.4 test'), 'contract.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/already hired/i);
+    });
+
+    it('rejects when freelancer is engaged in another project', async () => {
+      checkFreelancerAvailability.mockResolvedValue({
+        success: true,
+        is_available: false,
+        active_contracts: [{ project_title: 'Other Project', expected_end_date: '2026-12-01' }]
+      });
+
+      db.query.mockResolvedValueOnce({ rowCount: 1, rows: [associateRow()] });
+      mockClient.query
+        .mockResolvedValueOnce({})                       // BEGIN
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ associate_user_id: 3 }] }) // request lookup
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{}] }) // recommendation
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // no existing active hire
+        .mockResolvedValueOnce({});                       // ROLLBACK
+
+      const res = await request(app)
+        .post('/api/hiring/hire')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .field('request_id', 1)
+        .field('freelancer_id', 1)
+        .field('project_title', 'Test')
+        .attach('contract_pdf', Buffer.from('%PDF-1.4 test'), 'contract.pdf');
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/engaged in another project/i);
+    });
+
+    it('successfully hires a freelancer with contract', async () => {
+      checkFreelancerAvailability.mockResolvedValue({
+        success: true,
+        is_available: true,
+        active_contracts: []
+      });
+
+      db.query.mockResolvedValueOnce({ rowCount: 1, rows: [associateRow()] });
+      mockClient.query
+        .mockResolvedValueOnce({})                       // BEGIN
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ associate_user_id: 3, associate_id: 10 }] }) // request lookup
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{}] }) // recommendation
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // no existing active hire
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ hire_id: 42 }] }) // INSERT hire
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // UPDATE Request_Response
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // Freelancer_Response check
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // INSERT Request_Response
+        .mockResolvedValueOnce({});                       // COMMIT
+
+      const res = await request(app)
+        .post('/api/hiring/hire')
+        .set('Authorization', `Bearer ${tokenFor(3)}`)
+        .field('request_id', 1)
+        .field('freelancer_id', 1)
+        .field('project_title', 'Build Website')
+        .field('agreed_rate', 500)
+        .field('rate_type', 'fixed')
+        .attach('contract_pdf', Buffer.from('%PDF-1.4 test'), 'contract.pdf');
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.hire_id).toBe(42);
+      expect(res.body.data.project_title).toBe('Build Website');
+    });
   });
 
   describe('GET /api/hiring/recent-hires', () => {

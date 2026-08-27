@@ -1,5 +1,6 @@
 // controllers/hiringController.js
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLogger');
 const { updateExpiredContracts, checkFreelancerAvailability } = require('../utils/contractManager');
 const multer = require('multer');
@@ -52,7 +53,7 @@ const hireFreelancer = async (req, res) => {
       expected_end_date
     } = req.body;
 
-    console.log(`🔍 Associate ${userId} hiring freelancer ${freelancer_id} for request ${request_id}`);
+    logger.debug(`Associate ${userId} hiring freelancer ${freelancer_id} for request ${request_id}`);
 
     // Validate required fields
     if (!request_id || !freelancer_id || !project_title) {
@@ -120,7 +121,7 @@ const hireFreelancer = async (req, res) => {
     }
 
     // Check if freelancer is available for hiring (considers expired contracts)
-    console.log(`🔍 Checking availability for freelancer ${freelancer_id}`);
+    logger.debug(`Checking availability for freelancer ${freelancer_id}`);
     
     // Update any expired contracts first
     await updateExpiredContracts();
@@ -217,7 +218,7 @@ const hireFreelancer = async (req, res) => {
     // Commit transaction
     await client.query('COMMIT');
 
-    console.log(`✅ Freelancer ${freelancer_id} hired successfully by associate ${userId} for request ${request_id}`);
+    logger.info(`Freelancer ${freelancer_id} hired successfully by associate ${userId} for request ${request_id}`);
 
     return res.status(201).json({
       success: true,
@@ -230,13 +231,13 @@ const hireFreelancer = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Hire freelancer error:', error);
+    logger.error('Hire freelancer error:', error);
     
     if (client) {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('❌ Rollback failed:', rollbackError);
+        logger.error('Rollback failed:', rollbackError);
       }
     }
 
@@ -255,7 +256,7 @@ const hireFreelancer = async (req, res) => {
 // Get recent hires for ECS Employee dashboard
 const getRecentHires = async (req, res) => {
   try {
-    console.log('🔍 Fetching recent hires for ECS Employee dashboard');
+    logger.debug('Fetching recent hires for ECS Employee dashboard');
 
     // Get recent hires with associate and freelancer details
     const hiresResult = await db.query(
@@ -277,7 +278,7 @@ const getRecentHires = async (req, res) => {
        LIMIT 20`
     );
 
-    console.log(`✅ Found ${hiresResult.rowCount} recent hires`);
+    logger.debug(`Found ${hiresResult.rowCount} recent hires`);
 
     return res.status(200).json({
       success: true,
@@ -285,7 +286,7 @@ const getRecentHires = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get recent hires error:', error);
+    logger.error('Get recent hires error:', error);
     // Return empty list instead of 500 error
     return res.status(200).json({
       success: true,
@@ -293,17 +294,12 @@ const getRecentHires = async (req, res) => {
       message: 'No recent hires data available'
     });
   }
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch recent hires',
-      error: error.message
-    });
-  };
+};
 
 // Get hiring statistics for ECS Employee
 const getHiringStats = async (req, res) => {
   try {
-    console.log('🔍 Fetching hiring statistics for ECS Employee');
+    logger.debug('Fetching hiring statistics for ECS Employee');
 
     // Get total hires count
     const totalHiresResult = await db.query(
@@ -330,7 +326,7 @@ const getHiringStats = async (req, res) => {
       active_projects: parseInt(activeProjectsResult.rows[0].active_projects)
     };
 
-    console.log('✅ Hiring statistics fetched successfully');
+    logger.debug('Hiring statistics fetched successfully');
 
     return res.status(200).json({
       success: true,
@@ -338,7 +334,7 @@ const getHiringStats = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get hiring stats error:', error);
+    logger.error('Get hiring stats error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch hiring statistics',
@@ -350,7 +346,7 @@ const getHiringStats = async (req, res) => {
 // Manually trigger contract expiration check (for admin/testing)
 const checkExpiredContracts = async (req, res) => {
   try {
-    console.log('🔍 Manual contract expiration check requested');
+    logger.debug('Manual contract expiration check requested');
     
     const result = await updateExpiredContracts();
     
@@ -362,7 +358,7 @@ const checkExpiredContracts = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Manual contract check error:', error);
+    logger.error('Manual contract check error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to check expired contracts',
