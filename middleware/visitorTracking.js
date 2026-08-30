@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const logger = require('../utils/logger');
 
 // Device detection helper function
 function detectDeviceType(userAgent) {
@@ -87,8 +88,8 @@ const trackVisitor = async (req, res, next) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [sessionId, ipAddress, userAgent, deviceType, visitDate, visitTime, pageVisited, referrer, userId]);
     
-    // Log for debugging
-    console.log('💻 Web visitor tracked:', {
+    // Log for debugging (debug level, only in development)
+    logger.debug('Web visitor tracked:', {
       sessionId: sessionId.substring(0, 15) + '...',
       deviceType,
       pageVisited: pageVisited.substring(0, 50),
@@ -98,7 +99,7 @@ const trackVisitor = async (req, res, next) => {
     
   } catch (error) {
     // Don't let visitor tracking errors break the main request
-    console.error('❌ Visitor tracking error:', error.message);
+    logger.error('Visitor tracking error:', error);
   }
   
   next();
