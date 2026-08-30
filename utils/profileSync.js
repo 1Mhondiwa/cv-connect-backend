@@ -1,5 +1,6 @@
 // Utility functions for syncing CV parsed data with freelancer profile
 const db = require('../config/database');
+const logger = require('./logger');
 
 /**
  * Sync CV parsed data with freelancer profile
@@ -10,7 +11,7 @@ const db = require('../config/database');
  */
 async function syncCVDataWithProfile(freelancerId, parsedData, forceUpdate = false) {
   try {
-    console.log(`🔄 Syncing CV data for freelancer ID: ${freelancerId}`);
+    logger.info(`Syncing CV data for freelancer ID: ${freelancerId}`);
     
     const fieldsToUpdate = [];
     const values = [];
@@ -64,12 +65,12 @@ async function syncCVDataWithProfile(freelancerId, parsedData, forceUpdate = fal
           fieldsToUpdate.push(`${field.key} = $${paramIndex++}`);
           values.push(processedValue);
           
-          console.log(`   📝 ${field.key}: "${currentProfile?.[field.key] || 'null'}" → "${processedValue}"`);
+          logger.debug(`${field.key}: "${currentProfile?.[field.key] || 'null'}" → "${processedValue}"`);
         } else {
-          console.log(`   ✅ ${field.key}: Already up to date`);
+          logger.debug(`${field.key}: Already up to date`);
         }
       } else if (field.required) {
-        console.log(`   ⚠️ ${field.key}: Missing required field`);
+        logger.warn(`${field.key}: Missing required field`);
       }
     }
     
@@ -85,7 +86,7 @@ async function syncCVDataWithProfile(freelancerId, parsedData, forceUpdate = fal
       
       await db.query(updateQuery, values);
       
-      console.log(`✅ Updated ${fieldsToUpdate.length} fields for freelancer ${freelancerId}`);
+      logger.info(`Updated ${fieldsToUpdate.length} fields for freelancer ${freelancerId}`);
       
       return {
         success: true,
@@ -93,7 +94,7 @@ async function syncCVDataWithProfile(freelancerId, parsedData, forceUpdate = fal
         message: `Successfully synced ${fieldsToUpdate.length} fields`
       };
     } else {
-      console.log(`✅ No updates needed for freelancer ${freelancerId}`);
+      logger.info(`No updates needed for freelancer ${freelancerId}`);
       
       return {
         success: true,
@@ -103,7 +104,7 @@ async function syncCVDataWithProfile(freelancerId, parsedData, forceUpdate = fal
     }
     
   } catch (error) {
-    console.error(`❌ Error syncing CV data for freelancer ${freelancerId}:`, error);
+    logger.error(`Error syncing CV data for freelancer ${freelancerId}:`, error);
     
     return {
       success: false,
@@ -120,7 +121,7 @@ async function syncCVDataWithProfile(freelancerId, parsedData, forceUpdate = fal
  */
 async function syncAllFreelancers(forceUpdate = false) {
   try {
-    console.log('🔄 Syncing all freelancers with their CV data...');
+    logger.info('Syncing all freelancers with their CV data...');
     
     const result = await db.query(`
       SELECT 
@@ -134,8 +135,8 @@ async function syncAllFreelancers(forceUpdate = false) {
       ORDER BY f.first_name, f.last_name
     `);
     
-    console.log(`📋 Found ${result.rows.length} freelancers with CV data`);
-    console.log('=====================================');
+    logger.info(`Found ${result.rows.length} freelancers with CV data`);
+    logger.info('=====================================');
     
     let successCount = 0;
     let errorCount = 0;
@@ -147,7 +148,7 @@ async function syncAllFreelancers(forceUpdate = false) {
           ? JSON.parse(freelancer.parsed_data) 
           : freelancer.parsed_data;
         
-        console.log(`\n👤 Processing: ${freelancer.first_name} ${freelancer.last_name}`);
+        logger.info(`Processing: ${freelancer.first_name} ${freelancer.last_name}`);
         
         const syncResult = await syncCVDataWithProfile(
           freelancer.freelancer_id, 
@@ -163,17 +164,17 @@ async function syncAllFreelancers(forceUpdate = false) {
         }
         
       } catch (error) {
-        console.error(`❌ Error processing ${freelancer.first_name} ${freelancer.last_name}:`, error);
+        logger.error(`Error processing ${freelancer.first_name} ${freelancer.last_name}:`, error);
         errorCount++;
       }
     }
     
-    console.log('\n=====================================');
-    console.log('📊 SYNC SUMMARY:');
-    console.log(`✅ Successful: ${successCount} freelancers`);
-    console.log(`❌ Errors: ${errorCount} freelancers`);
-    console.log(`📝 Total fields updated: ${totalUpdatedFields}`);
-    console.log(`📋 Total processed: ${result.rows.length} freelancers`);
+    logger.info('=====================================');
+    logger.info('SYNC SUMMARY:');
+    logger.info(`Successful: ${successCount} freelancers`);
+    logger.info(`Errors: ${errorCount} freelancers`);
+    logger.info(`Total fields updated: ${totalUpdatedFields}`);
+    logger.info(`Total processed: ${result.rows.length} freelancers`);
     
     return {
       success: true,
@@ -184,7 +185,7 @@ async function syncAllFreelancers(forceUpdate = false) {
     };
     
   } catch (error) {
-    console.error('❌ Error in syncAllFreelancers:', error);
+    logger.error('Error in syncAllFreelancers:', error);
     return {
       success: false,
       error: error.message
