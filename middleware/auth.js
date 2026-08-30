@@ -1,6 +1,7 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 
 // Authenticate token middleware
 const authenticateToken = async (req, res, next) => {
@@ -17,7 +18,7 @@ const authenticateToken = async (req, res, next) => {
 
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      console.error('JWT_SECRET environment variable is not set');
+      logger.error('JWT_SECRET environment variable is not set');
       return res.status(500).json({ 
         success: false, 
         message: 'Server configuration error' 
@@ -60,7 +61,7 @@ const authenticateToken = async (req, res, next) => {
         message: 'Token expired' 
       });
     }
-    console.error('Authentication error:', error);
+    logger.error('Authentication error:', error);
     return res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 
@@ -91,7 +92,7 @@ const authenticateTokenSSE = async (req, res, next) => {
 
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      console.error('JWT_SECRET environment variable is not set');
+      logger.error('JWT_SECRET environment variable is not set');
       return res.status(500).json({ 
         success: false, 
         message: 'Server configuration error' 
@@ -135,7 +136,7 @@ const authenticateTokenSSE = async (req, res, next) => {
         message: 'Token expired' 
       });
     }
-    console.error('SSE Authentication error:', error);
+    logger.error('SSE Authentication error:', error);
     return res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 
@@ -156,7 +157,7 @@ const optionalAuth = async (req, res, next) => {
 
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      console.error('JWT_SECRET environment variable is not set');
+      logger.error('JWT_SECRET environment variable is not set');
       req.user = null;
       return next();
     }
@@ -232,7 +233,7 @@ const checkResourceOwnership = (resourceGetter) => {
       
       next();
     } catch (error) {
-      console.error('Resource ownership check error:', error);
+      logger.error('Resource ownership check error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error'
