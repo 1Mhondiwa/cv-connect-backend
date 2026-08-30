@@ -1,5 +1,6 @@
 // services/notificationService.js
 const db = require('../config/database');
+const logger = require('../utils/logger');
 
 class NotificationService {
   // Create a new notification
@@ -21,7 +22,7 @@ class NotificationService {
 
       return result.rows[0];
     } catch (error) {
-      console.error('Error creating notification:', error);
+      logger.error('Error creating notification:', error);
       throw error;
     }
   }
@@ -48,9 +49,9 @@ class NotificationService {
         [notification.notification_id]
       );
 
-      console.log(`📱 Notification sent to user ${notification.user_id}: ${notification.title}`);
+      logger.info(`Notification sent to user ${notification.user_id}: ${notification.title}`);
     } catch (error) {
-      console.error('Error sending notification:', error);
+      logger.error('Error sending notification:', error);
       throw error;
     }
   }
@@ -121,7 +122,7 @@ class NotificationService {
 
       return result.rows;
     } catch (error) {
-      console.error('Error getting user notifications:', error);
+      logger.error('Error getting user notifications:', error);
       throw error;
     }
   }
@@ -134,7 +135,7 @@ class NotificationService {
         [notification_id, user_id]
       );
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      logger.error('Error marking notification as read:', error);
       throw error;
     }
   }
@@ -151,7 +152,7 @@ class NotificationService {
 
       return result.rows;
     } catch (error) {
-      console.error('Error getting pending scheduled notifications:', error);
+      logger.error('Error getting pending scheduled notifications:', error);
       throw error;
     }
   }
