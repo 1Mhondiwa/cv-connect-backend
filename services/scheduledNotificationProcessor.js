@@ -1,5 +1,6 @@
 // services/scheduledNotificationProcessor.js
 const NotificationService = require('./notificationService');
+const logger = require('../utils/logger');
 
 class ScheduledNotificationProcessor {
   constructor() {
@@ -10,19 +11,19 @@ class ScheduledNotificationProcessor {
   // Start the scheduled notification processor
   start() {
     if (this.isRunning) {
-      console.log('📱 Scheduled notification processor already running');
+      logger.info('Scheduled notification processor already running');
       return;
     }
 
     this.isRunning = true;
-    console.log('📱 Starting scheduled notification processor');
+    logger.info('Starting scheduled notification processor');
 
     // Check for pending notifications every 30 seconds
     this.intervalId = setInterval(async () => {
       try {
         await this.processPendingNotifications();
       } catch (error) {
-        console.error('❌ Error processing pending notifications:', error);
+        logger.error('Error processing pending notifications:', error);
       }
     }, 30000); // 30 seconds
   }
@@ -34,7 +35,7 @@ class ScheduledNotificationProcessor {
       this.intervalId = null;
     }
     this.isRunning = false;
-    console.log('📱 Scheduled notification processor stopped');
+    logger.info('Scheduled notification processor stopped');
   }
 
   // Process pending scheduled notifications
@@ -46,29 +47,29 @@ class ScheduledNotificationProcessor {
         return;
       }
 
-      console.log(`📱 Processing ${pendingNotifications.length} pending notifications`);
+      logger.info(`Processing ${pendingNotifications.length} pending notifications`);
 
       for (const notification of pendingNotifications) {
         try {
           // Send notification via WebSocket if available
           if (global.io) {
             await NotificationService.sendNotification(global.io, notification);
-            console.log(`📱 Scheduled notification sent: ${notification.title}`);
+            logger.info(`Scheduled notification sent: ${notification.title}`);
           } else {
-            console.log('⚠️ WebSocket not available, notification queued for later');
+            logger.warn('WebSocket not available, notification queued for later');
           }
         } catch (error) {
-          console.error(`❌ Failed to send notification ${notification.notification_id}:`, error);
+          logger.error(`Failed to send notification ${notification.notification_id}:`, error);
         }
       }
     } catch (error) {
-      console.error('❌ Error processing pending notifications:', error);
+      logger.error('Error processing pending notifications:', error);
     }
   }
 
   // Process notifications immediately (for testing)
   async processNow() {
-    console.log('📱 Processing notifications immediately...');
+    logger.info('Processing notifications immediately...');
     await this.processPendingNotifications();
   }
 }
