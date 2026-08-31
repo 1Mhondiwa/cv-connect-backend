@@ -121,10 +121,10 @@ class CVParser {
       });
       
       const cleanedText = this.cleanExtractedText(text, 'doc');
-      console.log(`DOC text extracted: ${cleanedText.length} characters`);
+      logger.cv(`DOC text extracted: ${cleanedText.length} characters`);
       return cleanedText;
     } catch (error) {
-      console.error('DOC parsing error:', error);
+      logger.error('DOC parsing error:', error);
       throw new Error("DOC parsing failed. Please install textract or convert to DOCX format.");
     }
   }
@@ -222,10 +222,10 @@ class CVParser {
 
   // Extract address from CV text
   extractAddressFromText(text) {
-    console.log('Extracting address from CV text...');
+    logger.cv('Extracting address from CV text...');
     
     if (!text || typeof text !== 'string') {
-      console.log('No text provided for address extraction');
+      logger.cv('No text provided for address extraction');
       return null;
     }
 
@@ -248,7 +248,7 @@ class CVParser {
         if (match && match[1]) {
           const address = match[1].trim();
           if (this.looksLikeAddress(address)) {
-            console.log(`Found address with pattern: "${address}"`);
+            logger.cv(`Found address with pattern: "${address}"`);
             return address;
           }
         }
@@ -282,12 +282,12 @@ class CVParser {
     // Look for address-like content in contact section
     for (const line of contactLines) {
       if (this.looksLikeAddress(line) && !line.includes('@') && !line.includes('http')) {
-        console.log(`Found address in contact section: "${line}"`);
+        logger.cv(`Found address in contact section: "${line}"`);
         return line;
       }
     }
 
-    console.log('No address found in CV text');
+    logger.cv('No address found in CV text');
     return null;
   }
 
@@ -341,8 +341,8 @@ class CVParser {
 
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
-    console.log('Extracting name from first 10 lines:');
-    lines.slice(0, 10).forEach((line, i) => console.log(`Line ${i}: "${line}"`));
+    logger.cv('Extracting name from first 10 lines:');
+    lines.slice(0, 10).forEach((line, i) => logger.cv(`Line ${i}: "${line}"`));
     
     // Try extracting from the first meaningful lines
     for (let i = 0; i < Math.min(15, lines.length); i++) {
@@ -354,7 +354,7 @@ class CVParser {
       
       const nameResult = this.extractNameFromLine(line);
       if (nameResult.firstName && nameResult.lastName) {
-        console.log(`Found name on line ${i}: "${nameResult.firstName} ${nameResult.lastName}"`);
+        logger.cv(`Found name on line ${i}: "${nameResult.firstName} ${nameResult.lastName}"`);
         return nameResult;
       }
     }
@@ -473,32 +473,32 @@ class CVParser {
     const lines = text.split('\n').filter(line => line.trim().length > 0);
     let skills = [];
     
-    console.log('Starting skills extraction...');
+    logger.cv('Starting skills extraction...');
     
     // Primary method: Find dedicated skills section
     const skillsSection = this.findSection(lines, this.getSkillsKeywords());
     
     if (skillsSection.found) {
-      console.log('Found skills section, extracting from section only...');
+      logger.cv('Found skills section, extracting from section only...');
       skills = this.parseSkillsFromSection(skillsSection.content);
-      console.log(`Extracted ${skills.length} skills from section`);
+      logger.cv(`Extracted ${skills.length} skills from section`);
       
       // If we found a skills section, ONLY use skills from that section
       // Do not fall back to other methods to avoid contamination
       return this.deduplicateSkills(skills).slice(0, 20);
     }
     
-    console.log('No skills section found, trying document-wide extraction...');
+    logger.cv('No skills section found, trying document-wide extraction...');
     // Only use broader extraction if NO skills section was found
     skills = this.extractSkillsFromEntireDocument(lines);
     
     // Final fallback: Use known skills database only if still no skills found
     if (skills.length === 0) {
-      console.log('No skills found, using fallback database...');
+      logger.cv('No skills found, using fallback database...');
       skills = this.extractSkillsFallback(text);
     }
     
-    console.log(`Final skills count: ${skills.length}`);
+    logger.cv(`Final skills count: ${skills.length}`);
     // Limit to reasonable number and deduplicate
     return this.deduplicateSkills(skills).slice(0, 20);
   }
@@ -619,28 +619,28 @@ class CVParser {
     let startIndex = -1;
     let endIndex = lines.length;
     
-    console.log('Looking for section with keywords:', keywords);
+    logger.cv('Looking for section with keywords:', keywords);
     
     // Find section start - be more precise about section headers
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       const lowerLine = line.toLowerCase();
       
-      console.log(`Checking line ${i}: "${line}"`);
+      logger.cv(`Checking line ${i}: "${line}"`);
       
       // Check if this line is a section header (short line, likely all caps or title case)
       if (this.looksLikeSectionHeader(line)) {
         // Check if it matches our keywords
         if (keywords.some(keyword => this.matchesSectionKeyword(lowerLine, keyword.toLowerCase()))) {
           startIndex = i;
-          console.log(`Found section header at line ${i}: "${line}"`);
+          logger.cv(`Found section header at line ${i}: "${line}"`);
           break;
         }
       }
     }
     
     if (startIndex === -1) {
-      console.log('Section not found');
+      logger.cv('Section not found');
       return { found: false, content: [] };
     }
     
@@ -651,13 +651,13 @@ class CVParser {
       // Any line that looks like a section header should end the current section
       if (this.looksLikeSectionHeader(line)) {
         endIndex = i;
-        console.log(`Found section end at line ${i}: "${line}"`);
+        logger.cv(`Found section end at line ${i}: "${line}"`);
         break;
       }
     }
     
     const content = lines.slice(startIndex + 1, endIndex);
-    console.log(`Section content has ${content.length} lines`);
+    logger.cv(`Section content has ${content.length} lines`);
     
     return {
       found: true,
@@ -701,26 +701,26 @@ class CVParser {
   parseSkillsFromSection(lines) {
     const skills = [];
     
-    console.log('Parsing skills from section with', lines.length, 'lines');
+    logger.cv('Parsing skills from section with', lines.length, 'lines');
     
     for (const line of lines) {
       const trimmedLine = line.trim();
       
-      console.log(`Processing skills line: "${trimmedLine}"`);
+      logger.cv(`Processing skills line: "${trimmedLine}"`);
       
       if (this.isSkillLine(trimmedLine)) {
         const extractedSkills = this.extractSkillsFromLine(trimmedLine);
-        console.log(`Extracted skills from line: ${extractedSkills.map(s => s.name).join(', ')}`);
+        logger.cv(`Extracted skills from line: ${extractedSkills.map(s => s.name).join(', ')}`);
         
         // Additional validation: filter out obvious non-skills
         const validSkills = extractedSkills.filter(skill => this.isValidSkillInSkillsSection(skill.name));
         skills.push(...validSkills);
       } else {
-        console.log('Line not considered a skill line');
+        logger.cv('Line not considered a skill line');
       }
     }
     
-    console.log('Final skills from section:', skills.map(s => s.name));
+    logger.cv('Final skills from section:', skills.map(s => s.name));
     return this.deduplicateSkills(skills);
   }
 
@@ -757,7 +757,7 @@ class CVParser {
     const isNonSkill = nonSkillPatterns.some(pattern => pattern.test(skillName));
     
     if (isNonSkill) {
-      console.log(`Filtering out non-skill: "${skillName}"`);
+      logger.cv(`Filtering out non-skill: "${skillName}"`);
       return false;
     }
     
@@ -1086,29 +1086,29 @@ class CVParser {
     const education = [];
     let currentEntry = null;
     
-    console.log('Parsing education from section with', lines.length, 'lines');
+    logger.cv('Parsing education from section with', lines.length, 'lines');
     
     for (const line of lines) {
       const trimmedLine = line.trim();
       
-      console.log(`Processing education line: "${trimmedLine}"`);
+      logger.cv(`Processing education line: "${trimmedLine}"`);
       
       if (trimmedLine.length === 0 || trimmedLine.includes('---')) {
-        console.log('Skipping empty or separator line');
+        logger.cv('Skipping empty or separator line');
         continue;
       }
       
       // Skip bullet points that look like achievements or activities
       if (trimmedLine.startsWith('•') && this.looksLikeAchievement(trimmedLine)) {
-        console.log('Skipping achievement/activity line');
+        logger.cv('Skipping achievement/activity line');
         continue;
       }
       
       const degreeMatch = this.extractDegreeFromLine(trimmedLine);
       if (degreeMatch) {
-        console.log(`Found degree: ${degreeMatch.degree}`);
+        logger.cv(`Found degree: ${degreeMatch.degree}`);
         if (currentEntry) {
-          console.log(`Completing previous entry: ${currentEntry.degree}`);
+          logger.cv(`Completing previous entry: ${currentEntry.degree}`);
           education.push(currentEntry);
         }
         currentEntry = degreeMatch;
@@ -1118,24 +1118,24 @@ class CVParser {
         const year = this.extractYearFromLine(trimmedLine);
         
         if (institution && !currentEntry.institution) {
-          console.log(`Adding institution: ${institution}`);
+          logger.cv(`Adding institution: ${institution}`);
           currentEntry.institution = institution;
         }
         if (year && !currentEntry.year) {
-          console.log(`Adding year: ${year}`);
+          logger.cv(`Adding year: ${year}`);
           currentEntry.year = year;
         }
       } else {
-        console.log('No current entry, skipping line');
+        logger.cv('No current entry, skipping line');
       }
     }
     
     if (currentEntry) {
-      console.log(`Completing final entry: ${currentEntry.degree}`);
+      logger.cv(`Completing final entry: ${currentEntry.degree}`);
       education.push(currentEntry);
     }
     
-    console.log(`Final education entries: ${education.length}`);
+    logger.cv(`Final education entries: ${education.length}`);
     return education;
   }
 
@@ -1172,7 +1172,7 @@ class CVParser {
       /^(High\s+School\s+Diploma|Secondary\s+School|GED|Matriculation|Matric)/i
     ];
     
-    console.log(`Checking line for degree patterns: "${line}"`);
+    logger.cv(`Checking line for degree patterns: "${line}"`);
     
     for (let i = 0; i < degreePatterns.length; i++) {
       const pattern = degreePatterns[i];
@@ -1184,12 +1184,12 @@ class CVParser {
           institution: null,
           year: null
         };
-        console.log(`Pattern ${i} matched: degree="${result.degree}", field="${result.field}"`);
+        logger.cv(`Pattern ${i} matched: degree="${result.degree}", field="${result.field}"`);
         return result;
       }
     }
     
-    console.log('No degree pattern matched');
+    logger.cv('No degree pattern matched');
     return null;
   }
 
@@ -1259,16 +1259,16 @@ class CVParser {
     const experienceSection = this.findSection(lines, this.getExperienceKeywords());
     
     if (experienceSection.found) {
-      console.log('Found work experience section, parsing...');
+      logger.cv('Found work experience section, parsing...');
       experiences = this.parseExperienceFromSection(experienceSection.content);
-      console.log(`Extracted ${experiences.length} experiences from section`);
+      logger.cv(`Extracted ${experiences.length} experiences from section`);
     }
     
     // Only use fallback if we found no experiences at all AND there's a clear work experience section missing
     if (experiences.length === 0 && !experienceSection.found) {
-      console.log('No experience section found, trying fallback...');
+      logger.cv('No experience section found, trying fallback...');
       experiences = this.extractWorkExperienceFromEntireDocument(lines);
-      console.log(`Extracted ${experiences.length} experiences from fallback`);
+      logger.cv(`Extracted ${experiences.length} experiences from fallback`);
     }
     
     // Limit to reasonable number and validate
@@ -1289,7 +1289,7 @@ class CVParser {
     let descriptionLines = [];
     let i = 0;
     
-    console.log('Parsing experience section with', lines.length, 'lines');
+    logger.cv('Parsing experience section with', lines.length, 'lines');
     
     while (i < lines.length) {
       const trimmedLine = lines[i].trim();
@@ -1299,11 +1299,11 @@ class CVParser {
         continue;
       }
       
-      console.log(`Processing line ${i}: "${trimmedLine}"`);
+      logger.cv(`Processing line ${i}: "${trimmedLine}"`);
       
       // Check if we've hit a new section header (this means we should stop)
       if (this.looksLikeSectionHeader(trimmedLine) && i > 0) {
-        console.log('Hit section header, stopping:', trimmedLine);
+        logger.cv('Hit section header, stopping:', trimmedLine);
         break;
       }
       
@@ -1311,7 +1311,7 @@ class CVParser {
       const detectedEntry = this.detectWorkExperienceEntryStrict(lines, i);
       
       if (detectedEntry.isNewEntry) {
-        console.log('Detected new experience entry:', detectedEntry.title);
+        logger.cv('Detected new experience entry:', detectedEntry.title);
         
         // Save previous experience if exists
         if (currentExp) {
@@ -1337,7 +1337,7 @@ class CVParser {
         // First priority: extract company if we don't have one
         if (!currentExp.company && this.looksLikeCompany(trimmedLine) && !this.looksLikeJobDescription(trimmedLine)) {
           currentExp.company = trimmedLine;
-          console.log('Added company:', trimmedLine);
+          logger.cv('Added company:', trimmedLine);
           i++;
           continue;
         }
@@ -1348,7 +1348,7 @@ class CVParser {
           if (dates) {
             currentExp.start_date = dates.start;
             currentExp.end_date = dates.end;
-            console.log('Added dates:', dates);
+            logger.cv('Added dates:', dates);
             i++;
             continue;
           }
@@ -1357,14 +1357,14 @@ class CVParser {
         // Third priority: add to description only if it clearly looks like description content
         if (this.looksLikeJobDescription(trimmedLine) && !this.looksLikeCompany(trimmedLine)) {
           descriptionLines.push(trimmedLine);
-          console.log('Added to description:', trimmedLine.substring(0, 50) + '...');
+          logger.cv('Added to description:', trimmedLine.substring(0, 50) + '...');
         }
         
         i++;
       } else {
         // No current experience, check if this could start a new one
         if (this.looksLikeJobTitle(trimmedLine)) {
-          console.log('Found potential job title without experience context:', trimmedLine);
+          logger.cv('Found potential job title without experience context:', trimmedLine);
           // Only accept if it's a very clear job title
           if (this.isVeryLikelyJobTitle(trimmedLine)) {
             currentExp = {
@@ -1387,7 +1387,7 @@ class CVParser {
       experiences.push(currentExp);
     }
     
-    console.log('Final experiences extracted:', experiences.length);
+    logger.cv('Final experiences extracted:', experiences.length);
     return this.validateAndCleanExperiences(experiences);
   }
 
@@ -1837,7 +1837,7 @@ class CVParser {
   extractWorkExperienceFromEntireDocument(lines) {
     const experiences = [];
     
-    console.log('Using fallback extraction (no clear work experience section found)');
+    logger.cv('Using fallback extraction (no clear work experience section found)');
     
     // Only look for very obvious work experience patterns when no section is found
     for (let i = 0; i < lines.length; i++) {
@@ -1850,7 +1850,7 @@ class CVParser {
       
       // Only accept very obvious job titles
       if (this.isVeryLikelyJobTitle(line)) {
-        console.log('Found potential job title in fallback:', line);
+        logger.cv('Found potential job title in fallback:', line);
         
         const experience = {
           title: line,
@@ -1880,7 +1880,7 @@ class CVParser {
         // Only add if we found at least a company or dates (to validate it's real work experience)
         if (experience.company || experience.start_date) {
           experiences.push(experience);
-          console.log('Added fallback experience:', experience.title);
+          logger.cv('Added fallback experience:', experience.title);
         }
       }
     }
@@ -1987,10 +1987,10 @@ class CVParser {
 
   // Extract years of experience from CV text
   extractYearsOfExperienceFromText(text) {
-    console.log('Extracting years of experience from CV text...');
+    logger.cv('Extracting years of experience from CV text...');
     
     if (!text || typeof text !== 'string') {
-      console.log('No text provided for years extraction');
+      logger.cv('No text provided for years extraction');
       return null;
     }
 
@@ -2010,22 +2010,22 @@ class CVParser {
       if (match) {
         const years = parseInt(match[1]);
         if (years > 0 && years <= 50) { // Reasonable range
-          console.log(`Found years of experience in text: ${years} years (pattern: "${match[0]}")`);
+          logger.cv(`Found years of experience in text: ${years} years (pattern: "${match[0]}")`);
           return years;
         }
       }
     }
 
-    console.log('No years of experience pattern found in text');
+    logger.cv('No years of experience pattern found in text');
     return null;
   }
 
   // Calculate years of experience (fallback method)
   calculateTotalExperience(workExperience) {
-    console.log('Calculating total experience from work history...');
+    logger.cv('Calculating total experience from work history...');
     
     if (!Array.isArray(workExperience) || workExperience.length === 0) {
-      console.log('No work experience provided for calculation');
+      logger.cv('No work experience provided for calculation');
       return 0;
     }
     
@@ -2043,30 +2043,30 @@ class CVParser {
         
         if (startYear && endYear && endYear >= startYear) {
           const yearsDiff = endYear - startYear;
-          console.log(`Work experience: ${exp.title} (${startYear}-${endYear}) = ${yearsDiff} years`);
+          logger.cv(`Work experience: ${exp.title} (${startYear}-${endYear}) = ${yearsDiff} years`);
           totalYears += yearsDiff;
         }
       }
     }
     
-    console.log(`Total calculated experience: ${totalYears} years`);
+    logger.cv(`Total calculated experience: ${totalYears} years`);
     return Math.max(0, totalYears);
   }
 
   // Determine years of experience (prioritize CV text over calculation)
   determineYearsOfExperience(text, workExperience) {
-    console.log('Determining years of experience...');
+    logger.cv('Determining years of experience...');
     
     // FIRST: Try to extract from CV text (professional summary, etc.)
     const extractedYears = this.extractYearsOfExperienceFromText(text);
     if (extractedYears !== null) {
-      console.log(`Using extracted years from CV text: ${extractedYears}`);
+      logger.cv(`Using extracted years from CV text: ${extractedYears}`);
       return extractedYears;
     }
     
     // FALLBACK: Calculate from work experience dates
     const calculatedYears = this.calculateTotalExperience(workExperience);
-    console.log(`Using calculated years from work history: ${calculatedYears}`);
+    logger.cv(`Using calculated years from work history: ${calculatedYears}`);
     return calculatedYears;
   }
 
@@ -2079,10 +2079,10 @@ class CVParser {
 
   // Extract summary from CV text
   extractSummary(text) {
-    console.log('Starting summary extraction...');
+    logger.cv('Starting summary extraction...');
     
     if (!text || typeof text !== 'string') {
-      console.log('No text provided for summary extraction');
+      logger.cv('No text provided for summary extraction');
       return null;
     }
 
@@ -2092,12 +2092,12 @@ class CVParser {
       'career objective', 'professional profile', 'professional overview'
     ];
     
-    console.log('Looking for summary section with keywords:', summaryKeywords);
+    logger.cv('Looking for summary section with keywords:', summaryKeywords);
     const summarySection = this.findSection(lines, summaryKeywords);
     
     if (summarySection.found && summarySection.content.length > 0) {
-      console.log(`Found summary section with ${summarySection.content.length} lines`);
-      console.log('Summary content lines:', summarySection.content);
+      logger.cv(`Found summary section with ${summarySection.content.length} lines`);
+      logger.cv('Summary content lines:', summarySection.content);
       
       // Join the content and clean it up
       let summaryText = summarySection.content
@@ -2109,17 +2109,17 @@ class CVParser {
       // Clean up any extra whitespace
       summaryText = summaryText.replace(/\s+/g, ' ');
       
-      console.log(`Extracted summary text (${summaryText.length} chars): "${summaryText}"`);
+      logger.cv(`Extracted summary text (${summaryText.length} chars): "${summaryText}"`);
       
       // Validate summary length and content
       if (summaryText.length > 20 && summaryText.length < 1000) {
-        console.log('Summary validation passed');
+        logger.cv('Summary validation passed');
         return summaryText;
       } else {
-        console.log(`Summary validation failed - length: ${summaryText.length}`);
+        logger.cv(`Summary validation failed - length: ${summaryText.length}`);
       }
     } else {
-      console.log('No summary section found');
+      logger.cv('No summary section found');
     }
     
     return null;
@@ -2130,11 +2130,11 @@ class CVParser {
     // FIRST: Try to extract actual summary from CV
     const extractedSummary = this.extractSummary(text);
     if (extractedSummary) {
-      console.log('Using extracted summary from CV');
+      logger.cv('Using extracted summary from CV');
       return extractedSummary;
     }
     
-    console.log('No summary found in CV, generating fallback summary');
+    logger.cv('No summary found in CV, generating fallback summary');
     
     // FALLBACK: Generate summary from extracted data
     const { skills, work_experience, years_experience } = extractedData;
@@ -2167,10 +2167,10 @@ class CVParser {
 
   // Extract professional headline/title from CV
   extractHeadline(text, workExperience) {
-    console.log('Starting headline extraction...');
+    logger.cv('Starting headline extraction...');
     
     if (!text || typeof text !== 'string') {
-      console.log('No text provided for headline extraction');
+      logger.cv('No text provided for headline extraction');
       return null;
     }
 
@@ -2179,14 +2179,14 @@ class CVParser {
     // Strategy 1: Look for professional titles near the top of CV (after name)
     const topSectionHeadline = this.extractHeadlineFromTop(lines);
     if (topSectionHeadline) {
-      console.log('Found headline from top section:', topSectionHeadline);
+      logger.cv('Found headline from top section:', topSectionHeadline);
       return topSectionHeadline;
     }
     
     // Strategy 2: Extract from professional summary/objective sections  
     const summaryHeadline = this.extractHeadlineFromSummary(lines);
     if (summaryHeadline) {
-      console.log('Found headline from summary section:', summaryHeadline);
+      logger.cv('Found headline from summary section:', summaryHeadline);
       return summaryHeadline;
     }
     
@@ -2194,12 +2194,12 @@ class CVParser {
     if (workExperience && workExperience.length > 0) {
       const recentTitle = workExperience[0].title;
       if (recentTitle && this.isValidHeadline(recentTitle)) {
-        console.log('Using most recent job title as headline:', recentTitle);
+        logger.cv('Using most recent job title as headline:', recentTitle);
         return recentTitle;
       }
     }
     
-    console.log('No suitable headline found');
+    logger.cv('No suitable headline found');
     return null;
   }
 
@@ -2374,7 +2374,7 @@ class CVParser {
   // Main parsing method
   async parseCV(filePath) {
     if (!filePath || typeof filePath !== 'string') {
-      console.error('Invalid file path provided to parseCV');
+      logger.error('Invalid file path provided to parseCV');
       return {
         parsing_error: 'Invalid file path',
         parsed_at: new Date().toISOString()
@@ -2382,10 +2382,10 @@ class CVParser {
     }
 
     try {
-      console.log('Starting CV parsing for:', filePath);
+      logger.cv('Starting CV parsing for:', filePath);
       
       const text = await this.extractText(filePath);
-      console.log('Text extracted successfully, length:', text.length);
+      logger.cv('Text extracted successfully, length:', text.length);
       
       if (!text || text.trim().length === 0) {
         return {
@@ -2411,8 +2411,8 @@ class CVParser {
       const summary = this.generateSummary(text, extractedData);
       const headline = this.extractHeadline(text, workExperience);
       
-      console.log('Parsing completed successfully');
-      console.log('Extracted data summary:', {
+      logger.cv('Parsing completed successfully');
+      logger.cv('Extracted data summary:', {
         name: `${firstName} ${lastName}`,
         email: contactInfo.email,
         phone: contactInfo.phone,
@@ -2440,7 +2440,7 @@ class CVParser {
         parsed_at: new Date().toISOString()
       };
     } catch (error) {
-      console.error('CV parsing error:', error);
+      logger.error('CV parsing error:', error);
       return {
         parsing_error: `Failed to parse CV: ${error.message}`,
         parsed_at: new Date().toISOString()
