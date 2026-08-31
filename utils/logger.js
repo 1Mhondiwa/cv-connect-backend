@@ -58,18 +58,6 @@ class Logger {
     }
   }
 
-  db(message, data = null) {
-    if (isDevelopment) {
-      this.debug(`[DB] ${message}`, data);
-    }
-  }
-
-  api(message, data = null) {
-    if (isDevelopment) {
-      this.debug(`[API] ${message}`, data);
-    }
-  }
-
   cv(message, data = null) {
     if (isDevelopment) {
       this.debug(`[CV] ${message}`, data);
