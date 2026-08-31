@@ -1,3 +1,5 @@
+const logger = require('./utils/logger');
+
 class SignalingServer {
   constructor(io) {
     this.io = io; // Use the existing Socket.IO instance
@@ -9,7 +11,7 @@ class SignalingServer {
   setupEventHandlers() {
     // Set up WebRTC event handlers on the existing io instance
     // These will be added to each connection automatically
-    console.log('📡 WebRTC signaling server initialized');
+    logger.info('WebRTC signaling server initialized');
   }
 
   // Method to add WebRTC handlers to a socket connection
@@ -17,7 +19,7 @@ class SignalingServer {
     // Handle joining a room
     socket.on('join-room', (data) => {
         const { roomId, userId } = data;
-        console.log(`👤 User ${userId} joining room ${roomId}`);
+        logger.info(`User ${userId} joining room ${roomId}`);
         
         socket.join(roomId);
         socket.roomId = roomId;
@@ -36,13 +38,13 @@ class SignalingServer {
         // Notify others in the room
         socket.to(roomId).emit('user-joined', { userId, roomId });
         
-        console.log(`📊 Room ${roomId} now has ${this.rooms.get(roomId).participants.size} participants`);
+        logger.debug(`Room ${roomId} now has ${this.rooms.get(roomId).participants.size} participants`);
       });
 
       // Handle leaving a room
       socket.on('leave-room', (data) => {
         const { roomId } = data;
-        console.log(`👤 User leaving room ${roomId}`);
+        logger.info(`User leaving room ${roomId}`);
         
         if (this.rooms.has(roomId)) {
           this.rooms.get(roomId).participants.delete(socket.userId);
@@ -53,7 +55,7 @@ class SignalingServer {
           // Clean up empty rooms
           if (this.rooms.get(roomId).participants.size === 0) {
             this.rooms.delete(roomId);
-            console.log(`🗑️ Room ${roomId} deleted (empty)`);
+            logger.debug(`Room ${roomId} deleted (empty)`);
           }
         }
         
@@ -65,7 +67,7 @@ class SignalingServer {
       // Handle WebRTC offer
       socket.on('offer', (data) => {
         const { roomId, offer } = data;
-        console.log(`📞 Offer received in room ${roomId}`);
+        logger.debug(`Offer received in room ${roomId}`);
         
         // Forward offer to other participants in the room
         socket.to(roomId).emit('offer', {
@@ -78,7 +80,7 @@ class SignalingServer {
       // Handle WebRTC answer
       socket.on('answer', (data) => {
         const { roomId, answer } = data;
-        console.log(`📞 Answer received in room ${roomId}`);
+        logger.debug(`Answer received in room ${roomId}`);
         
         // Forward answer to other participants in the room
         socket.to(roomId).emit('answer', {
@@ -91,7 +93,7 @@ class SignalingServer {
       // Handle ICE candidates
       socket.on('ice-candidate', (data) => {
         const { roomId, candidate } = data;
-        console.log(`🧊 ICE candidate received in room ${roomId}`);
+        logger.debug(`ICE candidate received in room ${roomId}`);
         
         // Forward ICE candidate to other participants in the room
         socket.to(roomId).emit('ice-candidate', {
@@ -103,7 +105,7 @@ class SignalingServer {
 
       // Handle disconnection
       socket.on('disconnect', () => {
-        console.log('📡 Client disconnected:', socket.id);
+        logger.info('Client disconnected:', socket.id);
         
         if (socket.roomId) {
           const roomId = socket.roomId;
@@ -120,7 +122,7 @@ class SignalingServer {
             // Clean up empty rooms
             if (this.rooms.get(roomId).participants.size === 0) {
               this.rooms.delete(roomId);
-              console.log(`🗑️ Room ${roomId} deleted (empty)`);
+              logger.debug(`Room ${roomId} deleted (empty)`);
             }
           }
         }
@@ -128,7 +130,7 @@ class SignalingServer {
 
       // Handle errors
       socket.on('error', (error) => {
-        console.error('❌ Socket error:', error);
+        logger.error('Socket error:', error);
       });
   }
 
