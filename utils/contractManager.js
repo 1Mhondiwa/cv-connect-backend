@@ -1,5 +1,6 @@
 // utils/contractManager.js
 const db = require('../config/database');
+const logger = require('./logger');
 
 /**
  * Updates expired contracts to completed status
@@ -8,14 +9,14 @@ const db = require('../config/database');
  */
 const updateExpiredContracts = async () => {
   try {
-    console.log('🔄 Checking for expired contracts...');
+    logger.debug('Checking for expired contracts...');
     
     // Call the database function to update expired contracts
     const result = await db.query('SELECT update_expired_contracts() as updated_count');
     const updatedCount = parseInt(result.rows[0].updated_count);
     
     if (updatedCount > 0) {
-      console.log(`✅ Updated ${updatedCount} expired contracts to completed status`);
+      logger.info(`Updated ${updatedCount} expired contracts to completed status`);
       
       // Log activity for each updated contract (optional - for audit trail)
       const expiredContracts = await db.query(
@@ -27,10 +28,10 @@ const updateExpiredContracts = async () => {
       );
       
       for (const contract of expiredContracts.rows) {
-        console.log(`📋 Contract ${contract.hire_id} for freelancer ${contract.freelancer_id} marked as completed`);
+        logger.debug(`Contract ${contract.hire_id} for freelancer ${contract.freelancer_id} marked as completed`);
       }
     } else {
-      console.log('✅ No expired contracts found');
+      logger.debug('No expired contracts found');
     }
     
     return {
@@ -40,7 +41,7 @@ const updateExpiredContracts = async () => {
     };
     
   } catch (error) {
-    console.error('❌ Error updating expired contracts:', error);
+    logger.error('Error updating expired contracts:', error);
     return {
       success: false,
       updated_count: 0,
@@ -80,7 +81,7 @@ const checkFreelancerAvailability = async (freelancerId) => {
     };
     
   } catch (error) {
-    console.error('❌ Error checking freelancer availability:', error);
+    logger.error('Error checking freelancer availability:', error);
     return {
       success: false,
       is_available: false,
@@ -113,7 +114,7 @@ const getExpiredContracts = async (freelancerId) => {
     };
     
   } catch (error) {
-    console.error('❌ Error getting expired contracts:', error);
+    logger.error('Error getting expired contracts:', error);
     return {
       success: false,
       expired_contracts: [],
