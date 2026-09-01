@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const logger = require('./logger');
 
 async function logActivity({ user_id, role, activity_type, status = 'Completed', details = null }) {
   try {
@@ -30,14 +31,14 @@ async function logActivity({ user_id, role, activity_type, status = 'Completed',
           };
           userConnection.write(`data: ${JSON.stringify(activityData)}\n\n`);
         } catch (error) {
-          console.error('Error broadcasting activity update:', error);
+          logger.error('Error broadcasting activity update:', error);
         }
       }
     }
 
     return activity;
   } catch (error) {
-    console.error('Error logging activity:', error);
+    logger.error('Error logging activity:', error);
     throw error;
   }
 }
