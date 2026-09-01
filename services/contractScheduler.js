@@ -1,6 +1,7 @@
-// services/contractScheduler.js
+﻿// services/contractScheduler.js
 const cron = require('node-cron');
 const { updateExpiredContracts } = require('../utils/contractManager');
+const logger = require('../utils/logger');
 
 /**
  * Contract Expiration Scheduler
@@ -17,22 +18,22 @@ class ContractScheduler {
    */
   start() {
     if (this.isRunning) {
-      console.log('⚠️ Contract scheduler is already running');
+      logger.info('âš ï¸ Contract scheduler is already running');
       return;
     }
 
     // Schedule job to run daily at 2:00 AM
     this.job = cron.schedule('0 2 * * *', async () => {
-      console.log('🕐 Running scheduled contract expiration check...');
+      logger.info('ðŸ• Running scheduled contract expiration check...');
       try {
         const result = await updateExpiredContracts();
         if (result.success && result.updated_count > 0) {
-          console.log(`✅ Scheduled job completed: ${result.message}`);
+          logger.info(`âœ… Scheduled job completed: ${result.message}`);
         } else {
-          console.log('✅ Scheduled job completed: No expired contracts found');
+          logger.info('âœ… Scheduled job completed: No expired contracts found');
         }
       } catch (error) {
-        console.error('❌ Scheduled contract expiration check failed:', error);
+        logger.error('âŒ Scheduled contract expiration check failed:', error);
       }
     }, {
       scheduled: false, // Don't start immediately
@@ -42,7 +43,7 @@ class ContractScheduler {
     this.job.start();
     this.isRunning = true;
     
-    console.log('✅ Contract expiration scheduler started - runs daily at 2:00 AM UTC');
+    logger.info('âœ… Contract expiration scheduler started - runs daily at 2:00 AM UTC');
   }
 
   /**
@@ -50,7 +51,7 @@ class ContractScheduler {
    */
   stop() {
     if (!this.isRunning || !this.job) {
-      console.log('⚠️ Contract scheduler is not running');
+      logger.info('âš ï¸ Contract scheduler is not running');
       return;
     }
 
@@ -58,7 +59,7 @@ class ContractScheduler {
     this.job = null;
     this.isRunning = false;
     
-    console.log('🛑 Contract expiration scheduler stopped');
+    logger.info('ðŸ›‘ Contract expiration scheduler stopped');
   }
 
   /**
@@ -75,13 +76,13 @@ class ContractScheduler {
    * Run the contract expiration check manually (for testing or immediate execution)
    */
   async runNow() {
-    console.log('🔄 Running manual contract expiration check...');
+    logger.info('ðŸ”„ Running manual contract expiration check...');
     try {
       const result = await updateExpiredContracts();
-      console.log(result.success ? `✅ Manual check completed: ${result.message}` : `❌ Manual check failed: ${result.error}`);
+      logger.info(result.success ? `âœ… Manual check completed: ${result.message}` : `âŒ Manual check failed: ${result.error}`);
       return result;
     } catch (error) {
-      console.error('❌ Manual contract expiration check failed:', error);
+      logger.error('âŒ Manual contract expiration check failed:', error);
       return {
         success: false,
         error: error.message
