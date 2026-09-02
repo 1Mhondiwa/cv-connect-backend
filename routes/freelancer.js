@@ -9,6 +9,7 @@ const { syncCVDataWithProfile } = require('../utils/profileSync');
 const fs = require('fs-extra');
 const path = require('path');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLogger');
 
 // Get freelancer profile
@@ -30,15 +31,15 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     }
     
     // Get freelancer information
-    console.log('Step 2: Querying Freelancer table...');
+    logger.debug('Step 2: Querying Freelancer table...');
     const freelancerResult = await db.query(
       'SELECT * FROM "Freelancer" WHERE user_id = $1',
       [userId]
     );
-    console.log('Freelancer query result:', freelancerResult.rowCount, 'rows');
+    logger.debug('Freelancer query result:', freelancerResult.rowCount, 'rows');
     
     if (freelancerResult.rowCount === 0) {
-      console.log('Freelancer profile not found');
+      logger.debug('Freelancer profile not found');
       return res.status(404).json({
         success: false,
         message: 'Freelancer profile not found'
@@ -48,7 +49,7 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
     const freelancerId = freelancerResult.rows[0].freelancer_id;
     
     // Get freelancer skills (with error handling for missing Skill table)
-    console.log('Step 3: Querying Freelancer_Skill with Skill details...');
+    logger.debug('Step 3: Querying Freelancer_Skill with Skill details...');
     let skillsResult = { rows: [] };
     try {
       skillsResult = await db.query(
@@ -60,21 +61,21 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
          ORDER BY s.name ASC`,
         [freelancerId]
       );
-      console.log('Skills query result:', skillsResult.rowCount, 'rows');
+      logger.debug('Skills query result:', skillsResult.rowCount, 'rows');
     } catch (skillError) {
-      console.warn('Warning: Failed to fetch skills:', skillError.message);
+      logger.warn('Warning: Failed to fetch skills:', skillError.message);
       // Continue anyway - skills are not critical
     }
     
     // Get freelancer CV
-    console.log('Step 4: Querying CV...');
+    logger.debug('Step 4: Querying CV...');
     let cvData = null;
     try {
       const cvResult = await db.query(
         'SELECT * FROM "CV" WHERE freelancer_id = $1',
         [freelancerId]
       );
-      console.log('CV query result:', cvResult.rowCount, 'rows');
+      logger.debug('CV query result:', cvResult.rowCount, 'rows');
       
       // Handle missing CV gracefully
       if (cvResult.rowCount > 0) {
@@ -118,17 +119,17 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
               'UPDATE "CV" SET parsed_data = $1 WHERE cv_id = $2',
               [JSON.stringify(cvData.parsed_data), cvData.cv_id]
             );
-            console.log('Added missing IDs to CV data for freelancer:', freelancerId);
+            logger.debug('Added missing IDs to CV data for freelancer:', freelancerId);
           }
         }
       }
     } catch (cvError) {
-      console.warn('Warning: Failed to fetch CV:', cvError.message);
+      logger.warn('Warning: Failed to fetch CV:', cvError.message);
       // CV is not critical - continue anyway
     }
     
     // Get completed contracts/jobs (with error handling for missing tables)
-    console.log('Step 5: Querying Freelancer_Hire and Associate...');
+    logger.debug('Step 5: Querying Freelancer_Hire and Associate...');
     let completedJobsResult = { rows: [] };
     try {
       completedJobsResult = await db.query(
@@ -151,9 +152,9 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
          ORDER BY h.end_date DESC, h.created_at DESC`,
         [freelancerId]
       );
-      console.log('Completed jobs query result:', completedJobsResult.rowCount, 'rows');
+      logger.debug('Completed jobs query result:', completedJobsResult.rowCount, 'rows');
     } catch (jobError) {
-      console.warn('Warning: Failed to fetch completed jobs:', jobError.message);
+      logger.warn('Warning: Failed to fetch completed jobs:', jobError.message);
       // Jobs are not critical - continue anyway
     }
     
@@ -166,23 +167,23 @@ router.get('/profile', authenticateToken, requireRole(['freelancer']), async (re
       completed_jobs: completedJobsResult.rows
     };
     
-    console.log('Profile data compiled successfully');
+    logger.debug('Profile data compiled successfully');
     return res.status(200).json({
       success: true,
       profile: profileData
     });
   } catch (error) {
-    console.error('=== Freelancer Profile Error Details ===');
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    console.error('Error code:', error.code);
-    console.error('Error severity:', error.severity);
-    console.error('Error detail:', error.detail);
-    console.error('Error hint:', error.hint);
-    console.error('Error table:', error.table);
-    console.error('Error column:', error.column);
-    console.error('Error constraint:', error.constraint);
-    console.error('========================================');
+    logger.error('=== Freelancer Profile Error Details ===');
+    logger.error('Error message:', error.message);
+    logger.error('Error stack:', error.stack);
+    logger.error('Error code:', error.code);
+    logger.error('Error severity:', error.severity);
+    logger.error('Error detail:', error.detail);
+    logger.error('Error hint:', error.hint);
+    logger.error('Error table:', error.table);
+    logger.error('Error column:', error.column);
+    logger.error('Error constraint:', error.constraint);
+    logger.error('========================================');
     
     return res.status(500).json({
       success: false,
@@ -277,7 +278,7 @@ router.put('/profile', authenticateToken, requireRole(['freelancer']), validateF
       message: 'Profile updated successfully'
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
+    logger.error('Error updating profile:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -356,7 +357,7 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
         }));
       }
     } catch (parseError) {
-      console.warn('CV parsing warning (not critical):', parseError.message);
+      logger.warn('CV parsing warning (not critical):', parseError.message);
       // Continue anyway - CV can still be stored without parsing
       parsedData = { 
         parsing_error: 'Failed to parse CV content',
@@ -405,7 +406,7 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
       const syncResult = await syncCVDataWithProfile(freelancerId, parsedData, false);
       
       if (!syncResult.success) {
-        console.warn('Failed to sync CV data with profile:', syncResult.error);
+        logger.warn('Failed to sync CV data with profile:', syncResult.error);
         // Continue with the upload even if sync fails
       }
       
@@ -461,12 +462,12 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
                 ]
               );
             } catch (skillError) {
-              console.warn(`Warning: Failed to add skill "${skill.name}":`, skillError.message);
+              logger.warn(`Warning: Failed to add skill "${skill.name}":`, skillError.message);
               // Continue adding other skills
             }
           }
         } catch (skillsError) {
-          console.warn('Warning: Failed to process skills:', skillsError.message);
+          logger.warn('Warning: Failed to process skills:', skillsError.message);
           // Continue - CV upload is still successful even if skills fail
         }
       }
@@ -492,19 +493,19 @@ router.post('/cv/upload', authenticateToken, requireRole(['freelancer']), upload
       parsed_data: parsedData
     });
   } catch (error) {
-    console.error('=== CV Upload Error ===');
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error detail:', error.detail);
-    console.error('Error stack:', error.stack);
-    console.error('========================');
+    logger.error('=== CV Upload Error ===');
+    logger.error('Error message:', error.message);
+    logger.error('Error code:', error.code);
+    logger.error('Error detail:', error.detail);
+    logger.error('Error stack:', error.stack);
+    logger.error('========================');
     
     // Delete the uploaded file if there was an error
     if (req.file && req.file.path) {
       try {
         fs.unlinkSync(req.file.path);
       } catch (unlinkError) {
-        console.error('Failed to delete uploaded file:', unlinkError.message);
+        logger.error('Failed to delete uploaded file:', unlinkError.message);
       }
     }
     
@@ -572,7 +573,7 @@ router.post('/profile-image', authenticateToken, requireRole(['freelancer']), up
       image_url: imageUrl
     });
   } catch (error) {
-    console.error('Profile image upload error:', error);
+    logger.error('Profile image upload error:', error);
     
     // Delete the uploaded file if there was an error
     if (req.file && req.file.path) {
@@ -627,7 +628,7 @@ router.delete('/profile-image', authenticateToken, requireRole(['freelancer']), 
       message: 'Profile image deleted successfully'
     });
   } catch (error) {
-    console.error('Profile image deletion error:', error);
+    logger.error('Profile image deletion error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -729,7 +730,7 @@ router.post('/skills', authenticateToken, requireRole(['freelancer']), async (re
       freelancer_skill_id: freelancerSkillResult.rows[0].freelancer_skill_id
     });
   } catch (error) {
-    console.error('Add skill error:', error);
+    logger.error('Add skill error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -807,7 +808,7 @@ router.put('/skills/:skillId', authenticateToken, requireRole(['freelancer']), a
       message: 'Skill updated successfully'
     });
   } catch (error) {
-    console.error('Update skill error:', error);
+    logger.error('Update skill error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -869,7 +870,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         message: 'Skill deleted successfully'
       });
     } catch (error) {
-      console.error('Delete skill error:', error);
+      logger.error('Delete skill error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -966,7 +967,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         work_experience: newWorkExperience
       });
     } catch (error) {
-      console.error('Add work experience error:', error);
+      logger.error('Add work experience error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1026,8 +1027,8 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       // Clean up any corrupted entries (remove undefined IDs)
       const cleanWorkExperience = workExperience.filter(work => work && work.id && work.id !== undefined);
       
-      console.log('Looking for workId:', workId);
-      console.log('Available work experience IDs:', cleanWorkExperience.map(w => w.id));
+      logger.debug('Looking for workId:', workId);
+      logger.debug('Available work experience IDs:', cleanWorkExperience.map(w => w.id));
       const workIndex = cleanWorkExperience.findIndex(work => work.id === workId);
       
       if (workIndex === -1) {
@@ -1071,7 +1072,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         work_experience: workExperience[workIndex]
       });
     } catch (error) {
-      console.error('Update work experience error:', error);
+      logger.error('Update work experience error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1123,8 +1124,8 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       // Clean up any corrupted entries (remove undefined IDs)
       const cleanWorkExperience = workExperience.filter(work => work && work.id && work.id !== undefined);
       
-      console.log('Looking for workId to delete:', workId);
-      console.log('Available work experience IDs:', cleanWorkExperience.map(w => w.id));
+      logger.debug('Looking for workId to delete:', workId);
+      logger.debug('Available work experience IDs:', cleanWorkExperience.map(w => w.id));
       const filteredWorkExperience = cleanWorkExperience.filter(work => work.id !== workId);
       
       if (filteredWorkExperience.length === cleanWorkExperience.length) {
@@ -1157,7 +1158,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         message: 'Work experience deleted successfully'
       });
     } catch (error) {
-      console.error('Delete work experience error:', error);
+      logger.error('Delete work experience error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1247,7 +1248,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         education: newEducation
       });
     } catch (error) {
-      console.error('Add education error:', error);
+      logger.error('Add education error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1347,7 +1348,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         education: existingEducation[educationIndex]
       });
     } catch (error) {
-      console.error('Update education error:', error);
+      logger.error('Update education error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1427,7 +1428,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         message: 'Education deleted successfully'
       });
     } catch (error) {
-      console.error('Delete education error:', error);
+      logger.error('Delete education error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1505,7 +1506,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         parsed_data: updatedParsedData
       });
     } catch (error) {
-      console.error('Update CV parsed data error:', error);
+      logger.error('Update CV parsed data error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1546,13 +1547,13 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
           [userId]
         );
         
-        console.log('🔍 Activities query result:', {
+        logger.debug('🔍 Activities query result:', {
           userId,
           rowCount: activitiesResult.rowCount,
           activities: activitiesResult.rows
         });
       } catch (activityError) {
-        console.error('❌ Error fetching activities:', activityError);
+        logger.error('❌ Error fetching activities:', activityError);
         // Continue with empty activities if there's an error
       }
       
@@ -1564,7 +1565,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
       
       // If no activities exist, create some sample ones for testing
       if (activitiesResult.rows.length === 0) {
-        console.log('🔍 No activities found, creating sample activities...');
+        logger.debug('🔍 No activities found, creating sample activities...');
         
         // Create sample activities
         const sampleActivities = [
@@ -1585,7 +1586,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
           }
         ];
         
-        console.log('🔍 Sample activities created:', sampleActivities);
+        logger.debug('🔍 Sample activities created:', sampleActivities);
         activitiesResult.rows = sampleActivities;
       }
       
@@ -1607,7 +1608,7 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         dashboard: dashboardData
       });
     } catch (error) {
-      console.error('Dashboard error:', error);
+      logger.error('Dashboard error:', error);
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1693,7 +1694,7 @@ router.put('/availability', authenticateToken, requireRole(['freelancer']), asyn
       availability_status: availability_status
     });
   } catch (error) {
-    console.error('Update availability error:', error);
+    logger.error('Update availability error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -1739,7 +1740,7 @@ router.get('/availability/stream', authenticateTokenSSE, requireRole(['freelance
     // Handle client disconnect
     req.on('close', () => {
       req.app.locals.sseConnections.delete(userId);
-      console.log(`SSE connection closed for user ${userId}`);
+      logger.debug(`SSE connection closed for user ${userId}`);
     });
 
     // Keep connection alive
@@ -1752,7 +1753,7 @@ router.get('/availability/stream', authenticateTokenSSE, requireRole(['freelance
     });
 
   } catch (error) {
-    console.error('SSE connection error:', error);
+    logger.error('SSE connection error:', error);
     res.end();
   }
 });
@@ -1794,7 +1795,7 @@ router.get('/activity/stream', authenticateTokenSSE, requireRole(['freelancer'])
     // Handle client disconnect
     req.on('close', () => {
       req.app.locals.activityConnections.delete(userId);
-      console.log(`Activity SSE connection closed for user ${userId}`);
+      logger.debug(`Activity SSE connection closed for user ${userId}`);
     });
 
     // Keep connection alive
@@ -1807,7 +1808,7 @@ router.get('/activity/stream', authenticateTokenSSE, requireRole(['freelancer'])
     });
 
   } catch (error) {
-    console.error('Activity SSE connection error:', error);
+    logger.error('Activity SSE connection error:', error);
     res.end();
   }
 });
@@ -1816,7 +1817,7 @@ router.get('/activity/stream', authenticateTokenSSE, requireRole(['freelancer'])
 router.get('/hiring/stats', authenticateToken, requireRole(['freelancer']), async (req, res) => {
   try {
     const userId = req.user.user_id;
-    console.log('🔍 Fetching hiring statistics for freelancer user_id:', userId);
+    logger.debug('🔍 Fetching hiring statistics for freelancer user_id:', userId);
 
     // Get freelancer ID
     const freelancerResult = await db.query(
@@ -1857,7 +1858,7 @@ router.get('/hiring/stats', authenticateToken, requireRole(['freelancer']), asyn
       active_hires: parseInt(activeHiresResult.rows[0].active_hires)
     };
 
-    console.log('✅ Hiring statistics fetched successfully for freelancer:', freelancerId);
+    logger.debug('✅ Hiring statistics fetched successfully for freelancer:', freelancerId);
 
     return res.status(200).json({
       success: true,
@@ -1865,7 +1866,7 @@ router.get('/hiring/stats', authenticateToken, requireRole(['freelancer']), asyn
     });
 
   } catch (error) {
-    console.error('❌ Get hiring stats error:', error);
+    logger.error('❌ Get hiring stats error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch hiring statistics',
@@ -1878,7 +1879,7 @@ router.get('/hiring/stats', authenticateToken, requireRole(['freelancer']), asyn
 router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), async (req, res) => {
   try {
     const userId = req.user.user_id;
-    console.log('🔍 Fetching hiring history for freelancer user_id:', userId);
+    logger.debug('🔍 Fetching hiring history for freelancer user_id:', userId);
 
     // Get freelancer ID
     const freelancerResult = await db.query(
@@ -1925,7 +1926,7 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
       [freelancerId]
     );
 
-    console.log(`✅ Found ${hiringHistoryResult.rowCount} hiring records for freelancer:`, freelancerId);
+    logger.debug(`✅ Found ${hiringHistoryResult.rowCount} hiring records for freelancer:`, freelancerId);
 
     return res.status(200).json({
       success: true,
@@ -1933,7 +1934,7 @@ router.get('/hiring/history', authenticateToken, requireRole(['freelancer']), as
     });
 
   } catch (error) {
-    console.error('❌ Get hiring history error:', error);
+    logger.error('❌ Get hiring history error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch hiring history',
@@ -2006,7 +2007,7 @@ router.post('/contract/:hireId/upload-signed', authenticateToken, requireRole(['
       [signedContractPath, hireId]
     );
     
-    console.log(`✅ Signed contract uploaded for hire ID: ${hireId}`);
+    logger.debug(`✅ Signed contract uploaded for hire ID: ${hireId}`);
     
     return res.status(200).json({
       success: true,
@@ -2019,7 +2020,7 @@ router.post('/contract/:hireId/upload-signed', authenticateToken, requireRole(['
     });
     
   } catch (error) {
-    console.error('Upload signed contract error:', error);
+    logger.error('Upload signed contract error:', error);
     
     // Clean up uploaded file on error
     if (req.file && fs.existsSync(req.file.path)) {

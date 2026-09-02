@@ -4,6 +4,7 @@ const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { uploadProfileImage } = require('../middleware/upload');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const fs = require('fs-extra');
 const path = require('path');
 const { logActivity } = require('../utils/activityLogger');
@@ -52,7 +53,7 @@ router.get('/profile', authenticateToken, requireRole(['associate']), async (req
       profile: profileData
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    logger.error('Error fetching profile:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -119,7 +120,7 @@ router.put('/profile', authenticateToken, requireRole(['associate']), async (req
       message: 'Profile updated successfully'
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
+    logger.error('Error updating profile:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -171,7 +172,7 @@ router.post('/profile-image', authenticateToken, requireRole(['associate']), upl
       image_url: imageUrl
     });
   } catch (error) {
-    console.error('Associate profile image upload error:', error);
+    logger.error('Associate profile image upload error:', error);
     if (req.file && req.file.path) {
       fs.unlinkSync(req.file.path);
     }
@@ -217,7 +218,7 @@ router.delete('/profile-image', authenticateToken, requireRole(['associate']), a
       message: 'Profile image deleted successfully'
     });
   } catch (error) {
-    console.error('Associate profile image deletion error:', error);
+    logger.error('Associate profile image deletion error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -314,7 +315,7 @@ router.post('/job', authenticateToken, requireRole(['associate']), async (req, r
       job_id: jobId
     });
   } catch (error) {
-    console.error('Job posting error:', error);
+    logger.error('Job posting error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -354,7 +355,7 @@ router.get('/jobs', authenticateToken, requireRole(['associate']), async (req, r
       jobs: jobsResult.rows
     });
   } catch (error) {
-    console.error('Get jobs error:', error);
+    logger.error('Get jobs error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -421,7 +422,7 @@ router.get('/dashboard', authenticateToken, requireRole(['associate']), async (r
       dashboard: dashboardData
     });
   } catch (error) {
-    console.error('Dashboard error:', error);
+    logger.error('Dashboard error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -454,7 +455,7 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     const userId = req.user.user_id;
     const { oldPassword, newPassword } = req.body;
     
-    console.log(`🔍 Change password request for user ${userId}`);
+    logger.debug(`🔍 Change password request for user ${userId}`);
     
     if (!newPassword) {
       return res.status(400).json({
@@ -530,7 +531,7 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
       message: 'Password changed successfully'
     });
   } catch (error) {
-    console.error('Change password error:', error);
+    logger.error('Change password error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -545,7 +546,7 @@ router.post('/freelancer-request', authenticateToken, requireRole(['associate'])
     const userId = req.user.user_id;
     const { title, description, required_skills, min_experience, preferred_location, budget_range, urgency_level } = req.body;
 
-    console.log(`🔍 Associate ${userId} submitting freelancer request:`, { title, required_skills });
+    logger.debug(`🔍 Associate ${userId} submitting freelancer request:`, { title, required_skills });
 
     // Validate required fields
     if (!title || !description || !required_skills || required_skills.length === 0) {
@@ -589,7 +590,7 @@ router.post('/freelancer-request', authenticateToken, requireRole(['associate'])
       details: `Request ID: ${requestId}, Title: ${title}`
     });
 
-    console.log(`✅ Freelancer request ${requestId} submitted successfully by associate ${userId}`);
+    logger.debug(`✅ Freelancer request ${requestId} submitted successfully by associate ${userId}`);
 
     return res.status(201).json({
       success: true,
@@ -597,7 +598,7 @@ router.post('/freelancer-request', authenticateToken, requireRole(['associate'])
       request_id: requestId
     });
   } catch (error) {
-    console.error('❌ Freelancer request submission error:', error);
+    logger.error('❌ Freelancer request submission error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -611,7 +612,7 @@ router.get('/freelancer-requests', authenticateToken, requireRole(['associate'])
   try {
     const userId = req.user.user_id;
 
-    console.log(`🔍 Fetching freelancer requests for associate ${userId}`);
+    logger.debug(`🔍 Fetching freelancer requests for associate ${userId}`);
 
     // Get associate ID
     const associateResult = await db.query(
@@ -654,11 +655,11 @@ router.get('/freelancer-requests', authenticateToken, requireRole(['associate'])
       [associateId]
     );
 
-    console.log(`✅ Found ${requestsResult.rowCount} freelancer requests for associate ${userId}`);
+    logger.debug(`✅ Found ${requestsResult.rowCount} freelancer requests for associate ${userId}`);
     
     // Log recommendation counts for debugging
     requestsResult.rows.forEach(request => {
-      console.log(`   Request ID: ${request.request_id} - "${request.title}" - Recommendations: ${request.recommendation_count}`);
+      logger.debug(`   Request ID: ${request.request_id} - "${request.title}" - Recommendations: ${request.recommendation_count}`);
     });
 
     return res.status(200).json({
@@ -666,7 +667,7 @@ router.get('/freelancer-requests', authenticateToken, requireRole(['associate'])
       requests: requestsResult.rows
     });
   } catch (error) {
-    console.error('❌ Fetch freelancer requests error:', error);
+    logger.error('❌ Fetch freelancer requests error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -681,7 +682,7 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
     const userId = req.user.user_id;
     const { requestId } = req.params;
 
-    console.log(`🔍 Associate ${userId} fetching recommendations for request ${requestId}`);
+    logger.debug(`🔍 Associate ${userId} fetching recommendations for request ${requestId}`);
 
     // Verify the request belongs to this associate
     const requestResult = await db.query(
@@ -747,12 +748,12 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
       [requestId]
     );
 
-    console.log(`✅ Found ${recommendationsResult.rowCount} recommendations for request ${requestId}`);
+    logger.debug(`✅ Found ${recommendationsResult.rowCount} recommendations for request ${requestId}`);
     
     // Log each recommendation for debugging
     recommendationsResult.rows.forEach((rec, index) => {
-      console.log(`   ${index + 1}. ${rec.first_name} ${rec.last_name} (${rec.headline})`);
-      console.log(`      Completed jobs: ${rec.completed_jobs ? rec.completed_jobs.length : 0}`);
+      logger.debug(`   ${index + 1}. ${rec.first_name} ${rec.last_name} (${rec.headline})`);
+      logger.debug(`      Completed jobs: ${rec.completed_jobs ? rec.completed_jobs.length : 0}`);
     });
 
     return res.status(200).json({
@@ -760,7 +761,7 @@ router.get('/freelancer-requests/:requestId/recommendations', authenticateToken,
       recommendations: recommendationsResult.rows
     });
   } catch (error) {
-    console.error('❌ Fetch recommendations error:', error);
+    logger.error('❌ Fetch recommendations error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -776,7 +777,7 @@ router.post('/freelancer-requests/:requestId/respond', authenticateToken, requir
     const { requestId } = req.params;
     const { freelancer_id, response, notes } = req.body;
 
-    console.log(`🔍 Associate ${userId} responding to recommendation for request ${requestId}, freelancer ${freelancer_id}`);
+    logger.debug(`🔍 Associate ${userId} responding to recommendation for request ${requestId}, freelancer ${freelancer_id}`);
 
     if (!freelancer_id || !response) {
       return res.status(400).json({
@@ -847,14 +848,14 @@ router.post('/freelancer-requests/:requestId/respond', authenticateToken, requir
       details: `Request ID: ${requestId}, Freelancer ID: ${freelancer_id}, Response: ${response}`
     });
 
-    console.log(`✅ Response submitted successfully for request ${requestId}, freelancer ${freelancer_id}`);
+    logger.debug(`✅ Response submitted successfully for request ${requestId}, freelancer ${freelancer_id}`);
 
     return res.status(200).json({
       success: true,
       message: 'Response submitted successfully'
     });
   } catch (error) {
-    console.error('❌ Submit response error:', error);
+    logger.error('❌ Submit response error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -868,7 +869,7 @@ router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), 
   try {
     const userId = req.user.user_id;
     
-    console.log(`🔍 Fetching hired freelancers for associate ${userId}`);
+    logger.debug(`🔍 Fetching hired freelancers for associate ${userId}`);
     
     // Get associate ID
     const associateResult = await db.query(
@@ -914,7 +915,7 @@ router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), 
       [associateId]
     );
     
-    console.log(`✅ Found ${hiredFreelancersResult.rowCount} hired freelancers for associate ${userId}`);
+    logger.debug(`✅ Found ${hiredFreelancersResult.rowCount} hired freelancers for associate ${userId}`);
     
     return res.status(200).json({
       success: true,
@@ -922,7 +923,7 @@ router.get('/hired-freelancers', authenticateToken, requireRole(['associate']), 
     });
     
   } catch (error) {
-    console.error('❌ Get hired freelancers error:', error);
+    logger.error('❌ Get hired freelancers error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch hired freelancers',
