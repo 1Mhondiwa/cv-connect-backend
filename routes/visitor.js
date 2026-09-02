@@ -2,14 +2,15 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
 
 // Track visitor from mobile app
 router.post('/track', async (req, res) => {
   try {
-    console.log('=== Visitor Track Debug ===');
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
+    logger.debug('=== Visitor Track Debug ===');
+    logger.debug('Request body:', req.body);
+    logger.debug('Request headers:', req.headers);
     
     const { 
       device_type = 'mobile', // Default to mobile for mobile app
@@ -20,7 +21,7 @@ router.post('/track', async (req, res) => {
       user_id = null // Optional - if user is logged in (must be integer)
     } = req.body;
 
-    console.log('Extracted data:', { device_type, page_visited, session_id, user_agent, referrer, user_id });
+    logger.debug('Extracted data:', { device_type, page_visited, session_id, user_agent, referrer, user_id });
 
     // Validate required fields
     if (!page_visited) {
@@ -48,11 +49,11 @@ router.post('/track', async (req, res) => {
         if (userCheck.rows.length > 0) {
           finalUserId = userIdInt;
         } else {
-          console.log(`⚠️ User ID ${userIdInt} not found in database, tracking as anonymous`);
+          logger.debug(`⚠️ User ID ${userIdInt} not found in database, tracking as anonymous`);
           finalUserId = null;
         }
       } catch (error) {
-        console.log(`⚠️ Error checking user ID ${userIdInt}, tracking as anonymous:`, error.message);
+        logger.debug(`⚠️ Error checking user ID ${userIdInt}, tracking as anonymous:`, error.message);
         finalUserId = null;
       }
     }
@@ -70,7 +71,7 @@ router.post('/track', async (req, res) => {
     const visitDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
     const visitTime = new Date();
 
-    console.log('📱 Mobile visitor tracked:', {
+    logger.debug('📱 Mobile visitor tracked:', {
       sessionId: finalSessionId.substring(0, 15) + '...',
       deviceType: device_type,
       pageVisited: page_visited,
@@ -96,7 +97,7 @@ router.post('/track', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Mobile visitor tracking error:', error);
+    logger.error('❌ Mobile visitor tracking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to track visitor',
@@ -131,7 +132,7 @@ router.post('/track-web', authenticateToken, async (req, res) => {
     const visitDate = new Date().toISOString().split('T')[0];
     const visitTime = new Date();
 
-    console.log('💻 Web visitor tracked:', {
+    logger.debug('💻 Web visitor tracked:', {
       sessionId: finalSessionId.substring(0, 15) + '...',
       deviceType: deviceType,
       pageVisited: page_visited,
@@ -158,7 +159,7 @@ router.post('/track-web', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Web visitor tracking error:', error);
+    logger.error('❌ Web visitor tracking error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to track web visitor',
@@ -217,7 +218,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Visitor stats error:', error);
+    logger.error('❌ Visitor stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get visitor statistics',

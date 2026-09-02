@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const NotificationService = require('../services/notificationService');
 const {
   scheduleInterview,
@@ -32,7 +33,7 @@ router.get('/my-feedback', authenticateToken, requireRole(['freelancer']), async
   try {
     const freelancerUserId = req.user.user_id;
     
-    console.log(`🎯 Freelancer ${freelancerUserId} requesting their interview feedback`);
+    logger.debug(`🎯 Freelancer ${freelancerUserId} requesting their interview feedback`);
 
     // For now, return empty feedback since Interview_Feedback table structure doesn't match expected columns
     const interviews = [];
@@ -45,7 +46,7 @@ router.get('/my-feedback', authenticateToken, requireRole(['freelancer']), async
       noHireRecommendations: 0
     };
 
-    console.log(`✅ Found 0 interviews with feedback for freelancer ${freelancerUserId}`);
+    logger.debug(`✅ Found 0 interviews with feedback for freelancer ${freelancerUserId}`);
 
     return res.status(200).json({
       success: true,
@@ -56,7 +57,7 @@ router.get('/my-feedback', authenticateToken, requireRole(['freelancer']), async
     });
 
   } catch (error) {
-    console.error('❌ Error fetching freelancer feedback:', error);
+    logger.error('❌ Error fetching freelancer feedback:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch interview feedback',
@@ -71,7 +72,7 @@ router.get('/notifications', authenticateToken, requireRole(['freelancer', 'asso
     const userId = req.user.user_id;
     const { limit = 50 } = req.query;
     
-    console.log(`📱 User ${userId} requesting notifications`);
+    logger.debug(`📱 User ${userId} requesting notifications`);
     
     const notifications = await NotificationService.getUserNotifications(userId, parseInt(limit));
     
@@ -80,7 +81,7 @@ router.get('/notifications', authenticateToken, requireRole(['freelancer', 'asso
       data: notifications
     });
   } catch (error) {
-    console.error('❌ Get notifications error:', error);
+    logger.error('❌ Get notifications error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch notifications',
@@ -102,7 +103,7 @@ router.put('/notifications/:id/read', authenticateToken, requireRole(['freelance
       message: 'Notification marked as read'
     });
   } catch (error) {
-    console.error('❌ Mark notification as read error:', error);
+    logger.error('❌ Mark notification as read error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to mark notification as read',

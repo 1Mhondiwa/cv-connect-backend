@@ -34,7 +34,7 @@ const submitAssociateRequest = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error submitting associate request:', error);
+    logger.error('Error submitting associate request:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -53,7 +53,7 @@ const getAllAssociateRequests = async (req, res) => {
       requests: result.rows
     });
   } catch (error) {
-    console.error('Error fetching associate requests:', error);
+    logger.error('Error fetching associate requests:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -82,7 +82,7 @@ const getAssociateRequestById = async (req, res) => {
       request: result.rows[0]
     });
   } catch (error) {
-    console.error('Error fetching associate request:', error);
+    logger.error('Error fetching associate request:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -124,7 +124,7 @@ const reviewAssociateRequest = async (req, res) => {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Error reviewing associate request:', error);
+    logger.error('Error reviewing associate request:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error'

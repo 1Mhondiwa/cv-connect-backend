@@ -7,6 +7,7 @@ const { uploadProfileImage } = require('../middleware/upload');
 const fs = require('fs-extra');
 const path = require('path');
 const { logActivity } = require('../utils/activityLogger'); // Added for new endpoints
+const logger = require('../utils/logger');
 
 // Get system stats (ESC Admin)
 router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res) => {
@@ -73,7 +74,7 @@ router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res)
       stats
     });
   } catch (error) {
-    console.error('ESC Admin stats error:', error);
+    logger.error('ESC Admin stats error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -88,7 +89,7 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     const { availability_status, approval_status, page = 1, limit = 100 } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log('🔍 Admin freelancers query - Query params:', { availability_status, approval_status, page, limit });
+    logger.debug('🔍 Admin freelancers query - Query params:', { availability_status, approval_status, page, limit });
 
     let whereConditions = ['u.is_active = true'];
     const params = [];
@@ -117,9 +118,9 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
     
-    console.log('🔍 Admin freelancers query - Where conditions:', whereConditions);
-    console.log('🔍 Admin freelancers query - Final WHERE clause:', whereClause);
-    console.log('🔍 Admin freelancers query - Params:', params);
+    logger.debug('🔍 Admin freelancers query - Where conditions:', whereConditions);
+    logger.debug('🔍 Admin freelancers query - Final WHERE clause:', whereClause);
+    logger.debug('🔍 Admin freelancers query - Params:', params);
 
     // Count query
     const countQuery = `
@@ -128,10 +129,10 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
       JOIN "User" u ON f.user_id = u.user_id
       ${whereClause}
     `;
-    console.log('🔍 Admin freelancers query - Count query:', countQuery);
+    logger.debug('🔍 Admin freelancers query - Count query:', countQuery);
     const countResult = await db.query(countQuery, params);
     const totalCount = parseInt(countResult.rows[0].count);
-    console.log('🔍 Admin freelancers query - Count result:', totalCount);
+    logger.debug('🔍 Admin freelancers query - Count result:', totalCount);
 
     // Main query with all new ECS Admin management fields and completed jobs
     const mainQuery = `
@@ -200,11 +201,11 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
          f.freelancer_id DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     
-    console.log('🔍 Admin freelancers query - Main query:', mainQuery);
-    console.log('🔍 Admin freelancers query - Query params:', [...params, limit, offset]);
+    logger.debug('🔍 Admin freelancers query - Main query:', mainQuery);
+    logger.debug('🔍 Admin freelancers query - Query params:', [...params, limit, offset]);
     
     const freelancersResult = await db.query(mainQuery, [...params, limit, offset]);
-    console.log('🔍 Admin freelancers query - Results count:', freelancersResult.rows.length);
+    logger.debug('🔍 Admin freelancers query - Results count:', freelancersResult.rows.length);
     
     // Get skills for each freelancer separately to avoid JSON aggregation issues
     const freelancers = await Promise.all(
@@ -237,7 +238,7 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
       }
     };
     
-    console.log('🔍 Admin freelancers query - Final response:', {
+    logger.debug('🔍 Admin freelancers query - Final response:', {
       success: response.success,
       freelancerCount: response.freelancers.length,
       totalCount: response.pagination.total
@@ -245,7 +246,7 @@ router.get('/freelancers', authenticateToken, requireRole(['admin']), async (req
     
     return res.status(200).json(response);
   } catch (error) {
-    console.error('Get freelancers error:', error);
+    logger.error('Get freelancers error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -269,7 +270,7 @@ router.get('/associates', authenticateToken, requireRole(['admin']), async (req,
       associates: associatesResult.rows
     });
   } catch (error) {
-    console.error('Get associates error:', error);
+    logger.error('Get associates error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -310,7 +311,7 @@ router.put('/users/:userId/toggle-active', authenticateToken, requireRole(['admi
       is_active: !currentStatus
     });
   } catch (error) {
-    console.error('Toggle user error:', error);
+    logger.error('Toggle user error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -358,7 +359,7 @@ router.put('/freelancers/:freelancerId/availability', authenticateToken, require
       availability_status: availability_status
     });
   } catch (error) {
-    console.error('Update freelancer availability error:', error);
+    logger.error('Update freelancer availability error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -409,7 +410,7 @@ router.post('/profile-image', authenticateToken, requireRole(['admin']), uploadP
       image_url: imageUrl
     });
   } catch (error) {
-    console.error('Admin profile image upload error:', error);
+    logger.error('Admin profile image upload error:', error);
     if (req.file && req.file.path) {
       fs.unlinkSync(req.file.path);
     }
@@ -454,7 +455,7 @@ router.delete('/profile-image', authenticateToken, requireRole(['admin']), async
       message: 'Profile image deleted successfully'
     });
   } catch (error) {
-    console.error('Admin profile image deletion error:', error);
+    logger.error('Admin profile image deletion error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -469,7 +470,7 @@ router.put('/freelancers/:freelancerId/approve', authenticateToken, requireRole(
     const { freelancerId } = req.params;
     const adminUserId = req.user.user_id;
 
-    console.log(`🔐 ECS Admin ${adminUserId} approving freelancer ${freelancerId}`);
+    logger.debug(`🔐 ECS Admin ${adminUserId} approving freelancer ${freelancerId}`);
 
     // Update freelancer approval status
     const result = await db.query(
@@ -497,14 +498,14 @@ router.put('/freelancers/:freelancerId/approve', authenticateToken, requireRole(
       details: `Approved freelancer ID: ${freelancerId}`
     });
 
-    console.log(`✅ Freelancer ${freelancerId} approved successfully by ECS Admin ${adminUserId}`);
+    logger.debug(`✅ Freelancer ${freelancerId} approved successfully by ECS Admin ${adminUserId}`);
     
     return res.status(200).json({
       success: true,
       message: 'Freelancer approved successfully'
     });
   } catch (error) {
-    console.error('❌ Freelancer approval error:', error);
+    logger.error('❌ Freelancer approval error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -519,7 +520,7 @@ router.put('/freelancers/:freelancerId/reject', authenticateToken, requireRole([
     const { freelancerId } = req.params;
     const adminUserId = req.user.user_id;
 
-    console.log(`🔐 ECS Admin ${adminUserId} rejecting freelancer ${freelancerId}`);
+    logger.debug(`🔐 ECS Admin ${adminUserId} rejecting freelancer ${freelancerId}`);
 
     // Update freelancer approval status
     const result = await db.query(
@@ -547,14 +548,14 @@ router.put('/freelancers/:freelancerId/reject', authenticateToken, requireRole([
       details: `Rejected freelancer ID: ${freelancerId}`
     });
 
-    console.log(`✅ Freelancer ${freelancerId} rejected successfully by ECS Admin ${adminUserId}`);
+    logger.debug(`✅ Freelancer ${freelancerId} rejected successfully by ECS Admin ${adminUserId}`);
     
     return res.status(200).json({
       success: true,
       message: 'Freelancer rejected successfully'
     });
   } catch (error) {
-    console.error('❌ Freelancer rejection error:', error);
+    logger.error('❌ Freelancer rejection error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -570,7 +571,7 @@ router.put('/freelancers/:freelancerId/rating', authenticateToken, requireRole([
     const { rating } = req.body;
     const adminUserId = req.user.user_id;
 
-    console.log(`🔐 ECS Admin ${adminUserId} updating rating for freelancer ${freelancerId} to ${rating}`);
+    logger.debug(`🔐 ECS Admin ${adminUserId} updating rating for freelancer ${freelancerId} to ${rating}`);
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({
@@ -603,14 +604,14 @@ router.put('/freelancers/:freelancerId/rating', authenticateToken, requireRole([
       details: `Updated rating to ${rating}/5 for freelancer ID: ${freelancerId}`
     });
 
-    console.log(`✅ Freelancer ${freelancerId} rating updated to ${rating} by ECS Admin ${adminUserId}`);
+    logger.debug(`✅ Freelancer ${freelancerId} rating updated to ${rating} by ECS Admin ${adminUserId}`);
     
     return res.status(200).json({
       success: true,
       message: 'Freelancer rating updated successfully'
     });
   } catch (error) {
-    console.error('❌ Freelancer rating update error:', error);
+    logger.error('❌ Freelancer rating update error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -626,7 +627,7 @@ router.put('/freelancers/:freelancerId/notes', authenticateToken, requireRole(['
     const { notes } = req.body;
     const adminUserId = req.user.user_id;
 
-    console.log(`🔐 ECS Admin ${adminUserId} updating notes for freelancer ${freelancerId}`);
+    logger.debug(`🔐 ECS Admin ${adminUserId} updating notes for freelancer ${freelancerId}`);
 
     // Update freelancer notes
     const result = await db.query(
@@ -652,14 +653,14 @@ router.put('/freelancers/:freelancerId/notes', authenticateToken, requireRole(['
       details: `Updated admin notes for freelancer ID: ${freelancerId}`
     });
 
-    console.log(`✅ Freelancer ${freelancerId} notes updated by ECS Admin ${adminUserId}`);
+    logger.debug(`✅ Freelancer ${freelancerId} notes updated by ECS Admin ${adminUserId}`);
     
     return res.status(200).json({
       success: true,
       message: 'Freelancer notes updated successfully'
     });
   } catch (error) {
-    console.error('❌ Freelancer notes update error:', error);
+    logger.error('❌ Freelancer notes update error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -675,7 +676,7 @@ router.put('/freelancers/:freelancerId/availability', authenticateToken, require
     const { is_available } = req.body;
     const adminUserId = req.user.user_id;
 
-    console.log(`🔐 ECS Admin ${adminUserId} updating availability for freelancer ${freelancerId} to ${is_available}`);
+    logger.debug(`🔐 ECS Admin ${adminUserId} updating availability for freelancer ${freelancerId} to ${is_available}`);
 
     // Update freelancer availability
     const result = await db.query(
@@ -701,14 +702,14 @@ router.put('/freelancers/:freelancerId/availability', authenticateToken, require
       details: `Updated availability to ${is_available ? 'Available' : 'Unavailable'} for freelancer ID: ${freelancerId}`
     });
 
-    console.log(`✅ Freelancer ${freelancerId} availability updated to ${is_available} by ECS Admin ${adminUserId}`);
+    logger.debug(`✅ Freelancer ${freelancerId} availability updated to ${is_available} by ECS Admin ${adminUserId}`);
     
     return res.status(200).json({
       success: true,
       message: 'Freelancer availability updated successfully'
     });
   } catch (error) {
-    console.error('❌ Freelancer availability update error:', error);
+    logger.error('❌ Freelancer availability update error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -766,7 +767,7 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
       [...params, limit, offset]
     );
 
-    console.log(`✅ Found ${requestsResult.rowCount} associate freelancer requests`);
+    logger.debug(`✅ Found ${requestsResult.rowCount} associate freelancer requests`);
 
     return res.status(200).json({
       success: true,
@@ -779,7 +780,7 @@ router.get('/associate-requests', authenticateToken, requireRole(['admin', 'ecs_
       }
     });
   } catch (error) {
-    console.error('❌ Get associate requests error:', error);
+    logger.error('❌ Get associate requests error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -793,7 +794,7 @@ router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(
   try {
     const { freelancerId } = req.params;
     
-    console.log(`🔍 ECS Employee fetching detailed profile for freelancer ${freelancerId}`);
+    logger.debug(`🔍 ECS Employee fetching detailed profile for freelancer ${freelancerId}`);
     
     // Get freelancer details with user info
     const freelancerResult = await db.query(
@@ -861,14 +862,14 @@ router.get('/freelancers/:freelancerId/profile', authenticateToken, requireRole(
       completed_jobs: completedJobsResult.rows
     };
     
-    console.log(`✅ Detailed profile fetched for freelancer ${freelancerId}`);
+    logger.debug(`✅ Detailed profile fetched for freelancer ${freelancerId}`);
     
     return res.status(200).json({
       success: true,
       freelancer: freelancerProfile
     });
   } catch (error) {
-    console.error('❌ Get freelancer profile error:', error);
+    logger.error('❌ Get freelancer profile error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -883,7 +884,7 @@ router.get('/associate-requests/:requestId', authenticateToken, requireRole(['ad
     const { requestId } = req.params;
     const reviewerUserId = req.user.user_id;
 
-    console.log(`🔍 ECS Admin/Employee ${reviewerUserId} fetching associate request ${requestId}`);
+    logger.debug(`🔍 ECS Admin/Employee ${reviewerUserId} fetching associate request ${requestId}`);
 
     // Get request details
     const requestResult = await db.query(
@@ -944,7 +945,7 @@ router.get('/associate-requests/:requestId', authenticateToken, requireRole(['ad
       [requestId]
     );
 
-    console.log(`✅ Request ${requestId} details fetched successfully`);
+    logger.debug(`✅ Request ${requestId} details fetched successfully`);
 
     return res.status(200).json({
       success: true,
@@ -953,7 +954,7 @@ router.get('/associate-requests/:requestId', authenticateToken, requireRole(['ad
       responses: responsesResult.rows
     });
   } catch (error) {
-    console.error('❌ Get request details error:', error);
+    logger.error('❌ Get request details error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -969,7 +970,7 @@ router.post('/associate-requests/:requestId/recommendations', authenticateToken,
     const { freelancer_ids, admin_notes, highlighted_freelancers } = req.body;
     const reviewerUserId = req.user.user_id;
 
-    console.log(`🔍 ECS Admin/Employee ${reviewerUserId} adding recommendations to request ${requestId}`);
+    logger.debug(`🔍 ECS Admin/Employee ${reviewerUserId} adding recommendations to request ${requestId}`);
 
     if (!freelancer_ids || freelancer_ids.length === 0) {
       return res.status(400).json({
@@ -1036,14 +1037,14 @@ router.post('/associate-requests/:requestId/recommendations', authenticateToken,
       details: `Request ID: ${requestId}, Freelancers: ${freelancer_ids.length}`
     });
 
-    console.log(`✅ ${freelancer_ids.length} recommendations added to request ${requestId}`);
+    logger.debug(`✅ ${freelancer_ids.length} recommendations added to request ${requestId}`);
 
     return res.status(200).json({
       success: true,
       message: 'Recommendations added successfully'
     });
   } catch (error) {
-    console.error('❌ Add recommendations error:', error);
+    logger.error('❌ Add recommendations error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -1059,7 +1060,7 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
     const { status, admin_notes } = req.body;
     const reviewerUserId = req.user.user_id;
 
-    console.log(`🔍 ECS Admin/Employee ${reviewerUserId} updating request ${requestId} status to ${status}`);
+    logger.debug(`🔍 ECS Admin/Employee ${reviewerUserId} updating request ${requestId} status to ${status}`);
 
     if (!['pending', 'reviewed', 'provided', 'completed', 'cancelled'].includes(status)) {
       return res.status(400).json({
@@ -1093,14 +1094,14 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
       details: `Request ID: ${requestId}, New Status: ${status}`
     });
 
-    console.log(`✅ Request ${requestId} status updated to ${status}`);
+    logger.debug(`✅ Request ${requestId} status updated to ${status}`);
 
     return res.status(200).json({
       success: true,
       message: 'Request status updated successfully'
     });
   } catch (error) {
-    console.error('❌ Update request status error:', error);
+    logger.error('❌ Update request status error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -1169,7 +1170,7 @@ router.get('/analytics/registration-trends', authenticateToken, requireRole(['ad
       data: dateRange
     });
   } catch (error) {
-    console.error('Analytics registration trends error:', error);
+    logger.error('Analytics registration trends error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch registration trends',
@@ -1207,7 +1208,7 @@ router.get('/analytics/user-type-distribution', authenticateToken, requireRole([
       }))
     });
   } catch (error) {
-    console.error('Analytics user type distribution error:', error);
+    logger.error('Analytics user type distribution error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch user type distribution',
@@ -1244,7 +1245,7 @@ router.get('/analytics/user-activity-status', authenticateToken, requireRole(['a
       }))
     });
   } catch (error) {
-    console.error('Analytics user activity status error:', error);
+    logger.error('Analytics user activity status error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch user activity status',
@@ -1326,7 +1327,7 @@ router.get('/analytics/cv-upload-trends', authenticateToken, requireRole(['admin
       data: trends
     });
   } catch (error) {
-    console.error('Analytics CV upload trends error:', error);
+    logger.error('Analytics CV upload trends error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch CV upload trends',
@@ -1359,14 +1360,14 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
       fill: getSkillColor(row.skill)
     }));
 
-    console.log('📊 Top Skills Data:', skillsData);
+    logger.debug('📊 Top Skills Data:', skillsData);
 
     return res.status(200).json({
       success: true,
       data: skillsData
     });
   } catch (error) {
-    console.error('Analytics top skills error:', error);
+    logger.error('Analytics top skills error:', error);
     // Return empty array if there's an error
     return res.status(200).json({
       success: true,
@@ -1378,7 +1379,7 @@ router.get('/analytics/top-skills', authenticateToken, requireRole(['admin']), a
 // Get skills demand data from ALL sources where associates require skills
 router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔍 Fetching skills demand data from ALL sources...');
+    logger.debug('🔍 Fetching skills demand data from ALL sources...');
     
     // 1. Get skills from job postings (TEXT field - comma separated)
     const jobPostingsResult = await db.query(`
@@ -1394,7 +1395,7 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       GROUP BY TRIM(UNNEST(string_to_array(required_skills, ',')))
     `);
 
-    console.log('📊 Job Postings Skills:', jobPostingsResult.rows);
+    logger.debug('📊 Job Postings Skills:', jobPostingsResult.rows);
 
     // 2. Get skills from associate freelancer requests (TEXT[] field - proper array)
     const associateRequestsResult = await db.query(`
@@ -1409,7 +1410,7 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       GROUP BY UNNEST(required_skills)
     `);
 
-    console.log('📊 Associate Requests Skills:', associateRequestsResult.rows);
+    logger.debug('📊 Associate Requests Skills:', associateRequestsResult.rows);
 
     // 3. Get skills from project descriptions in Freelancer_Hire (TEXT field - might contain skills)
     const projectDescriptionsResult = await db.query(`
@@ -1425,7 +1426,7 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       GROUP BY TRIM(UNNEST(string_to_array(project_description, ' ')))
     `);
 
-    console.log('📊 Project Descriptions Skills:', projectDescriptionsResult.rows);
+    logger.debug('📊 Project Descriptions Skills:', projectDescriptionsResult.rows);
 
     // 4. Get skills from job descriptions in Job_Posting (TEXT field - might contain skills)
     const jobDescriptionsResult = await db.query(`
@@ -1441,7 +1442,7 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       GROUP BY TRIM(UNNEST(string_to_array(description, ' ')))
     `);
 
-    console.log('📊 Job Descriptions Skills:', jobDescriptionsResult.rows);
+    logger.debug('📊 Job Descriptions Skills:', jobDescriptionsResult.rows);
 
     // Combine and aggregate the data from ALL sources
     const demandMap = new Map();
@@ -1484,7 +1485,7 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       }
     });
 
-    console.log('📊 Combined Demand Map from ALL sources:', Array.from(demandMap.entries()));
+    logger.debug('📊 Combined Demand Map from ALL sources:', Array.from(demandMap.entries()));
 
     // Convert to array and sort by count
     const demandData = Array.from(demandMap.entries())
@@ -1496,15 +1497,15 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
       .sort((a, b) => b.count - a.count)
       .slice(0, 10); // Top 10
 
-    console.log('📊 Final Skills Demand Data:', demandData);
+    logger.debug('📊 Final Skills Demand Data:', demandData);
 
     return res.status(200).json({
       success: true,
       data: demandData
     });
   } catch (error) {
-    console.error('❌ Analytics skills demand error:', error);
-    console.error('❌ Error details:', {
+    logger.error('❌ Analytics skills demand error:', error);
+    logger.error('❌ Error details:', {
       message: error.message,
       code: error.code,
       detail: error.detail
@@ -1519,7 +1520,7 @@ router.get('/analytics/skills-demand', authenticateToken, requireRole(['admin'])
 // Test endpoint to check skills demand data structure from ALL sources
 router.get('/analytics/skills-demand-test', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔍 Testing skills demand data structure from ALL sources...');
+    logger.debug('🔍 Testing skills demand data structure from ALL sources...');
     
     // Check all table structures
     const jobPostingsStructure = await db.query(`
@@ -1617,7 +1618,7 @@ router.get('/analytics/skills-demand-test', authenticateToken, requireRole(['adm
       }
     });
   } catch (error) {
-    console.error('❌ Skills demand test error:', error);
+    logger.error('❌ Skills demand test error:', error);
     return res.status(500).json({
       success: false,
       error: error.message
@@ -1680,7 +1681,7 @@ router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']
       data: trends
     });
   } catch (error) {
-    console.error('Analytics message trends error:', error);
+    logger.error('Analytics message trends error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch message trends',
@@ -1727,7 +1728,7 @@ router.get('/analytics/user-communication-activity', authenticateToken, requireR
       }))
     });
   } catch (error) {
-    console.error('Analytics user communication activity error:', error);
+    logger.error('Analytics user communication activity error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch user communication activity',
@@ -1798,7 +1799,7 @@ router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole
       data: hiredTrends
     });
   } catch (error) {
-    console.error('Analytics hired freelancers trends error:', error);
+    logger.error('Analytics hired freelancers trends error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch hired freelancers trends',
@@ -1812,14 +1813,14 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
   try {
     const { days = 90 } = req.query;
     
-    console.log('📊 Visitor data API called with days parameter:', days);
+    logger.debug('📊 Visitor data API called with days parameter:', days);
     
     // Calculate date range based on days parameter
     const endDate = new Date(); // Today
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - parseInt(days));
     
-    console.log('📅 Date range calculation:', {
+    logger.debug('📅 Date range calculation:', {
       days: parseInt(days),
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString()
@@ -1861,10 +1862,10 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
         },
         ...visitorData
       ];
-      console.log('📊 Added yesterday data point for line chart visibility');
+      logger.debug('📊 Added yesterday data point for line chart visibility');
     }
 
-    console.log('📊 Real visitor tracking data:', {
+    logger.debug('📊 Real visitor tracking data:', {
       totalRows: result.rows.length,
       finalDataPoints: finalData.length,
       dateRange: finalData.length > 0 ? {
@@ -1880,7 +1881,7 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
       data: finalData
     });
   } catch (error) {
-    console.error('Analytics visitor data error:', error);
+    logger.error('Analytics visitor data error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch visitor data',
@@ -1896,7 +1897,7 @@ router.get('/analytics/visitor-data', authenticateToken, requireRole(['admin']),
 // Get System Performance Report
 router.get('/reports/performance', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('📊 Generating system performance report with real data...');
+    logger.debug('📊 Generating system performance report with real data...');
     
     // Get real database connection metrics
     const connectionResult = await db.query(`
@@ -1923,7 +1924,7 @@ router.get('/reports/performance', authenticateToken, requireRole(['admin']), as
         WHERE calls > 0
       `);
     } catch (error) {
-      console.log('⚠️ pg_stat_statements not available, using stored metrics');
+      logger.debug('⚠️ pg_stat_statements not available, using stored metrics');
       // Get metrics from our performance monitoring tables
       queryPerformanceResult = await db.query(`
         SELECT 
@@ -2141,9 +2142,9 @@ router.get('/reports/performance', authenticateToken, requireRole(['admin']), as
         parseInt(systemResources.memoryUsage) < 70 ? 'excellent' : 'good',
         JSON.stringify({ timestamp: new Date().toISOString() })
       ]);
-      console.log('✅ Performance metrics updated in database');
+      logger.debug('✅ Performance metrics updated in database');
     } catch (error) {
-      console.log('⚠️ Failed to update performance metrics:', error.message);
+      logger.debug('⚠️ Failed to update performance metrics:', error.message);
       // Continue without failing the entire report
     }
 
@@ -2156,14 +2157,14 @@ router.get('/reports/performance', authenticateToken, requireRole(['admin']), as
       lastUpdated: new Date().toISOString()
     };
 
-    console.log('✅ Real performance data generated and stored:', performanceData);
+    logger.debug('✅ Real performance data generated and stored:', performanceData);
 
     return res.status(200).json({
       success: true,
       data: performanceData
     });
   } catch (error) {
-    console.error('Performance report error:', error);
+    logger.error('Performance report error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate performance report',
@@ -2175,7 +2176,7 @@ router.get('/reports/performance', authenticateToken, requireRole(['admin']), as
 // Get Business Intelligence Report
 router.get('/reports/business', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('📈 Generating business intelligence report...');
+    logger.debug('📈 Generating business intelligence report...');
     
     // Get user growth metrics
     const userGrowthResult = await db.query(`
@@ -2228,7 +2229,7 @@ router.get('/reports/business', authenticateToken, requireRole(['admin']), async
       data: businessData
     });
   } catch (error) {
-    console.error('Business intelligence report error:', error);
+    logger.error('Business intelligence report error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate business intelligence report',
@@ -2240,7 +2241,7 @@ router.get('/reports/business', authenticateToken, requireRole(['admin']), async
 // Get Security & Compliance Report
 router.get('/reports/security', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔒 Generating comprehensive security & compliance report...');
+    logger.debug('🔒 Generating comprehensive security & compliance report...');
     
     // Get real-time security overview from database
     const securityOverviewResult = await db.query(`
@@ -2395,7 +2396,7 @@ router.get('/reports/security', authenticateToken, requireRole(['admin']), async
       data: securityData
     });
   } catch (error) {
-    console.error('Security report error:', error);
+    logger.error('Security report error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate security report',
@@ -2407,7 +2408,7 @@ router.get('/reports/security', authenticateToken, requireRole(['admin']), async
 // Get Operational Report
 router.get('/reports/operations', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('⚙️ Generating real-time operational report...');
+    logger.debug('⚙️ Generating real-time operational report...');
     
     // Get real workflow efficiency metrics from message activity
     const workflowResult = await db.query(`
@@ -2521,7 +2522,7 @@ router.get('/reports/operations', authenticateToken, requireRole(['admin']), asy
       data: operationsData
     });
   } catch (error) {
-    console.error('Operational report error:', error);
+    logger.error('Operational report error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate operational report',
@@ -2537,7 +2538,7 @@ router.get('/reports/operations', authenticateToken, requireRole(['admin']), asy
 // Get Real-time Security Dashboard
 router.get('/security/dashboard', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔒 Generating real-time security dashboard...');
+    logger.debug('🔒 Generating real-time security dashboard...');
     
     // Get real-time security metrics
     const securityMetrics = await db.query(`
@@ -2592,7 +2593,7 @@ router.get('/security/dashboard', authenticateToken, requireRole(['admin']), asy
       data: securityData
     });
   } catch (error) {
-    console.error('Security dashboard error:', error);
+    logger.error('Security dashboard error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate security dashboard',
@@ -2604,7 +2605,7 @@ router.get('/security/dashboard', authenticateToken, requireRole(['admin']), asy
 // Get Communication Analysis Report
 router.get('/security/communications', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('💬 Generating communication analysis report...');
+    logger.debug('💬 Generating communication analysis report...');
     
     const { days = 7, userType = 'all' } = req.query;
     
@@ -2706,7 +2707,7 @@ router.get('/security/communications', authenticateToken, requireRole(['admin'])
       data: communicationData
     });
   } catch (error) {
-    console.error('Communication analysis error:', error);
+    logger.error('Communication analysis error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate communication analysis',
@@ -2718,7 +2719,7 @@ router.get('/security/communications', authenticateToken, requireRole(['admin'])
 // Get System Audit Log
 router.get('/security/audit-log', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('📋 Generating system audit log...');
+    logger.debug('📋 Generating system audit log...');
     
     const { days = 30, action = 'all' } = req.query;
     
@@ -2791,7 +2792,7 @@ router.get('/security/audit-log', authenticateToken, requireRole(['admin']), asy
       data: auditData
     });
   } catch (error) {
-    console.error('Audit log error:', error);
+    logger.error('Audit log error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate audit log',
@@ -2812,7 +2813,7 @@ router.post('/security/flag-message', authenticateToken, requireRole(['admin']),
       });
     }
 
-    console.log(`🚩 Flagging message ${messageId} with reason: ${flagReason}`);
+    logger.debug(`🚩 Flagging message ${messageId} with reason: ${flagReason}`);
 
     // This would update a message_flags table or add a flag column to Message table
     // For now, we'll just return success
@@ -2831,7 +2832,7 @@ router.post('/security/flag-message', authenticateToken, requireRole(['admin']),
       data: flagData
     });
   } catch (error) {
-    console.error('Flag message error:', error);
+    logger.error('Flag message error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to flag message',
@@ -2843,7 +2844,7 @@ router.post('/security/flag-message', authenticateToken, requireRole(['admin']),
 // Get Threat Intelligence Summary
 router.get('/security/threat-intelligence', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🕵️ Generating threat intelligence summary...');
+    logger.debug('🕵️ Generating threat intelligence summary...');
     
     // Get threat patterns from recent activity
     const threatPatterns = await db.query(`
@@ -2902,7 +2903,7 @@ router.get('/security/threat-intelligence', authenticateToken, requireRole(['adm
       data: threatData
     });
   } catch (error) {
-    console.error('Threat intelligence error:', error);
+    logger.error('Threat intelligence error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate threat intelligence',
@@ -2918,7 +2919,7 @@ router.get('/security/threat-intelligence', authenticateToken, requireRole(['adm
 // Get Real-time Security Dashboard
 router.get('/security/dashboard', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🔒 Generating real-time security dashboard...');
+    logger.debug('🔒 Generating real-time security dashboard...');
     
     // Get real-time security metrics
     const securityMetrics = await db.query(`
@@ -2973,7 +2974,7 @@ router.get('/security/dashboard', authenticateToken, requireRole(['admin']), asy
       data: securityData
     });
   } catch (error) {
-    console.error('Security dashboard error:', error);
+    logger.error('Security dashboard error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate security dashboard',
@@ -2985,7 +2986,7 @@ router.get('/security/dashboard', authenticateToken, requireRole(['admin']), asy
 // Get Communication Analysis Report
 router.get('/security/communications', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('💬 Generating communication analysis report...');
+    logger.debug('💬 Generating communication analysis report...');
     
     const { days = 7, userType = 'all' } = req.query;
     
@@ -3087,7 +3088,7 @@ router.get('/security/communications', authenticateToken, requireRole(['admin'])
       data: communicationData
     });
   } catch (error) {
-    console.error('Communication analysis error:', error);
+    logger.error('Communication analysis error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate communication analysis',
@@ -3099,7 +3100,7 @@ router.get('/security/communications', authenticateToken, requireRole(['admin'])
 // Get System Audit Log
 router.get('/security/audit-log', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('📋 Generating system audit log...');
+    logger.debug('📋 Generating system audit log...');
     
     const { days = 30, action = 'all' } = req.query;
     
@@ -3172,7 +3173,7 @@ router.get('/security/audit-log', authenticateToken, requireRole(['admin']), asy
       data: auditData
     });
   } catch (error) {
-    console.error('Audit log error:', error);
+    logger.error('Audit log error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate audit log',
@@ -3193,7 +3194,7 @@ router.post('/security/flag-message', authenticateToken, requireRole(['admin']),
       });
     }
 
-    console.log(`🚩 Flagging message ${messageId} with reason: ${flagReason}`);
+    logger.debug(`🚩 Flagging message ${messageId} with reason: ${flagReason}`);
 
     // This would update a message_flags table or add a flag column to Message table
     // For now, we'll just return success
@@ -3212,7 +3213,7 @@ router.post('/security/flag-message', authenticateToken, requireRole(['admin']),
       data: flagData
     });
   } catch (error) {
-    console.error('Flag message error:', error);
+    logger.error('Flag message error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to flag message',
@@ -3224,7 +3225,7 @@ router.post('/security/flag-message', authenticateToken, requireRole(['admin']),
 // Get Threat Intelligence Summary
 router.get('/security/threat-intelligence', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🕵️ Generating threat intelligence summary...');
+    logger.debug('🕵️ Generating threat intelligence summary...');
     
     // Get threat patterns from recent activity
     const threatPatterns = await db.query(`
@@ -3283,7 +3284,7 @@ router.get('/security/threat-intelligence', authenticateToken, requireRole(['adm
       data: threatData
     });
   } catch (error) {
-    console.error('Threat intelligence error:', error);
+    logger.error('Threat intelligence error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate threat intelligence',
@@ -3299,7 +3300,7 @@ router.get('/security/threat-intelligence', authenticateToken, requireRole(['adm
 // Get System Health Metrics
 router.get('/performance/system-health', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('💻 Generating system health metrics...');
+    logger.debug('💻 Generating system health metrics...');
     
     // This would come from actual system monitoring
     // For now, we'll simulate realistic system data
@@ -3319,7 +3320,7 @@ router.get('/performance/system-health', authenticateToken, requireRole(['admin'
       data: systemHealth
     });
   } catch (error) {
-    console.error('System health error:', error);
+    logger.error('System health error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate system health metrics',
@@ -3331,7 +3332,7 @@ router.get('/performance/system-health', authenticateToken, requireRole(['admin'
 // Get Database Performance Metrics
 router.get('/performance/database', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('🗄️ Generating database performance metrics...');
+    logger.debug('🗄️ Generating database performance metrics...');
     
     // Get actual database connection pool info
     const connectionPool = await db.query(`
@@ -3379,7 +3380,7 @@ router.get('/performance/database', authenticateToken, requireRole(['admin']), a
       data: dbMetrics
     });
   } catch (error) {
-    console.error('Database performance error:', error);
+    logger.error('Database performance error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate database performance metrics',
@@ -3391,7 +3392,7 @@ router.get('/performance/database', authenticateToken, requireRole(['admin']), a
 // Get API Performance Metrics
 router.get('/performance/api-metrics', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('📡 Generating API performance metrics...');
+    logger.debug('📡 Generating API performance metrics...');
     
     // This would come from actual API monitoring/logs
     // For now, we'll simulate realistic API data
@@ -3420,7 +3421,7 @@ router.get('/performance/api-metrics', authenticateToken, requireRole(['admin'])
       data: apiMetrics
     });
   } catch (error) {
-    console.error('API performance error:', error);
+    logger.error('API performance error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate API performance metrics',
@@ -3432,7 +3433,7 @@ router.get('/performance/api-metrics', authenticateToken, requireRole(['admin'])
 // Get User Experience Metrics
 router.get('/performance/user-experience', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    console.log('👥 Generating user experience metrics...');
+    logger.debug('👥 Generating user experience metrics...');
     
     // This would come from actual user analytics and feedback
     // For now, we'll simulate realistic UX data
@@ -3462,7 +3463,7 @@ router.get('/performance/user-experience', authenticateToken, requireRole(['admi
       data: userExperience
     });
   } catch (error) {
-    console.error('User experience error:', error);
+    logger.error('User experience error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate user experience metrics',
@@ -3481,7 +3482,7 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
     const { timeRange = '30' } = req.query; // Default to last 30 days
     const days = parseInt(timeRange);
     
-    console.log(`🔍 ECS Admin fetching interview feedback analytics for last ${days} days`);
+    logger.debug(`🔍 ECS Admin fetching interview feedback analytics for last ${days} days`);
 
     // Calculate date range
     const startDate = new Date();
@@ -3613,12 +3614,12 @@ router.get('/analytics/interview-feedback', authenticateToken, requireRole(['adm
       }
     };
 
-    console.log(`✅ Interview analytics fetched: ${stats.total_interviews} interviews, ${stats.total_feedback_submissions} feedback submissions`);
+    logger.debug(`✅ Interview analytics fetched: ${stats.total_interviews} interviews, ${stats.total_feedback_submissions} feedback submissions`);
 
     return res.status(200).json(response);
 
   } catch (error) {
-    console.error('Interview feedback analytics error:', error);
+    logger.error('Interview feedback analytics error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch interview feedback analytics',
@@ -3633,7 +3634,7 @@ router.get('/analytics/interview-feedback/detailed', authenticateToken, requireR
     const { limit = 100, offset = 0, timeRange = '30' } = req.query;
     const days = parseInt(timeRange);
     
-    console.log(`🔍 ECS Admin fetching detailed interview feedback data`);
+    logger.debug(`🔍 ECS Admin fetching detailed interview feedback data`);
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -3707,7 +3708,7 @@ router.get('/analytics/interview-feedback/detailed', authenticateToken, requireR
     });
 
   } catch (error) {
-    console.error('Detailed interview feedback error:', error);
+    logger.error('Detailed interview feedback error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch detailed interview feedback data',
