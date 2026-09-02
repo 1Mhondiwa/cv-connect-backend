@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 
 // FIXED VERSION - Handles PostgreSQL JSON aggregation properly
 router.get('/freelancers', authenticateToken, requireRole(['associate', 'admin']), async (req, res) => {
@@ -82,8 +83,8 @@ router.get('/freelancers', authenticateToken, requireRole(['associate', 'admin']
       ${whereClause}
     `;
     
-    console.log('Count Query:', countQuery);
-    console.log('Count Parameters:', params);
+    logger.debug('Count Query:', countQuery);
+    logger.debug('Count Parameters:', params);
     
     const countResult = await db.query(countQuery, params);
     const totalCount = parseInt(countResult.rows[0].count || '0');
@@ -101,8 +102,8 @@ router.get('/freelancers', authenticateToken, requireRole(['associate', 'admin']
     // Add pagination parameters
     const finalParams = [...params, parseInt(limit), offset];
     
-    console.log('Search Query:', searchQuery);
-    console.log('Search Parameters:', finalParams);
+    logger.debug('Search Query:', searchQuery);
+    logger.debug('Search Parameters:', finalParams);
     
     const searchResult = await db.query(searchQuery, finalParams);
     
@@ -145,9 +146,9 @@ router.get('/freelancers', authenticateToken, requireRole(['associate', 'admin']
     });
     
   } catch (error) {
-    console.error('Search error:', error);
-    console.error('Error details:', error.message);
-    console.error('Error stack:', error.stack);
+    logger.error('Search error:', error);
+    logger.error('Error details:', error.message);
+    logger.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -292,7 +293,7 @@ router.get('/freelancers-single-query', authenticateToken, requireRole(['associa
     });
     
   } catch (error) {
-    console.error('Search error:', error);
+    logger.error('Search error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -374,7 +375,7 @@ router.get('/freelancers/:id', authenticateToken, requireRole(['associate', 'adm
       freelancer: freelancerDetails
     });
   } catch (error) {
-    console.error('Get freelancer error:', error);
+    logger.error('Get freelancer error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -462,7 +463,7 @@ router.get('/freelancers/by-skill/:skillId', authenticateToken, requireRole(['as
       }
     });
   } catch (error) {
-    console.error('Search by skill error:', error);
+    logger.error('Search by skill error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -487,7 +488,7 @@ router.get('/skills', authenticateToken, requireRole(['associate', 'admin']), as
       skills: skillsResult.rows
     });
   } catch (error) {
-    console.error('Get skills error:', error);
+    logger.error('Get skills error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -575,7 +576,7 @@ router.get('/associates', authenticateToken, requireRole(['freelancer', 'admin']
     });
     
   } catch (error) {
-    console.error('Search associates error:', error);
+    logger.error('Search associates error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',

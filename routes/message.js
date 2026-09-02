@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 
 // Create a new conversation
 router.post('/conversations', authenticateToken, async (req, res) => {
@@ -11,13 +12,13 @@ router.post('/conversations', authenticateToken, async (req, res) => {
     const userType = req.user.user_type;
     const { recipient_id, freelancer_id } = req.body;
     
-    console.log('🔍 Creating conversation:', { userId, userType, recipient_id, freelancer_id });
+    logger.debug('🔍 Creating conversation:', { userId, userType, recipient_id, freelancer_id });
     
     // Handle both parameter names for backward compatibility
     const targetId = recipient_id || freelancer_id;
     
     if (!targetId) {
-      console.log('❌ Missing target ID');
+      logger.debug('❌ Missing target ID');
       return res.status(400).json({
         success: false,
         message: 'Recipient ID or Freelancer ID is required'
@@ -28,7 +29,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
     
     // Determine which user is the freelancer and which is the associate
     if (userType === 'freelancer') {
-      console.log('👤 Current user is freelancer, target is associate');
+      logger.debug('👤 Current user is freelancer, target is associate');
       // Current user is the freelancer
       const freelancerResult = await db.query(
         'SELECT freelancer_id FROM "Freelancer" WHERE user_id = $1',
@@ -36,7 +37,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       );
       
       if (freelancerResult.rowCount === 0) {
-        console.log('❌ Freelancer profile not found for user:', userId);
+        logger.debug('❌ Freelancer profile not found for user:', userId);
         return res.status(404).json({
           success: false,
           message: 'Freelancer profile not found'
@@ -52,7 +53,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       );
       
       if (recipientUserResult.rowCount === 0) {
-        console.log('❌ Associate not found for ID:', targetId);
+        logger.debug('❌ Associate not found for ID:', targetId);
         return res.status(404).json({
           success: false,
           message: 'Associate not found'
@@ -61,7 +62,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       
       associateId = targetId;
     } else if (userType === 'associate') {
-      console.log('👤 Current user is associate, target is freelancer');
+      logger.debug('👤 Current user is associate, target is freelancer');
       // Current user is the associate
       const associateResult = await db.query(
         'SELECT associate_id FROM "Associate" WHERE user_id = $1',
@@ -69,7 +70,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       );
       
       if (associateResult.rowCount === 0) {
-        console.log('❌ Associate profile not found for user:', userId);
+        logger.debug('❌ Associate profile not found for user:', userId);
         return res.status(404).json({
           success: false,
           message: 'Associate profile not found'
@@ -85,7 +86,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       );
       
       if (recipientUserResult.rowCount === 0) {
-        console.log('❌ Freelancer not found for ID:', targetId);
+        logger.debug('❌ Freelancer not found for ID:', targetId);
         return res.status(404).json({
           success: false,
           message: 'Freelancer not found'
@@ -94,14 +95,14 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       
       freelancerId = targetId;
     } else {
-      console.log('❌ Invalid user type:', userType);
+      logger.debug('❌ Invalid user type:', userType);
       return res.status(403).json({
         success: false,
         message: 'Only freelancers and associates can create conversations'
       });
     }
     
-    console.log('✅ IDs determined:', { freelancerId, associateId });
+    logger.debug('✅ IDs determined:', { freelancerId, associateId });
     
     // Check if conversation already exists
     const existingConversationResult = await db.query(
@@ -111,7 +112,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
     
     if (existingConversationResult.rowCount > 0) {
       const conversationId = existingConversationResult.rows[0].conversation_id;
-      console.log('✅ Conversation already exists:', conversationId);
+      logger.debug('✅ Conversation already exists:', conversationId);
       return res.status(200).json({
         success: true,
         message: 'Conversation already exists',
@@ -120,21 +121,21 @@ router.post('/conversations', authenticateToken, async (req, res) => {
     }
     
     // Create new conversation
-    console.log('🆕 Creating new conversation...');
+    logger.debug('🆕 Creating new conversation...');
     const conversationResult = await db.query(
       'INSERT INTO "Conversation" (freelancer_id, associate_id, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()) RETURNING conversation_id',
       [freelancerId, associateId]
     );
     
     const conversationId = conversationResult.rows[0].conversation_id;
-    console.log('✅ New conversation created:', conversationId);
+    logger.debug('✅ New conversation created:', conversationId);
     return res.status(201).json({
       success: true,
       message: 'Conversation created successfully',
       conversation: { conversation_id: conversationId }
     });
   } catch (error) {
-    console.error('❌ Create conversation error:', error);
+    logger.error('❌ Create conversation error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -261,7 +262,7 @@ router.get('/conversations', authenticateToken, async (req, res) => {
       conversations: conversations.rows
     });
   } catch (error) {
-    console.error('Get conversations error:', error);
+    logger.error('Get conversations error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -369,7 +370,7 @@ router.get('/conversations/:id/messages', authenticateToken, async (req, res) =>
       }
     });
   } catch (error) {
-    console.error('Get messages error:', error);
+    logger.error('Get messages error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -441,7 +442,7 @@ router.post('/conversations/:id/messages', authenticateToken, async (req, res) =
       data: messageResult.rows[0]
     });
   } catch (error) {
-    console.error('Send message error:', error);
+    logger.error('Send message error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -490,7 +491,7 @@ router.delete('/messages/:id', authenticateToken, async (req, res) => {
       message: 'Message deleted successfully'
     });
   } catch (error) {
-    console.error('Delete message error:', error);
+    logger.error('Delete message error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -549,7 +550,7 @@ router.put('/conversations/:id/read', authenticateToken, async (req, res) => {
       count: result.rowCount
     });
   } catch (error) {
-    console.error('Mark as read error:', error);
+    logger.error('Mark as read error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -636,7 +637,7 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
       conversations: conversationUnreadResult.rows
     });
   } catch (error) {
-    console.error('Unread count error:', error);
+    logger.error('Unread count error:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
