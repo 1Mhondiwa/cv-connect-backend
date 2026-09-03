@@ -2,7 +2,6 @@
 const db = require('../config/database');
 const logger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLogger');
-const { v4: uuidv4 } = require('uuid');
 const NotificationService = require('../services/notificationService');
 
 // Schedule a new interview
@@ -11,15 +10,17 @@ const scheduleInterview = async (req, res) => {
   
   try {
     const userId = req.user.user_id;
+    // Note: duration_minutes and invitation_message are intentionally not
+    // destructured — the Interview INSERT does not persist them (no matching
+    // columns confirmed in the schema). The frontend scheduling modal sends
+    // them, but they are currently ignored server-side.
     const { 
       request_id, 
       freelancer_id, 
       interview_type = 'video',
       scheduled_date,
-      duration_minutes = 60,
       location = null,
-      interview_notes = null,
-      invitation_message = null
+      interview_notes = null
     } = req.body;
 
     logger.debug(`Associate ${userId} scheduling interview with freelancer ${freelancer_id} for request ${request_id}`);
@@ -704,8 +705,6 @@ const updateInterviewStatus = async (req, res) => {
         message: 'Interview not found or access denied'
       });
     }
-
-    const interview = interviewResult.rows[0];
 
     // Update interview status and notes
     const updateFields = ['status = $1', 'updated_at = CURRENT_TIMESTAMP'];
