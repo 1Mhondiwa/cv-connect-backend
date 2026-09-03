@@ -1533,8 +1533,6 @@ router.delete('/skills/:skillId', authenticateToken, requireRole(['freelancer'])
         });
       }
       
-      const freelancerId = freelancerResult.rows[0].freelancer_id;
-      
       // Get recent activities
       let activitiesResult = { rows: [] };
       try {

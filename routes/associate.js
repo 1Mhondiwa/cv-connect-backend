@@ -487,7 +487,6 @@ router.post('/change-password', authenticateToken, requireRole(['associate']), a
     }
     
     const currentHashedPassword = userResult.rows[0].hashed_password;
-    const hasChangedTempPassword = userResult.rows[0].has_changed_temp_password;
     
 
     

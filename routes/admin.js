@@ -1116,12 +1116,6 @@ router.put('/associate-requests/:requestId/status', authenticateToken, requireRo
 // Get registration trends with real-time dates from system start
 router.get('/analytics/registration-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    // Always start from June 19, 2025 (your system start date)
-    const startDate = new Date('2025-06-19');
-    // Ensure we include today by setting end time to end of day
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999); // Set to end of today
-    
     // Get registration data for ALL users (not just those created after June 19)
     const result = await db.query(`
       SELECT 
@@ -1653,8 +1647,6 @@ function getSkillColor(skillName) {
 // Get message trends from system start
 router.get('/analytics/message-trends', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    const { days = 90 } = req.query;
-    
     // Always start from June 19, 2025 (your system start date)
     const startDate = new Date('2025-06-19');
     const endDate = new Date(); // Today
@@ -1740,8 +1732,6 @@ router.get('/analytics/user-communication-activity', authenticateToken, requireR
 // Get hired freelancers trends analytics
 router.get('/analytics/hired-freelancers-trends', authenticateToken, requireRole(['admin', 'ecs_employee']), async (req, res) => {
   try {
-    const { days = 90 } = req.query;
-    
     // Always start from June 19, 2025 (your system start date)
     const startDate = new Date('2025-06-19');
     const endDate = new Date(); // Today
@@ -1923,8 +1913,8 @@ router.get('/reports/performance', authenticateToken, requireRole(['admin']), as
         FROM pg_stat_statements 
         WHERE calls > 0
       `);
-    } catch (error) {
-      logger.debug('⚠️ pg_stat_statements not available, using stored metrics');
+    } catch {
+      logger.debug('pg_stat_statements not available, using stored metrics');
       // Get metrics from our performance monitoring tables
       queryPerformanceResult = await db.query(`
         SELECT 
