@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 // Submit associate request
 const submitAssociateRequest = async (req, res) => {
