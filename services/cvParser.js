@@ -2,7 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
-const nlp = require('compromise');
 const mammoth = require('mammoth');
 const logger = require('../utils/logger');
 
@@ -130,7 +129,7 @@ class CVParser {
   }
 
   // Unified text cleaning method
-  cleanExtractedText(text, sourceType) {
+  cleanExtractedText(text, _sourceType) {
     if (!text) return '';
     
     // Normalize line endings
@@ -471,7 +470,7 @@ class CVParser {
     }
 
     const lines = text.split('\n').filter(line => line.trim().length > 0);
-    let skills = [];
+    let skills;
     
     logger.cv('Starting skills extraction...');
     
@@ -1889,8 +1888,6 @@ class CVParser {
   }
 
   isDefinitelyNotWorkExperienceSection(line, lines, index) {
-    const lowerLine = line.toLowerCase().trim();
-    
     // Check if we're in a clearly defined non-work section
     const nonWorkSections = [
       'education', 'academic background', 'qualifications', 'degrees',

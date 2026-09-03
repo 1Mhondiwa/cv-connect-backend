@@ -1,6 +1,5 @@
 // Logging utility for CV-Connect backend
 const isDevelopment = process.env.NODE_ENV === 'development';
-const isProduction = process.env.NODE_ENV === 'production';
 
 class Logger {
   constructor() {

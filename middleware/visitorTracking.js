@@ -72,11 +72,10 @@ const trackVisitor = async (req, res, next) => {
       // Try to extract user from JWT token if present
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
         // Note: In a real implementation, you'd verify the JWT token here
         // For now, we'll track as anonymous
       }
-    } catch (error) {
+    } catch {
       // Ignore token extraction errors
     }
     

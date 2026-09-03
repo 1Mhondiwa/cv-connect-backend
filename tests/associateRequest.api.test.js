@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const { app } = require('../app');
 const db = require('../config/database');
 
-const tokenFor = (userId, userType) =>
+const tokenFor = (userId, _userType) =>
   jwt.sign({ userId }, process.env.JWT_SECRET);
 
 const adminRow = (id = 1) => ({
