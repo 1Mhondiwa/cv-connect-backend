@@ -2,7 +2,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const db = require('../config/database');
 const logger = require('../utils/logger');
 const NotificationService = require('../services/notificationService');
 const {

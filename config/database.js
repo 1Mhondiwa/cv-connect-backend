@@ -22,15 +22,15 @@ const pool = new Pool({
 });
 
 // Pool event handlers for monitoring
-pool.on('connect', (client) => {
+pool.on('connect', (_client) => {
   logger.debug('New client connected to database pool');
 });
 
-pool.on('error', (err, client) => {
+pool.on('error', (err, _client) => {
   logger.error('Unexpected error on idle client', err);
 });
 
-pool.on('remove', (client) => {
+pool.on('remove', (_client) => {
   logger.debug('Client removed from database pool');
 });
 

@@ -174,7 +174,7 @@ const optionalAuth = async (req, res, next) => {
       req.user = userResult.rows[0];
     }
     next();
-  } catch (error) {
+  } catch {
     req.user = null;
     next();
   }

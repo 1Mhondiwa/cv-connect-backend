@@ -57,9 +57,10 @@ class NotificationService {
   }
 
   // Create interview scheduled notification
+  // Note: callers may pass associate_user_id, but only the freelancer is
+  // notified here — the associate scheduled it and needs no notification.
   static async createInterviewScheduledNotification({
     freelancer_user_id,
-    associate_user_id,
     interview_id,
     interview_type,
     scheduled_date,
