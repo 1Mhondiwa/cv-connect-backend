@@ -7,6 +7,18 @@ const { app } = require('./app');
 
 const scheduledNotificationProcessor = require('./services/scheduledNotificationProcessor');
 const contractScheduler = require('./services/contractScheduler');
+const { validateEnv } = require('./utils/envValidator');
+
+// Fail fast on missing configuration before binding any ports or pools
+try {
+  const { warnings } = validateEnv();
+  for (const warning of warnings) {
+    logger.warn(warning);
+  }
+} catch (error) {
+  logger.error(error.message);
+  process.exit(1);
+}
 
 // Initialize http server + socket.io
 const server = http.createServer(app);
