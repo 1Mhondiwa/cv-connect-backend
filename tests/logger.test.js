@@ -4,7 +4,7 @@
 
 describe('logger level gating', () => {
   let logger;
-
+//
   const loadLogger = () => {
     let resolved;
     jest.isolateModules(() => {
